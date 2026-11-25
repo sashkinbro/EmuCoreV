@@ -23,6 +23,7 @@
 #include <renderer/vulkan/depth_stencil_model.h>
 #include <shader/uniform_block.h>
 #include <renderer/vulkan/frame_command_buffer_cursor.h>
+#include <renderer/vulkan/yuv_convert.h>
 #include <unordered_map>
 #include <vkutil/objects.h>
 
@@ -55,6 +56,8 @@ struct TextureCacheEntry {
     bool is_cube;
     uint16_t mip_count;
     uint32_t memory_needed;
+    // GPU side of a YUV texture (null for every other texture)
+    std::unique_ptr<YuvEntryData> yuv;
 };
 
 struct VKTextureCache : public TextureCache {
@@ -78,6 +81,9 @@ struct VKTextureCache : public TextureCache {
     vk::CommandBuffer cmd_buffer = nullptr;
     bool is_texture_transfer_ready = false;
 
+    // YUV textures are converted on the GPU when the device allows it (see yuv_convert.h)
+    YuvConverter yuv_converter;
+
     VKTextureCache(VKState &state);
     // get an available staging buffer, wait for one if all are busy
     void prepare_staging_buffer(bool is_configure = false);
@@ -87,6 +93,7 @@ struct VKTextureCache : public TextureCache {
     void configure_texture(const SceGxmTexture &texture) override;
     void upload_texture_impl(SceGxmTextureBaseFormat base_format, uint32_t width, uint32_t height, uint32_t mip_index, const void *pixels, int face, uint32_t pixels_per_stride) override;
     void upload_done() override;
+    bool upload_yuv_gpu(const SceGxmTexture &texture, SceGxmTextureBaseFormat base_format, const uint8_t *src, uint32_t width, uint32_t height, uint32_t stride_pixels, uint32_t layout_width, uint32_t layout_height) override;
     void configure_sampler(size_t index, const SceGxmTexture &texture, bool no_linear) override;
 
     bool format_supports_linear_filter(vk::Format format);

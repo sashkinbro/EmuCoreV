@@ -31,7 +31,9 @@ add_library(
 	src/vulkan/surface_cache_snapshot.cpp
 	src/vulkan/surface_cache_snapshot_codec.cpp
 	src/vulkan/sync_state.cpp
+	src/vulkan/sampler_support.cpp
 	src/vulkan/texture.cpp
+	src/vulkan/yuv_convert.cpp
 
 	src/texture/cache.cpp
 	src/texture/format.cpp

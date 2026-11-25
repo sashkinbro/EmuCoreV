@@ -788,6 +788,10 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         }
 #endif
 
+        // mirror-clamp address mode and YCbCr conversion (P4/P6), see sampler_support.cpp
+        vk::PhysicalDeviceSamplerYcbcrConversionFeatures ycbcr_features{};
+        select_sampler_device_support(physical_device, physical_device.enumerateDeviceExtensionProperties(), device_extensions, sampler_device_support, ycbcr_features);
+
         bool support_memory_mapping = true;
         const bool has_features2_khr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceFeatures2KHR != nullptr;
         support_buffer_device_address &= has_features2_khr;
@@ -955,6 +959,11 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         if (!support_device_fault)
             device_info.unlink<vk::PhysicalDeviceFaultFeaturesEXT>();
 
+        if (sampler_device_support.ycbcr_conversion) {
+            ycbcr_features.pNext = const_cast<void *>(device_info.get().pNext);
+            device_info.get().pNext = &ycbcr_features;
+        }
+
         try {
             device = physical_device.createDevice(device_info.get());
         } catch (vk::NotPermittedError &) {
@@ -967,6 +976,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             device = physical_device.createDevice(device_info.get());
         }
         VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
+        sampler_support = make_sampler_support(physical_device_properties, enabled_features, sampler_device_support);
     }
 
     // Get Queues

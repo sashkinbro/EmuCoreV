@@ -21,6 +21,7 @@
 #include <cpu/functions.h>
 #include <renderer/profile.h>
 #include <renderer/texture_cache.h>
+#include <renderer/yuv.h>
 
 #include <gxm/functions.h>
 #include <mem/functions.h>
@@ -340,11 +341,6 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
     const SceGxmTextureFormat fmt = gxm::get_format(gxm_texture);
     const SceGxmTextureBaseFormat base_format = gxm::get_base_format(fmt);
 
-    if (base_format == SCE_GXM_TEXTURE_BASE_FORMAT_YUV422) {
-        LOG_ERROR_ONCE("Unimplemented YUV format 0x{:0X}, please report it to the developers.", fmt::underlying(base_format));
-        return;
-    }
-
     uint32_t width = gxm::get_width(gxm_texture);
     uint32_t height = gxm::get_height(gxm_texture);
 
@@ -552,14 +548,33 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
             upload_format = SCE_GXM_TEXTURE_BASE_FORMAT_F32;
             break;
         case SCE_GXM_TEXTURE_BASE_FORMAT_YUV420P2:
-        case SCE_GXM_TEXTURE_BASE_FORMAT_YUV420P3:
+        case SCE_GXM_TEXTURE_BASE_FORMAT_YUV420P3: {
+            const uint32_t swizzle = gxm_texture.swizzle_format;
+            const yuv::PlaneLayout420 planes = yuv::plane_layout_420(base_format == SCE_GXM_TEXTURE_BASE_FORMAT_YUV420P3,
+                pixels_per_stride, memory_height, pixels_per_stride, layout_width, layout_height);
+            const Address plane_address = (gxm_texture.data_addr << 2) + total_source_so_far;
+            if (!is_valid_addr_range(mem, plane_address, plane_address + planes.total_bytes)) {
+                LOG_WARN("YUV texture planes are not in valid memory (addr=0x{:08X} size={}), skipping upload", plane_address, planes.total_bytes);
+                return;
+            }
+            // GPU conversion is tried once per texture, on the first mip (a YUV texture has no usable mip chain)
+            if (mip_index == 0 && upload_yuv_gpu(gxm_texture, base_format, static_cast<const uint8_t *>(pixels), width, height,
+                    pixels_per_stride, layout_width, layout_height))
+                return;
             texture_data_decompressed.resize(pixels_per_stride * memory_height * 4);
-            yuv420_texture_to_rgb(yuv_conversion_cache, texture_data_decompressed.data(),
+            yuv420_texture_to_rgb(gxm_texture.unk2, yuv::chroma_swapped_420(swizzle), texture_data_decompressed.data(),
                 static_cast<const uint8_t *>(pixels), pixels_per_stride, memory_height, layout_width, layout_height,
                 base_format == SCE_GXM_TEXTURE_BASE_FORMAT_YUV420P3);
             pixels = texture_data_decompressed.data();
             bpp = 32;
             upload_format = SCE_GXM_TEXTURE_BASE_FORMAT_U8U8U8U8;
+            break;
+        }
+        case SCE_GXM_TEXTURE_BASE_FORMAT_YUV422:
+            // converted below, once the texture has been brought to a linear layout
+            if (mip_index == 0 && upload_yuv_gpu(gxm_texture, base_format, static_cast<const uint8_t *>(pixels), width, height,
+                    pixels_per_stride, layout_width, layout_height))
+                return;
             break;
         default:
             break;
@@ -580,6 +595,15 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
                     static_cast<std::uint8_t>(bpp));
 
             pixels = texture_pixels_lineared.data();
+        }
+
+        if (base_format == SCE_GXM_TEXTURE_BASE_FORMAT_YUV422) {
+            texture_data_decompressed.resize(pixels_per_stride * memory_height * 4);
+            yuv422_texture_to_rgb(gxm_texture.unk2, gxm_texture.swizzle_format, texture_data_decompressed.data(),
+                static_cast<const uint8_t *>(pixels), pixels_per_stride, memory_height);
+            pixels = texture_data_decompressed.data();
+            bpp = 32;
+            upload_format = SCE_GXM_TEXTURE_BASE_FORMAT_U8U8U8U8;
         }
 
         if (!support_dxt && gxm::is_bcn_format(base_format)) {
@@ -652,14 +676,16 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
 }
 
 // remove everything related to the sampler state
+// word 0 keeps bits 29-30 (SceGxmTexture::unk2): for YUV textures the renderer stores the colour space conversion
+// profile there (see renderer::set_texture), and the same data must not be shared between two profiles
 static constexpr TextureGxmDataRepr default_texture_mask = {
-    0x981E0000,
+    0xF81E0000,
     0xFFFFFFFF,
     0xFFFFFFFC,
     0xF3FFFFFF
 };
 static constexpr TextureGxmDataRepr strided_texture_mask = {
-    0x9FFE0E06,
+    0xFFFE0E06,
     0xFFFFFFFF,
     0xFFFFFFFC,
     0xF3FFFFFF
@@ -872,6 +898,8 @@ int TextureCache::cache_and_bind_sampler(const SceGxmTexture &gxm_texture, bool 
     }
 
     compact_repr |= (static_cast<uint32_t>(no_linear) << 23);
+    // unnormalized (texel unit) coordinates change how the sampler is built
+    compact_repr |= (static_cast<uint32_t>(gxm_texture.normalize_mode) << 24);
 
     auto it = sampler_lookup.find(compact_repr);
     if (it != sampler_lookup.end()) {

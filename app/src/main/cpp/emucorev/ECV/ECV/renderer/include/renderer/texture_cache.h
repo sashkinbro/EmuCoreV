@@ -35,13 +35,6 @@ struct MemState;
 enum SceGxmTextureBaseFormat : uint32_t;
 
 namespace renderer {
-struct YUVConversionCache {
-    void *sws_context = nullptr;
-    size_t width = 0;
-    size_t height = 0;
-    bool is_p3 = false;
-};
-
 enum class Backend : uint32_t;
 static constexpr size_t TextureCacheSize = 1024;
 
@@ -109,7 +102,6 @@ public:
     bool use_protect = false;
     // Scene the renderer is currently replaying
     uint64_t current_scene = 0;
-    YUVConversionCache yuv_conversion_cache;
     // use a separate sampler cache
     bool use_sampler_cache = false;
     int anisotropic_filtering = 1;
@@ -153,6 +145,9 @@ public:
     virtual void configure_texture(const SceGxmTexture &texture) = 0;
     virtual void upload_texture_impl(SceGxmTextureBaseFormat base_format, uint32_t width, uint32_t height, uint32_t mip_index, const void *pixels, int face, uint32_t pixels_per_stride) = 0;
     virtual void upload_done() {}
+    // YUV textures: try to convert the first mip on the GPU. Returns true when the whole texture was handled,
+    // false to use the CPU conversion. src is the start of the luma plane / packed macro pixels.
+    virtual bool upload_yuv_gpu(const SceGxmTexture &texture, SceGxmTextureBaseFormat base_format, const uint8_t *src, uint32_t width, uint32_t height, uint32_t stride_pixels, uint32_t layout_width, uint32_t layout_height) { return false; }
 
     virtual void configure_sampler(size_t index, const SceGxmTexture &texture, bool no_linear) {}
 

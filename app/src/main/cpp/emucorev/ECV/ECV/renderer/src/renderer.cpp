@@ -18,6 +18,7 @@
 #include <renderer/functions.h>
 #include <renderer/state.h>
 #include <renderer/types.h>
+#include <renderer/yuv.h>
 
 
 #include <atomic>
@@ -168,7 +169,18 @@ void set_cull_mode(State &state, Context *ctx, SceGxmCullMode cull) {
 }
 
 void set_texture(State &state, Context *ctx, const std::uint32_t tex_index, const SceGxmTexture tex) {
-    renderer::add_state_set_command(ctx, renderer::GXMState::Texture, tex_index, tex);
+    SceGxmTexture bound = tex;
+    const SceGxmTextureBaseFormat base_format = gxm::get_base_format(gxm::get_format(tex));
+    if (gxm::is_yuv_format(base_format)) {
+        // the conversion profile is part of what the texture means: stamp it into the copy sent to the renderer
+        const uint32_t csc = (base_format == SCE_GXM_TEXTURE_BASE_FORMAT_YUV422) ? yuv::csc_of_422(tex.swizzle_format) : yuv::csc_of_420(tex.swizzle_format);
+        bound.unk2 = ctx->yuv_profile[tex_index >= SCE_GXM_MAX_TEXTURE_UNITS ? 0 : 1][csc];
+    }
+    renderer::add_state_set_command(ctx, renderer::GXMState::Texture, tex_index, bound);
+}
+
+void set_yuv_profile(Context *ctx, bool is_fragment, uint32_t csc_index, uint8_t profile) {
+    ctx->yuv_profile[is_fragment ? 1 : 0][csc_index] = profile;
 }
 
 void set_viewport_real(State &state, Context *ctx, float xOffset, float yOffset, float zOffset, float xScale, float yScale, float zScale) {

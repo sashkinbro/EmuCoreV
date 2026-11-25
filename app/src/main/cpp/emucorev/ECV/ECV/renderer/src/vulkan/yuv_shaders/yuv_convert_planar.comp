@@ -1,0 +1,104 @@
+// YUV -> RGBA8 conversion of a GXM YUV texture (route "Shader"). Keep in sync with renderer/yuv.h (CPU reference).
+// Rebuild yuv_shaders.inc with: build_yuv_shaders.py
+#version 450
+#extension GL_EXT_samplerless_texture_functions : require
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// mode 0 (P2): plane0 = Y (R8), plane1 = interleaved chroma (RG8)
+// mode 1 (P3): plane0 = Y (R8), plane1 = first chroma plane (R8), plane2 = second chroma plane (R8)
+// mode 2 (4:2:2): plane0 = packed macro pixels (RGBA8, one texel = two horizontal pixels)
+layout(set = 0, binding = 0) uniform texture2D plane0;
+layout(set = 0, binding = 1) uniform texture2D plane1;
+layout(set = 0, binding = 2) uniform texture2D plane2;
+layout(set = 0, binding = 3, rgba8) uniform writeonly image2D dst;
+
+layout(push_constant) uniform PC {
+    vec4 yc; // y_bias, y_scale, c_bias, c_scale
+    vec4 coef; // r_v, g_u, g_v, b_u
+    ivec4 info; // width, height, mode, order
+} pc;
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    int w = pc.info.x;
+    int h = pc.info.y;
+    if (p.x >= w || p.y >= h)
+        return;
+    int mode = pc.info.z;
+    int order = pc.info.w;
+
+    float y;
+    float u;
+    float v;
+
+    if (mode == 2) {
+        int macro_count = (w + 1) / 2;
+        int i0 = min(p.x >> 1, macro_count - 1);
+        int i1 = min((p.x >> 1) + 1, macro_count - 1);
+        float fx = ((p.x & 1) != 0) ? 0.5 : 0.0;
+        vec4 m0 = texelFetch(plane0, ivec2(i0, p.y), 0);
+        vec4 m1 = texelFetch(plane0, ivec2(i1, p.y), 0);
+        // byte positions inside the macro pixel for YUYV, YVYU, UYVY, VYUY
+        int py0 = (order >= 2) ? 1 : 0;
+        int py1 = (order >= 2) ? 3 : 2;
+        int pu;
+        int pv;
+        if (order == 0) {
+            pu = 1;
+            pv = 3;
+        } else if (order == 1) {
+            pu = 3;
+            pv = 1;
+        } else if (order == 2) {
+            pu = 0;
+            pv = 2;
+        } else {
+            pu = 2;
+            pv = 0;
+        }
+        y = (((p.x & 1) != 0) ? m0[py1] : m0[py0]);
+        u = mix(m0[pu], m1[pu], fx);
+        v = mix(m0[pv], m1[pv], fx);
+    } else {
+        y = texelFetch(plane0, p, 0).r;
+        int cw = (w + 1) / 2;
+        int ch = (h + 1) / 2;
+        int x0 = min(p.x >> 1, cw - 1);
+        int x1 = min((p.x >> 1) + 1, cw - 1);
+        float fx = ((p.x & 1) != 0) ? 0.5 : 0.0;
+        float pos = float(p.y) * 0.5 - 0.25;
+        float fl = floor(pos);
+        float fyv = pos - fl;
+        int y0 = clamp(int(fl), 0, ch - 1);
+        int y1 = clamp(int(fl) + 1, 0, ch - 1);
+
+        vec2 a;
+        vec2 b;
+        vec2 c;
+        vec2 d;
+        if (mode == 0) {
+            a = texelFetch(plane1, ivec2(x0, y0), 0).rg;
+            b = texelFetch(plane1, ivec2(x1, y0), 0).rg;
+            c = texelFetch(plane1, ivec2(x0, y1), 0).rg;
+            d = texelFetch(plane1, ivec2(x1, y1), 0).rg;
+        } else {
+            a = vec2(texelFetch(plane1, ivec2(x0, y0), 0).r, texelFetch(plane2, ivec2(x0, y0), 0).r);
+            b = vec2(texelFetch(plane1, ivec2(x1, y0), 0).r, texelFetch(plane2, ivec2(x1, y0), 0).r);
+            c = vec2(texelFetch(plane1, ivec2(x0, y1), 0).r, texelFetch(plane2, ivec2(x0, y1), 0).r);
+            d = vec2(texelFetch(plane1, ivec2(x1, y1), 0).r, texelFetch(plane2, ivec2(x1, y1), 0).r);
+        }
+        vec2 chroma = mix(mix(a, b, fx), mix(c, d, fx), fyv);
+        // order 0: first plane/byte is U (YUV), order 1: V (YVU)
+        u = (order == 0) ? chroma.x : chroma.y;
+        v = (order == 0) ? chroma.y : chroma.x;
+    }
+
+    float yy = (y - pc.yc.x) * pc.yc.y;
+    float uu = (u - pc.yc.z) * pc.yc.w;
+    float vv = (v - pc.yc.z) * pc.yc.w;
+    vec3 rgb = vec3(yy + pc.coef.x * vv,
+        yy + pc.coef.y * uu + pc.coef.z * vv,
+        yy + pc.coef.w * uu);
+    imageStore(dst, p, vec4(clamp(rgb, 0.0, 1.0), 1.0));
+}

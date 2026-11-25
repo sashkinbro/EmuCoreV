@@ -1,0 +1,21 @@
+// YUV -> RGBA8 conversion of a GXM YUV texture (route "Ycbcr"): the sampler carries the VkSamplerYcbcrConversion
+// (model, range, chroma siting) as an immutable sampler, so the colour space maths is done by the sampler.
+// Rebuild yuv_shaders.inc with: build_yuv_shaders.py
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) uniform sampler2D src;
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D dst;
+
+layout(push_constant) uniform PC {
+    ivec2 size;
+} pc;
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= pc.size.x || p.y >= pc.size.y)
+        return;
+    vec2 uv = (vec2(p) + 0.5) / vec2(pc.size);
+    imageStore(dst, p, vec4(textureLod(src, uv, 0.0).rgb, 1.0));
+}

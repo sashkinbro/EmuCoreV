@@ -60,6 +60,7 @@
 #include <renderer/functions.h>
 #include <renderer/state.h>
 #include <renderer/types.h>
+#include <renderer/yuv.h>
 #include <renderer/vulkan/types.h>
 #include <renderer/gl/types.h>
 #include <util/align.h>
@@ -5852,9 +5853,21 @@ EXPORT(int, sceGxmSetWarningEnabled) {
     return UNIMPLEMENTED();
 }
 
-EXPORT(int, sceGxmSetYuvProfile) {
-    TRACY_FUNC(sceGxmSetYuvProfile);
-    return UNIMPLEMENTED();
+// Selects the matrix (BT.601/BT.709, standard/full range) that the CSC0/CSC1 slot of a YUV texture format uses.
+// PROVISIONAL: the argument order (context, program type, CSC slot, profile) and the SceGxmYuvProfile values
+// follow the public SDK header and have not been checked against a title that calls this function.
+EXPORT(int, sceGxmSetYuvProfile, SceGxmContext *context, uint32_t programType, uint32_t cscIndex, uint32_t yuvProfile) {
+    TRACY_FUNC(sceGxmSetYuvProfile, context, programType, cscIndex, yuvProfile);
+    if (!context)
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_POINTER);
+
+    LOG_INFO_ONCE("sceGxmSetYuvProfile(programType={}, cscIndex={}, profile={})", programType, cscIndex, yuvProfile);
+    if (programType >= renderer::yuv::program_type_count || cscIndex >= renderer::yuv::csc_count || yuvProfile >= renderer::yuv::profile_count)
+        return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
+
+    // SceGxmProgramType: 0 = vertex, 1 = fragment
+    renderer::set_yuv_profile(context->renderer.get(), programType == 1, cscIndex, static_cast<uint8_t>(yuvProfile));
+    return 0;
 }
 
 static Address alloc_callbacked(EmuEnvState &emuenv, SceUID thread_id, const SceGxmShaderPatcherParams &shaderPatcherParams, unsigned int size) {

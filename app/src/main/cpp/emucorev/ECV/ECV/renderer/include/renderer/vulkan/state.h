@@ -23,6 +23,7 @@
 #include <renderer/vulkan/depth_stencil_model.h>
 #include <renderer/vulkan/overlay_renderer.h>
 #include <renderer/vulkan/pipeline_cache.h>
+#include <renderer/vulkan/sampler_support.h>
 #include <renderer/vulkan/screen_renderer.h>
 #include <renderer/vulkan/surface_cache.h>
 #include <renderer/vulkan/types.h>
@@ -144,6 +145,10 @@ struct VKState : public renderer::State {
     vkutil::Image default_image;
     vkutil::Image default_raw_image;
     vkutil::Buffer default_buffer;
+
+    // mirror-clamp / YCbCr capabilities and sampler limits chosen at device creation (P4/P6)
+    SamplerDeviceSupport sampler_device_support;
+    renderer::SamplerSupport sampler_support;
 
     bool support_fsr = false;
     // support for the VK_KHR_uniform_buffer_standard_layout extension, needed for memory mapping and texture viewport

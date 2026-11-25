@@ -17,6 +17,8 @@
 
 #include <renderer/vulkan/gxm_to_vulkan.h>
 
+#include <renderer/sampler_state.h>
+
 #include <gxm/functions.h>
 #include <util/log.h>
 
@@ -920,24 +922,25 @@ vk::Format translate_format(SceGxmTextureBaseFormat base_format) {
     }
 }
 
-vk::SamplerAddressMode translate_address_mode(SceGxmTextureAddrMode src) {
-    switch (src) {
-    case SCE_GXM_TEXTURE_ADDR_REPEAT:
-        return vk::SamplerAddressMode::eRepeat;
-    case SCE_GXM_TEXTURE_ADDR_MIRROR:
-        return vk::SamplerAddressMode::eMirroredRepeat;
-    case SCE_GXM_TEXTURE_ADDR_CLAMP:
-        return vk::SamplerAddressMode::eClampToEdge;
-    case SCE_GXM_TEXTURE_ADDR_MIRROR_CLAMP:
-        return vk::SamplerAddressMode::eMirrorClampToEdge;
-    case SCE_GXM_TEXTURE_ADDR_REPEAT_IGNORE_BORDER:
-    case SCE_GXM_TEXTURE_ADDR_CLAMP_FULL_BORDER:
-    case SCE_GXM_TEXTURE_ADDR_CLAMP_IGNORE_BORDER:
-    case SCE_GXM_TEXTURE_ADDR_CLAMP_HALF_BORDER:
-        LOG_ERROR_ONCE("Unhandled border color address mode, texture will be corrupted. Please report it to the developers.");
-        return (src == SCE_GXM_TEXTURE_ADDR_REPEAT_IGNORE_BORDER) ? vk::SamplerAddressMode::eRepeat : vk::SamplerAddressMode::eClampToBorder;
-    default:
+vk::SamplerAddressMode translate_address_mode(SceGxmTextureAddrMode src, bool mirror_clamp_supported) {
+    if (src > SCE_GXM_TEXTURE_ADDR_CLAMP_HALF_BORDER)
         LOG_ERROR("Unknown address mode {}", log_hex(src));
+
+    const AddressTranslation translation = translate_address(src, mirror_clamp_supported);
+    if (translation.approximate)
+        LOG_WARN_ONCE("GXM texture address mode {} is approximated (clamp / border semantics, see renderer/sampler_state.h)", log_hex(src));
+
+    switch (translation.kind) {
+    case AddressKind::Repeat:
+        return vk::SamplerAddressMode::eRepeat;
+    case AddressKind::MirroredRepeat:
+        return vk::SamplerAddressMode::eMirroredRepeat;
+    case AddressKind::MirrorClampToEdge:
+        return vk::SamplerAddressMode::eMirrorClampToEdge;
+    case AddressKind::ClampToBorder:
+        return vk::SamplerAddressMode::eClampToBorder;
+    case AddressKind::ClampToEdge:
+    default:
         return vk::SamplerAddressMode::eClampToEdge;
     }
 }

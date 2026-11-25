@@ -36,7 +36,6 @@ struct FragmentProgram;
 struct RenderTarget;
 struct State;
 struct VertexProgram;
-struct YUVConversionCache;
 
 bool create(std::unique_ptr<FragmentProgram> &fp, State &state, const SceGxmProgram &program, const SceGxmBlendInfo *blend, GXPPtrMap &gxp_ptr_map);
 bool create(std::unique_ptr<VertexProgram> &vp, State &state, const SceGxmProgram &program, GXPPtrMap &gxp_ptr_map, const std::vector<SceGxmVertexAttribute> &attributes);
@@ -90,6 +89,7 @@ void set_stencil_ref(State &state, Context *ctx, bool is_front, unsigned char sr
 void set_program(State &state, Context *ctx, Ptr<const void> program, const bool is_fragment);
 void set_cull_mode(State &state, Context *ctx, SceGxmCullMode cull);
 void set_texture(State &state, Context *ctx, const std::uint32_t tex_index, const SceGxmTexture tex);
+void set_yuv_profile(Context *ctx, bool is_fragment, uint32_t csc_index, uint8_t profile);
 void set_viewport_real(State &state, Context *ctx, float xOffset, float yOffset, float zOffset, float xScale, float yScale, float zScale);
 void set_viewport_flat(State &state, Context *ctx);
 void set_region_clip(State &state, Context *ctx, SceGxmRegionClipMode mode, unsigned int xMin, unsigned int xMax, unsigned int yMin, unsigned int yMax);
@@ -186,7 +186,8 @@ namespace texture {
 // Paletted textures.
 void palette_texture_to_rgba_4(uint32_t *dst, const uint8_t *src, uint32_t width, uint32_t height, const uint32_t *palette);
 void palette_texture_to_rgba_8(uint32_t *dst, const uint8_t *src, uint32_t width, uint32_t height, const uint32_t *palette);
-void yuv420_texture_to_rgb(YUVConversionCache &cache, uint8_t *dst, const uint8_t *src, uint32_t width, uint32_t height, uint32_t layout_width, uint32_t layout_height, bool is_p3);
+void yuv420_texture_to_rgb(uint8_t profile, bool chroma_swapped, uint8_t *dst, const uint8_t *src, uint32_t width, uint32_t height, uint32_t layout_width, uint32_t layout_height, bool is_p3);
+void yuv422_texture_to_rgb(uint8_t profile, uint32_t swizzle, uint8_t *dst, const uint8_t *src, uint32_t width, uint32_t height);
 const uint32_t *get_texture_palette(const SceGxmTexture &texture, const MemState &mem);
 
 // Assume fmt is a bcn format
