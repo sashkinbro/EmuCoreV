@@ -3,9 +3,11 @@ add_library(
 	STATIC
 	include/vkutil/native_surface.h
 	include/vkutil/objects.h
+	include/vkutil/sync_tracker.h
 	include/vkutil/vkutil.h
 
 	src/objects.cpp
+	src/sync_tracker.cpp
 	src/image_snapshot.cpp
 	src/vkutil.cpp
 )

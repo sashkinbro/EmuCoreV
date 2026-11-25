@@ -133,30 +133,15 @@ static constexpr ImageLayoutTransition layout_transitions[] = {
         vk::AccessFlagBits::eShaderRead },
 };
 
-static void transition_image_layout_impl(vk::CommandBuffer cmd_buffer, vk::Image image, ImageLayout src_layout, ImageLayout dst_layout, const vk::ImageSubresourceRange &range, bool initial_undefined) {
-    const ImageLayoutTransition &src_transition = layout_transitions[static_cast<int>(src_layout)];
-    const ImageLayoutTransition &dst_transition = layout_transitions[static_cast<int>(dst_layout)];
-
-    vk::ImageMemoryBarrier barrier{
-        .srcAccessMask = src_transition.access,
-        .dstAccessMask = dst_transition.access,
-        .oldLayout = initial_undefined ? vk::ImageLayout::eUndefined : src_transition.layout,
-        .newLayout = dst_transition.layout,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = image,
-        .subresourceRange = range
-    };
-
-    cmd_buffer.pipelineBarrier(src_transition.stages, dst_transition.stages, vk::DependencyFlags(), {}, {}, barrier);
-}
-
 void transition_image_layout(vk::CommandBuffer cmd_buffer, vk::Image image, ImageLayout src_layout, ImageLayout dst_layout, const vk::ImageSubresourceRange &range) {
-    transition_image_layout_impl(cmd_buffer, image, src_layout, dst_layout, range, false);
-}
-
-void transition_image_layout_discard(vk::CommandBuffer cmd_buffer, vk::Image image, ImageLayout src_layout, ImageLayout dst_layout, const vk::ImageSubresourceRange &range) {
-    transition_image_layout_impl(cmd_buffer, image, src_layout, dst_layout, range, true);
+    const ImageLayoutTransition &src = layout_transitions[static_cast<int>(src_layout)];
+    const ImageLayoutTransition &dst = layout_transitions[static_cast<int>(dst_layout)];
+    sync::explicit_barrier(cmd_buffer, image, range,
+        { sync::Stage(static_cast<VkPipelineStageFlags2>(static_cast<VkPipelineStageFlags>(src.stages))),
+            sync::Stage(static_cast<VkPipelineStageFlags2>(static_cast<VkPipelineStageFlags>(dst.stages))),
+            sync::Access(static_cast<VkAccessFlags2>(static_cast<VkAccessFlags>(src.access))),
+            sync::Access(static_cast<VkAccessFlags2>(static_cast<VkAccessFlags>(dst.access))),
+            src_layout == ImageLayout::Undefined ? vk::ImageLayout::eUndefined : src.layout, dst.layout, true });
 }
 
 vk::ImageLayout get_underlying_layout(ImageLayout layout) {

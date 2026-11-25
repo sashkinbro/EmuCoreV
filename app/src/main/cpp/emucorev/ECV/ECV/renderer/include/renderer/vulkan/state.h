@@ -21,6 +21,7 @@
 #include <renderer/types.h>
 
 #include <renderer/vulkan/depth_stencil_model.h>
+#include <renderer/vulkan/gpu_caps.h>
 #include <renderer/vulkan/overlay_renderer.h>
 #include <renderer/vulkan/pipeline_cache.h>
 #include <renderer/vulkan/sampler_support.h>
@@ -67,6 +68,9 @@ struct VKState : public renderer::State {
     vk::Instance instance;
     vk::Device device;
     bool support_device_fault = false;
+    // capability layer + the path table chosen from it at device creation (gpu_caps.h)
+    GpuCaps gpu_caps;
+    Strategy gpu_strategy;
 
     ScreenRenderer screen_renderer;
     OverlayRenderer overlay_renderer;

@@ -24,6 +24,7 @@
 #include <renderer/types.h>
 #include <renderer/shaders.h>
 #include <renderer/vulkan/functions.h>
+#include <renderer/vulkan/gpu_caps_probe.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/frame_runtime_reset.h>
 #include <renderer/vulkan/gpu_caps_selftest.h>
@@ -123,8 +124,14 @@ static void debug_log_message(std::string_view msg) {
         }
     }
 
-    if (log_error)
+    if (log_error) {
+        // lab gate: `validation_hazards` must be 0 in a sync-validation run (ECVLAB sync line, result.json)
+        if (msg.contains("SYNC-HAZARD"))
+            vkutil::sync::stats().validation_hazards++;
+        else
+            vkutil::sync::stats().validation_errors++;
         LOG_ERROR("Validation layer: {}", msg);
+    }
 }
 
 static vk::DebugUtilsMessengerEXT debug_messenger;
@@ -705,9 +712,15 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         vk::PhysicalDeviceFeatures enabled_features{
             .independentBlend = physical_device_features.independentBlend,
             .depthClamp = enable_depth_clamp ? physical_device_features.depthClamp : VK_FALSE,
+            // P1: features the code relies on (BCn/ASTC/ETC2 texture formats, depth bias clamp) are enabled whenever the driver has them;
+            // formats are still gated per-format by vkGetPhysicalDeviceFormatProperties
+            .depthBiasClamp = physical_device_features.depthBiasClamp,
             .fillModeNonSolid = physical_device_features.fillModeNonSolid,
             .wideLines = physical_device_features.wideLines,
             .samplerAnisotropy = physical_device_features.samplerAnisotropy,
+            .textureCompressionETC2 = physical_device_features.textureCompressionETC2,
+            .textureCompressionASTC_LDR = physical_device_features.textureCompressionASTC_LDR,
+            .textureCompressionBC = physical_device_features.textureCompressionBC,
             .occlusionQueryPrecise = physical_device_features.occlusionQueryPrecise,
             .fragmentStoresAndAtomics = physical_device_features.fragmentStoresAndAtomics,
             .shaderStorageImageExtendedFormats = physical_device_features.shaderStorageImageExtendedFormats,
@@ -722,6 +735,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         bool support_buffer_device_address = false;
         bool support_external_memory = false;
         bool support_shader_interlock = false;
+        bool support_sync2 = false;
         const std::map<std::string_view, bool *> optional_extensions = {
             { vk::KHRGetMemoryRequirements2ExtensionName, &temp_bool },
             // can be used by vma to improve performance
@@ -743,6 +757,10 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             // used for accurate programmable blending on desktop GPUs
             { vk::EXTFragmentShaderInterlockExtensionName, &support_shader_interlock },
             { vk::EXTDeviceFaultExtensionName, &support_device_fault },
+            // barrier granularity of the sync tracker (vkutil/sync_tracker.h); legacy masks otherwise
+            { vk::KHRSynchronization2ExtensionName, &support_sync2 },
+            // eMirrorClampToEdge sampler address mode (no feature bit, the extension is the enable)
+            { VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME, &temp_bool },
 #ifdef __APPLE__
             // Needed to create the MoltenVK device
             { vk::KHRPortabilitySubsetExtensionName, &temp_bool },
@@ -795,6 +813,11 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         bool support_memory_mapping = true;
         const bool has_features2_khr = VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceFeatures2KHR != nullptr;
         support_buffer_device_address &= has_features2_khr;
+        support_sync2 &= has_features2_khr;
+        if (support_sync2) {
+            auto sync2_features = physical_device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceSynchronization2Features>();
+            support_sync2 = static_cast<bool>(sync2_features.get<vk::PhysicalDeviceSynchronization2Features>().synchronization2);
+        }
         support_standard_layout &= has_features2_khr;
         if (support_buffer_device_address) {
             auto features = physical_device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceBufferDeviceAddressFeatures>();
@@ -893,6 +916,46 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 
         support_shader_interlock &= static_cast<bool>(physical_device_features.fragmentStoresAndAtomics);
 
+        // ---- capability layer: probe once, pick every path from what the driver exposes (gpu_caps.h) ----
+        {
+            gpu_caps = probe_gpu_caps(physical_device, physical_device.enumerateDeviceExtensionProperties(), has_features2_khr);
+            gpu_caps.sync2 = support_sync2;
+            gpu_caps.roaa_color = support_rasterized_order_access;
+            gpu_caps.shader_interlock = support_shader_interlock;
+            gpu_caps.input_attachment_self_dependency = true;
+            ForcedPaths forced;
+#if ECV_ORACLE
+            {
+                fs::path oracle_root = vita_fs_path;
+                if (!oracle_root.has_filename())
+                    oracle_root = oracle_root.parent_path();
+                forced = read_forced_paths(oracle_root.parent_path().string());
+                // <files dir>/ecv-sync-log: one log line per emitted barrier with its hazard class (hazard logger)
+                if (fs::exists(oracle_root.parent_path() / "ecv-sync-log")) {
+                    vkutil::sync::config().log_hazards = true;
+                    vkutil::sync::config().log = [](const char *line) { LOG_INFO("{}", line); };
+                }
+            }
+#endif
+            gpu_strategy = choose_strategy(gpu_caps, forced);
+            // apply the table: the existing renderer paths follow the strategy instead of their own ad-hoc probes
+            support_rasterized_order_access = gpu_strategy.fbfetch == FbFetchPath::RasterOrderAttachmentAccess;
+            support_shader_interlock = gpu_strategy.use_shader_interlock;
+            support_sync2 = gpu_strategy.barriers == BarrierStyle::Sync2;
+            vkutil::sync::config().use_sync2 = support_sync2;
+            LOG_INFO("GPU paths: {}", describe(gpu_caps, gpu_strategy));
+            publish_paths_line(describe(gpu_caps, gpu_strategy));
+            LOG_INFO("GPU caps: sync2={} timeline={} roaa={} interlock={} dyn_rendering={} local_read={} tile_image={} ds_resolve={} (depth modes 0x{:X}) "
+                     "lazy_memory={} msaa_color=0x{:X} msaa_depth=0x{:X} host_coherent={} host_coherent_cached={} max_sets={} input_attachments={}",
+                gpu_caps.sync2, gpu_caps.timeline_semaphore, gpu_caps.roaa_color, gpu_caps.shader_interlock, gpu_caps.dynamic_rendering,
+                gpu_caps.dynamic_rendering_local_read, gpu_caps.shader_tile_image, gpu_caps.depth_stencil_resolve, gpu_caps.ds_resolve_depth_modes,
+                gpu_caps.lazily_allocated_memory, gpu_caps.framebuffer_color_sample_counts, gpu_caps.framebuffer_depth_sample_counts,
+                gpu_caps.host_visible_coherent, gpu_caps.host_visible_coherent_cached, gpu_caps.max_bound_descriptor_sets,
+                gpu_caps.max_per_stage_input_attachments);
+            if (gpu_strategy.force_rejected)
+                LOG_WARN("A forced GPU path is not supported/implemented here; the table above is what actually runs");
+        }
+
         // support_shader_interlock = false; // Nick - Useful for testing as RenderDoc won't always let you debug a shader with this on
 
         if (support_shader_interlock) {
@@ -916,7 +979,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             vk::PhysicalDeviceShaderFloat16Int8Features,
             vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT,
             vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT,
-            vk::PhysicalDeviceFaultFeaturesEXT>
+            vk::PhysicalDeviceFaultFeaturesEXT,
+            vk::PhysicalDeviceSynchronization2Features>
             device_info{
                 vk::DeviceCreateInfo{
                     .pEnabledFeatures = &enabled_features },
@@ -932,7 +996,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT{
                     .rasterizationOrderColorAttachmentAccess = VK_TRUE },
                 vk::PhysicalDeviceFaultFeaturesEXT{
-                    .deviceFault = VK_TRUE }
+                    .deviceFault = VK_TRUE },
+                vk::PhysicalDeviceSynchronization2Features{
+                    .synchronization2 = VK_TRUE }
             };
         device_info.get().setQueueCreateInfos(queue_infos);
         device_info.get().setPEnabledExtensionNames(device_extensions);
@@ -958,6 +1024,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         }
         if (!support_device_fault)
             device_info.unlink<vk::PhysicalDeviceFaultFeaturesEXT>();
+        if (!support_sync2)
+            device_info.unlink<vk::PhysicalDeviceSynchronization2Features>();
 
         if (sampler_device_support.ycbcr_conversion) {
             ycbcr_features.pNext = const_cast<void *>(device_info.get().pNext);
@@ -1683,13 +1751,11 @@ void VKState::render_frame(DisplayState &display, const GxmState &gxm, MemState 
         const bool need_present_order_barrier = (mapping_method == MappingMethod::PageTable || mapping_method == MappingMethod::NativeBuffer)
             && surface_handle && screen_renderer.current_cmd_buffer;
         if (need_present_order_barrier) {
-            const vk::MemoryBarrier order_barrier{
-                .srcAccessMask = vk::AccessFlagBits::eMemoryWrite,
-                .dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eMemoryRead
-            };
-            screen_renderer.current_cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands,
-                vk::PipelineStageFlagBits::eFragmentShader | vk::PipelineStageFlagBits::eTransfer,
-                vk::DependencyFlags(), order_barrier, {}, {});
+            // the present path reads guest memory written through device addresses: untracked global dependency
+            vkutil::sync::Batch batch;
+            batch.global(vkutil::sync::S::eAllCommands, vkutil::sync::A::eMemoryWrite,
+                vkutil::sync::S::eFragmentShader | vkutil::sync::S::eTransfer, vkutil::sync::A::eShaderRead | vkutil::sync::A::eMemoryRead);
+            batch.flush(screen_renderer.current_cmd_buffer);
         }
 
         screen_renderer.render(surface_handle, layout, viewport,

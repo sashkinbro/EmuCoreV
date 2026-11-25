@@ -621,24 +621,11 @@ IMGUI_API ImTextureID ImGui_ImplSdlVulkan_CreateTexture(ImGui_VulkanState &state
     vk::CommandBuffer transfer_buffer = vkutil::create_single_time_command(vk_state.device,
         vk_state.transfer_command_pool);
 
-    vk::ImageMemoryBarrier image_transfer_optimal_barrier{
-        .srcAccessMask = vk::AccessFlagBits(),
-        .dstAccessMask = vk::AccessFlagBits::eTransferWrite, // Will be written by a transfer operation.
-        .oldLayout = vk::ImageLayout::eUndefined, // Old Layout
-        .newLayout = vk::ImageLayout::eTransferDstOptimal, // New Layout
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, // No Queue Family Transition
-        .image = texture->image,
-        .subresourceRange = vkutil::color_subresource_range // Subresource Range
-    };
-
-    transfer_buffer.pipelineBarrier(
-        vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, // Top Of Pipe -> Transfer Stage
-        vk::DependencyFlags(), // No Dependency Flags
-        0, nullptr, // No Memory Barriers
-        0, nullptr, // No Buffer Memory Barriers
-        1, &image_transfer_optimal_barrier // 1 Image Memory Barrier
-    );
+    namespace sync = vkutil::sync;
+    // freshly created font texture: not tracked by an Image object, explicit barriers through the tracker's emitter
+    sync::explicit_barrier(transfer_buffer, texture->image, vkutil::color_subresource_range,
+        { sync::Stage{}, sync::S::eTransfer, sync::Access{}, sync::A::eTransferWrite, vk::ImageLayout::eUndefined,
+            vk::ImageLayout::eTransferDstOptimal, true });
 
     vk::BufferImageCopy region{
         0, // Buffer Offset
@@ -659,24 +646,9 @@ IMGUI_API ImTextureID ImGui_ImplSdlVulkan_CreateTexture(ImGui_VulkanState &state
         1, &region // Regions
     );
 
-    vk::ImageMemoryBarrier image_shader_read_only_barrier{
-        .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-        .dstAccessMask = vk::AccessFlagBits(),
-        .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-        .newLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = texture->image,
-        .subresourceRange = vkutil::color_subresource_range
-    };
-
-    transfer_buffer.pipelineBarrier(
-        vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eBottomOfPipe, // Transfer -> Bottom of Pipe Stage
-        vk::DependencyFlags(), // No Dependency Flags
-        0, nullptr, // No Memory Barriers
-        0, nullptr, // No Buffer Barriers
-        1, &image_shader_read_only_barrier // Image Memory Barriers
-    );
+    sync::explicit_barrier(transfer_buffer, texture->image, vkutil::color_subresource_range,
+        { sync::S::eTransfer, sync::Stage{}, sync::A::eTransferWrite, sync::Access{}, vk::ImageLayout::eTransferDstOptimal,
+            vk::ImageLayout::eShaderReadOnlyOptimal, true });
 
     vkutil::end_single_time_command(vk_state.device, vk_state.transfer_queue, vk_state.transfer_command_pool, transfer_buffer);
     vk_state.allocator.destroyBuffer(temp_buffer, temp_allocation);

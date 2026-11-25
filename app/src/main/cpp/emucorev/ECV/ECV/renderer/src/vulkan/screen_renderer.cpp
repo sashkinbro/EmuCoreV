@@ -556,36 +556,19 @@ void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, co
         const vk::Image source_image{ shader_source->image };
         const vk::Image target_image = swapchain_images[swapchain_image_idx];
         const auto source_read_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-        const vk::ImageMemoryBarrier source_to_read{
-            .srcAccessMask = layout == vk::ImageLayout::eGeneral
-                ? vk::AccessFlagBits::eMemoryWrite | vk::AccessFlagBits::eMemoryRead
-                : vk::AccessFlags(),
-            .dstAccessMask = vk::AccessFlagBits::eShaderRead,
-            .oldLayout = layout,
-            .newLayout = source_read_layout,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = source_image,
-            .subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
-        };
+        namespace sync = vkutil::sync;
+        const vk::ImageSubresourceRange whole_color{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
+        // the source image is owned by the caller (its layout arrives as a parameter): explicit barrier through the emitter
         if (layout != source_read_layout) {
-            current_cmd_buffer.pipelineBarrier(
-                layout == vk::ImageLayout::eGeneral ? vk::PipelineStageFlagBits::eAllCommands : vk::PipelineStageFlagBits::eTopOfPipe,
-                vk::PipelineStageFlagBits::eFragmentShader, vk::DependencyFlags(), {}, {}, source_to_read);
+            const bool general = layout == vk::ImageLayout::eGeneral;
+            sync::explicit_barrier(current_cmd_buffer, source_image, whole_color,
+                { general ? sync::S::eAllCommands : sync::Stage{}, sync::S::eFragmentShader,
+                    general ? sync::A::eMemoryWrite | sync::A::eMemoryRead : sync::Access{}, sync::A::eShaderRead, layout, source_read_layout, true });
         }
 
-        const vk::ImageMemoryBarrier target_to_color{
-            .srcAccessMask = vk::AccessFlags(),
-            .dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
-            .oldLayout = vk::ImageLayout::ePresentSrcKHR,
-            .newLayout = vk::ImageLayout::eColorAttachmentOptimal,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = target_image,
-            .subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
-        };
-        current_cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::DependencyFlags(), {}, {}, target_to_color);
+        sync::explicit_barrier(current_cmd_buffer, target_image, whole_color,
+            { sync::Stage{}, sync::S::eColorAttachmentOutput, sync::Access{}, sync::A::eColorAttachmentRead | sync::A::eColorAttachmentWrite,
+                vk::ImageLayout::ePresentSrcKHR, vk::ImageLayout::eColorAttachmentOptimal, true });
 
         const vk::Viewport viewport_rect = display_viewport();
         emucorev::shaders::ShaderChainImage target{
@@ -604,36 +587,17 @@ void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, co
             static_cast<VkCommandBuffer>(current_cmd_buffer), *shader_source, target, output_view, shader_error);
 
         if (layout != source_read_layout) {
-            const vk::ImageMemoryBarrier source_restore{
-                .srcAccessMask = vk::AccessFlagBits::eShaderRead,
-                .dstAccessMask = layout == vk::ImageLayout::eGeneral
-                    ? vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite
-                    : vk::AccessFlags(),
-                .oldLayout = source_read_layout,
-                .newLayout = layout,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = source_image,
-                .subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
-            };
-            current_cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eFragmentShader,
-                layout == vk::ImageLayout::eGeneral ? vk::PipelineStageFlagBits::eAllCommands : vk::PipelineStageFlagBits::eBottomOfPipe,
-                vk::DependencyFlags(), {}, {}, source_restore);
+            const bool general = layout == vk::ImageLayout::eGeneral;
+            sync::explicit_barrier(current_cmd_buffer, source_image, whole_color,
+                { sync::S::eFragmentShader, general ? sync::S::eAllCommands : sync::Stage{}, sync::A::eShaderRead,
+                    general ? sync::A::eMemoryRead | sync::A::eMemoryWrite : sync::Access{}, source_read_layout, layout, true });
         }
 
         if (shader_rendered) {
-            const vk::ImageMemoryBarrier target_to_load{
-                .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
-                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,
-                .oldLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                .newLayout = vk::ImageLayout::eGeneral,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = target_image,
-                .subresourceRange = vk::ImageSubresourceRange{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
-            };
-            current_cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::DependencyFlags(), {}, {}, target_to_load);
+            sync::explicit_barrier(current_cmd_buffer, target_image, whole_color,
+                { sync::S::eColorAttachmentOutput, sync::S::eColorAttachmentOutput, sync::A::eColorAttachmentWrite,
+                    sync::A::eColorAttachmentRead | sync::A::eColorAttachmentWrite, vk::ImageLayout::eColorAttachmentOptimal,
+                    vk::ImageLayout::eGeneral, true });
             vk::RenderPassBeginInfo pass_info{
                 .renderPass = post_filter_render_pass,
                 .framebuffer = swapchain_framebuffers[swapchain_image_idx],

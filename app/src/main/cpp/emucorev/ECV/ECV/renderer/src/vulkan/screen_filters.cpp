@@ -628,18 +628,12 @@ void FSRScreenFilter::render(bool is_pre_renderpass, vk::ImageView src_img, vk::
     cmd_buffer.dispatch(dispatch_x, dispatch_y, 1);
 
     // meanwhile, we need to clear the swapchain surface
-    vk::ImageMemoryBarrier barrier{
-        .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
-        .dstAccessMask = vk::AccessFlagBits::eTransferWrite,
-        .oldLayout = vk::ImageLayout::eUndefined,
-        .newLayout = vk::ImageLayout::eTransferDstOptimal,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = screen.swapchain_images[screen.swapchain_image_idx],
-        .subresourceRange = vkutil::color_subresource_range
-    };
-    cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer,
-        vk::DependencyFlags(), {}, {}, barrier);
+    namespace sync = vkutil::sync;
+    const vk::Image swapchain_image = screen.swapchain_images[screen.swapchain_image_idx];
+    // swapchain images are owned by the presentation engine: explicit barriers through the tracker's emitter
+    sync::explicit_barrier(cmd_buffer, swapchain_image, vkutil::color_subresource_range,
+        { sync::S::eColorAttachmentOutput, sync::S::eTransfer, sync::A::eColorAttachmentWrite, sync::A::eTransferWrite,
+            vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, true });
 
     vk::ClearColorValue clear_color{ std::array<float, 4>({ 0.0f, 0.0f, 0.0f, 0.0f }) };
     cmd_buffer.clearColorImage(screen.swapchain_images[screen.swapchain_image_idx], vk::ImageLayout::eTransferDstOptimal, clear_color, vkutil::color_subresource_range);
@@ -649,18 +643,9 @@ void FSRScreenFilter::render(bool is_pre_renderpass, vk::ImageView src_img, vk::
 
     if (screen.swapchain_has_storage) {
         // also transition the swapchain image to general
-        barrier = {
-            .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-            .dstAccessMask = vk::AccessFlagBits::eShaderWrite,
-            .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-            .newLayout = vk::ImageLayout::eGeneral,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = screen.swapchain_images[screen.swapchain_image_idx],
-            .subresourceRange = vkutil::color_subresource_range
-        };
-        cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader,
-            vk::DependencyFlags(), {}, {}, barrier);
+        sync::explicit_barrier(cmd_buffer, swapchain_image, vkutil::color_subresource_range,
+            { sync::S::eTransfer, sync::S::eComputeShader, sync::A::eTransferWrite, sync::A::eShaderWrite,
+                vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eGeneral, true });
     } else {
         // rcas writes into its own image instead (the swapchain has no storage usage) so swapchain stays transfer dst
         rcas_images[screen.swapchain_image_idx].transition_to_discard(cmd_buffer, vkutil::ImageLayout::StorageImage);
@@ -695,18 +680,9 @@ void FSRScreenFilter::render(bool is_pre_renderpass, vk::ImageView src_img, vk::
             screen.swapchain_images[screen.swapchain_image_idx], vk::ImageLayout::eTransferDstOptimal,
             blit_region, vk::Filter::eNearest);
 
-        barrier = {
-            .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-            .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
-            .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-            .newLayout = vk::ImageLayout::eGeneral,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = screen.swapchain_images[screen.swapchain_image_idx],
-            .subresourceRange = vkutil::color_subresource_range
-        };
-        cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            vk::DependencyFlags(), {}, {}, barrier);
+        sync::explicit_barrier(cmd_buffer, swapchain_image, vkutil::color_subresource_range,
+            { sync::S::eTransfer, sync::S::eColorAttachmentOutput, sync::A::eTransferWrite, sync::A::eColorAttachmentWrite,
+                vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eGeneral, true });
     }
 
     // the barrier for the render pass will be handled by the renderpass external dependencies

@@ -182,12 +182,13 @@ void mid_scene_flush(VKContext &context, const SceGxmNotification notification) 
         context.stop_render_pass();
 
     // in case there is no notification, this will happen in the render pass
-    vk::MemoryBarrier barrier{
-        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-        .dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead,
-    };
-    context.render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eVertexShader, vk::PipelineStageFlagBits::eVertexInput,
-        vk::DependencyFlags(), barrier, {}, {});
+    {
+        // shader stores through device addresses cannot be attributed to a tracked buffer: explicit global dependency
+        vkutil::sync::Batch batch;
+        batch.global(vkutil::sync::S::eVertexShader, vkutil::sync::A::eShaderWrite,
+            vkutil::sync::S::eVertexInput, vkutil::sync::A::eVertexAttributeRead);
+        batch.flush(context.render_cmd);
+    }
 
     if (restart_render_pass) {
         SceGxmNotification empty_notification = { Ptr<uint32_t>(0), 0 };
@@ -575,14 +576,17 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         };
         context.render_cmd.copyImage(source.image, vk::ImageLayout::eTransferSrcOptimal,
             snapshot.image, vk::ImageLayout::eTransferDstOptimal, region);
-        source.transition_to(context.render_cmd, vkutil::ImageLayout::ColorAttachmentReadWrite);
-        snapshot.transition_to(context.render_cmd, vkutil::ImageLayout::StorageImage);
-        vk::MemoryBarrier ready{
-            .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-            .dstAccessMask = vk::AccessFlagBits::eInputAttachmentRead
-        };
-        context.render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-            vk::PipelineStageFlagBits::eFragmentShader, {}, ready, {}, {});
+        {
+            // back to the attachment layout; the snapshot becomes the pass' input attachment
+            vkutil::sync::Batch batch;
+            source.use(batch, vkutil::sync::S::eColorAttachmentOutput, vkutil::sync::A::eColorAttachmentRead | vkutil::sync::A::eColorAttachmentWrite,
+                vk::ImageLayout::eGeneral);
+            snapshot.use(batch, vkutil::sync::S::eFragmentShader, vkutil::sync::A::eInputAttachmentRead | vkutil::sync::A::eShaderRead,
+                vk::ImageLayout::eGeneral);
+            batch.flush(context.render_cmd);
+            source.layout = vkutil::ImageLayout::ColorAttachmentReadWrite;
+            snapshot.layout = vkutil::ImageLayout::StorageImage;
+        }
         context.start_render_pass();
     }
 
@@ -615,29 +619,29 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
 #endif
     if (context.state.features.direct_fragcolor && fragment_program_gxp.is_frag_color_used()) {
         // the fragment shader is using programmable blending with a subpass input
-        vk::ImageMemoryBarrier barrier{
-            .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
-            .dstAccessMask = vk::AccessFlagBits::eInputAttachmentRead,
-            .oldLayout = vk::ImageLayout::eGeneral,
-            .newLayout = vk::ImageLayout::eGeneral,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = context.current_color_base_image->image,
-            .subresourceRange = vkutil::color_subresource_range
-        };
-        std::array<vk::ImageMemoryBarrier, 2> barriers = { barrier, barrier };
-        const uint32_t barrier_count = context.current_color_raw_image ? 2 : 1;
-        if (context.current_color_raw_image)
-            barriers[1].image = context.current_color_raw_image->image;
+        {
+            // render pass self-dependency (dependencies[3] in pipeline_cache.cpp): pixels written by earlier draws -> input attachment read.
+            // Recorded inside the pass, so it is an explicit by-region barrier and does not change the tracked image state.
+            namespace sync = vkutil::sync;
+            const sync::Barrier self_dep{ sync::S::eColorAttachmentOutput, sync::S::eFragmentShader, sync::A::eColorAttachmentWrite,
+                sync::A::eInputAttachmentRead, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral, true };
+            sync::Batch batch;
+            batch.set_by_region(true);
+            batch.explicit_image(context.current_color_base_image->image, vkutil::color_subresource_range, self_dep);
+            if (context.current_color_raw_image)
+                batch.explicit_image(context.current_color_raw_image->image, vkutil::color_subresource_range, self_dep);
 #if ECV_ORACLE
-        if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_NOBARRIER)) {
-        } else if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_NOREGION)) {
-            context.render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eFragmentShader,
-                vk::DependencyFlags(), {}, {}, vk::ArrayProxy<const vk::ImageMemoryBarrier>(barrier_count, barriers.data()));
-        } else
+            if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_NOBARRIER)) {
+                // debug A/B: no barrier at all (batch dropped)
+            } else {
+                if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_NOREGION))
+                    batch.set_by_region(false);
+                batch.flush(context.render_cmd);
+            }
+#else
+            batch.flush(context.render_cmd);
 #endif
-        context.render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eFragmentShader,
-            vk::DependencyFlagBits::eByRegion, {}, {}, vk::ArrayProxy<const vk::ImageMemoryBarrier>(barrier_count, barriers.data()));
+        }
     } else if (context.state.features.support_shader_interlock
         && fragment_program_gxp.is_frag_color_used() != context.last_draw_was_framebuffer_fetch) {
         // restart the render pass to act as a barrier

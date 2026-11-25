@@ -353,7 +353,12 @@ struct VKContext : public renderer::Context {
     vk::Framebuffer current_framebuffer;
     vk::Framebuffer current_shader_interlock_framebuffer = nullptr;
     // we need the format or image for some cases
-    vkutil::Image *current_color_base_image;
+    vkutil::Image *current_color_base_image = nullptr;
+    vkutil::Image *current_ds_image = nullptr;
+    // the current scene's pass loads depth or stencil content (selects the pass' initial depth layout)
+    bool current_ds_loaded = false;
+    // the colour attachment is backed by a surface (loaded), not the transient/unbacked one (initial layout Undefined)
+    bool current_color_loaded = true;
     vk::Format current_color_format;
     vk::ImageView current_color_view;
     vk::ImageView current_ds_view;

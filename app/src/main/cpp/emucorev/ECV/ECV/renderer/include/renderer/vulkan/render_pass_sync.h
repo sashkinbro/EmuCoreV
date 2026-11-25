@@ -3,6 +3,7 @@
 // check the stage/access masks (app/src/test/core-host/render_pass_sync_tests.cpp).
 #pragma once
 
+#include <vkutil/sync_tracker.h>
 #include <vkutil/vkutil.h>
 
 #include <array>
@@ -52,6 +53,44 @@ inline std::array<vk::SubpassDependency, 3> render_target_dependencies(bool shad
             | vk::AccessFlagBits::eTransferRead | vk::AccessFlagBits::eTransferWrite
     };
     return d;
+}
+
+// ---- tracker view of a render pass (docs/gpu-sync-tracker.md, "Render passes") ------------------------------------------------
+// The pass' external dependencies above are the barriers the tracker relies on. The tracker is asked at vkCmdBeginRenderPass
+// whether the tracked state of each attachment is COVERED by them (same stages, access, layout); only if it is not, an explicit
+// barrier is recorded before the pass. At vkCmdEndRenderPass it records the writes and what dependency [2] made visible.
+enum class PassAttachment { Color, ColorRaw, DepthStencil };
+
+inline vkutil::sync::Stage to_stage2(vk::PipelineStageFlags f) {
+    return vkutil::sync::Stage(static_cast<VkPipelineStageFlags2>(static_cast<VkPipelineStageFlags>(f)));
+}
+inline vkutil::sync::Access to_access2(vk::AccessFlags f) {
+    return vkutil::sync::Access(static_cast<VkAccessFlags2>(static_cast<VkAccessFlags>(f)));
+}
+
+// `content_loaded`: the pass loads (does not clear / discard) the attachment, which for depth selects the pass' initialLayout
+inline vkutil::sync::PassCoverage pass_coverage(PassAttachment kind, bool content_loaded) {
+    const auto d = render_target_dependencies(false);
+    vkutil::sync::PassCoverage c;
+    c.raw_src_stages = to_stage2(d[0].srcStageMask);
+    c.raw_src_access = to_access2(d[0].srcAccessMask);
+    c.war_src_stages = to_stage2(d[1].srcStageMask);
+    c.dst_stages = to_stage2(rt_attachment_write_stages);
+    c.dst_access = to_access2(rt_attachment_access);
+    c.initial_layout = !content_loaded ? vk::ImageLayout::eUndefined
+        : (kind == PassAttachment::DepthStencil ? vk::ImageLayout::eDepthStencilReadOnlyOptimal : vk::ImageLayout::eGeneral);
+    return c;
+}
+
+inline vk::ImageLayout pass_final_layout(PassAttachment kind) {
+    return kind == PassAttachment::DepthStencil ? vk::ImageLayout::eDepthStencilReadOnlyOptimal : vk::ImageLayout::eGeneral;
+}
+
+inline void note_pass_end(vkutil::sync::State &st, PassAttachment kind) {
+    const auto d = render_target_dependencies(false);
+    // writers: attachment output / fragment tests, plus fragment shader storage writes (interlock / raw attachment)
+    vkutil::sync::track_pass_end(st, pass_final_layout(kind), to_stage2(d[2].srcStageMask), to_access2(d[2].srcAccessMask),
+        to_stage2(d[2].dstStageMask), to_access2(d[2].dstAccessMask));
 }
 
 } // namespace renderer::vulkan

@@ -21,6 +21,7 @@
 #include <renderer/vulkan/context_snapshot.h>
 #include <renderer/vulkan/depth_clear.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
+#include <renderer/vulkan/render_pass_sync.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/surface_sync.h>
 
@@ -387,6 +388,9 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     context.current_framebuffer = framebuffer.standard;
     context.current_shader_interlock_framebuffer = framebuffer.shader_interlock;
     context.current_color_base_image = framebuffer.base_image;
+    context.current_ds_image = framebuffer.ds_image;
+    context.current_ds_loaded = depth_load || stencil_load;
+    context.current_color_loaded = color_surface_fin != nullptr;
     context.current_fb_width = framebuffer.width;
     context.current_fb_height = framebuffer.height;
     context.current_color_raw_view = framebuffer.raw_image ? framebuffer.raw_image->view : state.default_raw_image.view;
@@ -626,18 +630,42 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
     curr_clear_values[1].depthStencil = ds_clear;
     curr_clear_values[2].depthStencil = ds_clear;
     curr_renderpass_info.setClearValues(curr_clear_values);
+    {
+        // sync tracker: the pass' external dependencies cover the tracked state of the attachments, else an explicit barrier first
+        namespace sync = vkutil::sync;
+        sync::Batch pass_batch;
+        const auto begin_attachment = [&](vkutil::Image *img, PassAttachment kind, bool loaded, const vk::ImageSubresourceRange &range) {
+            if (!img || !img->image)
+                return;
+            const sync::PassCoverage cov = pass_coverage(kind, loaded);
+            if (loaded && img->sync.layout == vk::ImageLayout::eUndefined) {
+                // never seen by the tracker (e.g. restored/legacy path): the render pass has always run on these without a barrier,
+                // so adopt the layout the pass expects instead of emitting an UNDEFINED -> X transition that would drop the content
+                LOG_WARN_ONCE("Render pass attachment with untracked layout: adopting the pass' initial layout");
+                img->sync.layout = cov.initial_layout;
+            }
+            sync::Barrier b;
+            const sync::UseResult r = sync::track_pass_begin(img->sync, cov, b);
+            if (r.barrier) {
+                sync::stats().pass_explicit++;
+                pass_batch.explicit_image(img->image, range, b);
+            } else {
+                sync::stats().pass_covered++;
+            }
+        };
+        begin_attachment(current_color_base_image, PassAttachment::Color, current_color_loaded, vkutil::color_subresource_range);
+        begin_attachment(current_color_raw_image, PassAttachment::ColorRaw, true, vkutil::color_subresource_range);
+        begin_attachment(current_ds_image, PassAttachment::DepthStencil, current_ds_loaded, vkutil::ds_subresource_range);
+        pass_batch.flush(render_cmd);
+    }
 #if ECV_ORACLE
     if (ecv::oracle::gpu::enabled())
         ecv::oracle::gpu::rp_begin(reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(current_render_pass)),
             reinterpret_cast<uint64_t>(static_cast<VkFramebuffer>(current_framebuffer)), is_first_scene_draw, curr_renderpass_info.renderArea.offset.x,
             curr_renderpass_info.renderArea.offset.y, curr_renderpass_info.renderArea.extent.width, curr_renderpass_info.renderArea.extent.height);
-    if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FULL_BARRIER)) {
-        const vk::MemoryBarrier oracle_all{
-            .srcAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite,
-            .dstAccessMask = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite
-        };
-        render_cmd.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, oracle_all, {}, {});
-    }
+    // oracle A/B (dbg-full-barrier): the tracker widens every barrier to ALL_COMMANDS and adds one global barrier here
+    vkutil::sync::config().full_barrier = ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FULL_BARRIER);
+    vkutil::sync::debug_full_barrier(render_cmd);
 #endif
     render_cmd.beginRenderPass(curr_renderpass_info, vk::SubpassContents::eInline);
 
@@ -712,6 +740,14 @@ void VKContext::stop_render_pass() {
 #endif
     render_cmd.endRenderPass();
     prev_draw_fbfetch = false;
+
+    // sync tracker: what the pass wrote and what its outgoing dependency made visible
+    if (current_color_base_image && current_color_base_image->image)
+        note_pass_end(current_color_base_image->sync, PassAttachment::Color);
+    if (current_color_raw_image && current_color_raw_image->image)
+        note_pass_end(current_color_raw_image->sync, PassAttachment::ColorRaw);
+    if (current_ds_image && current_ds_image->image)
+        note_pass_end(current_ds_image->sync, PassAttachment::DepthStencil);
 
     in_renderpass = false;
 }

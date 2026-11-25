@@ -42,6 +42,7 @@ Image::Image(Image &&other) noexcept {
     other.view = nullptr;
     other.image = nullptr;
     other.layout = ImageLayout::Undefined;
+    other.sync = sync::State{};
 }
 Image &Image::operator=(Image &&other) noexcept {
     memcpy(this, &other, sizeof(Image));
@@ -49,6 +50,7 @@ Image &Image::operator=(Image &&other) noexcept {
     other.view = nullptr;
     other.image = nullptr;
     other.layout = ImageLayout::Undefined;
+    other.sync = sync::State{};
     return *this;
 }
 
@@ -82,6 +84,7 @@ Image::~Image() {
 }
 
 void Image::init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping, const vk::ImageCreateFlags image_create_flags, const void *pNext) {
+    sync.reset();
     vk::ImageCreateInfo image_info{
         .pNext = pNext,
         .flags = image_create_flags,
@@ -130,6 +133,18 @@ void Image::init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping, 
     view = allocator.getAllocatorInfo().device.createImageView(view_info);
 }
 
+void Image::sync_reset() {
+    sync.reset();
+}
+
+void Image::use(sync::Batch &batch, sync::Stage stage, sync::Access access, vk::ImageLayout vk_layout, const vk::ImageSubresourceRange &range, bool discard) {
+    batch.use_image(sync, image, range, stage, access, vk_layout, discard);
+}
+
+void Image::use_in_place(sync::Batch &batch, sync::Stage stage, sync::Access access, const vk::ImageSubresourceRange &range) {
+    batch.use_image(sync, image, range, stage, access, sync.layout == vk::ImageLayout::eUndefined ? vk::ImageLayout::eGeneral : sync.layout, false);
+}
+
 // A barrier may only name aspects the image has: callers pass the combined depth+stencil range, a depth-only or
 // stencil-only format keeps just its own aspect.
 static vk::ImageSubresourceRange range_for_format(const vk::Format format, vk::ImageSubresourceRange range) {
@@ -151,14 +166,30 @@ static vk::ImageSubresourceRange range_for_format(const vk::Format format, vk::I
     return range;
 }
 
+static void transition_tracked(Image &img, vk::CommandBuffer buffer, ImageLayout new_layout, const vk::ImageSubresourceRange &range, bool discard) {
+    // some call sites still assign `layout = Undefined` after re-creating the image: that is a fresh tracked state
+    if (img.layout == ImageLayout::Undefined && img.sync.layout != vk::ImageLayout::eUndefined)
+        img.sync.reset();
+    const LayoutBarrierMasks m = get_layout_barrier_masks(new_layout);
+    sync::Batch batch;
+    // legacy and sync2 share the low 32 bits of both masks
+    const sync::Stage stages(static_cast<VkPipelineStageFlags2>(static_cast<VkPipelineStageFlags>(m.stages)));
+    const sync::Access access(static_cast<VkAccessFlags2>(static_cast<VkAccessFlags>(m.access)));
+    batch.use_image(img.sync, img.image, range_for_format(img.format, range), stages, access, get_underlying_layout(new_layout), discard);
+    batch.flush(buffer);
+    img.layout = new_layout;
+}
+
 void Image::transition_to(vk::CommandBuffer buffer, ImageLayout new_layout, const vk::ImageSubresourceRange &range) {
-    transition_image_layout(buffer, image, layout, new_layout, range_for_format(format, range));
-    layout = new_layout;
+    transition_tracked(*this, buffer, new_layout, range, false);
 }
 
 void Image::transition_to_discard(vk::CommandBuffer buffer, ImageLayout new_layout, const vk::ImageSubresourceRange &range) {
-    transition_image_layout_discard(buffer, image, layout, new_layout, range_for_format(format, range));
-    layout = new_layout;
+    transition_tracked(*this, buffer, new_layout, range, true);
+}
+
+void Buffer::use(sync::Batch &batch, sync::Stage stage, sync::Access access) {
+    batch.use_buffer(sync, buffer, stage, access);
 }
 
 Buffer::Buffer() = default;
@@ -198,6 +229,7 @@ Buffer::~Buffer() {
 }
 
 void Buffer::init_buffer(vk::BufferUsageFlags usage_flags, const vma::AllocationCreateInfo &alloc_create_info) {
+    sync.reset();
     vk::BufferCreateInfo buffer_info{
         .size = size,
         .usage = usage_flags,

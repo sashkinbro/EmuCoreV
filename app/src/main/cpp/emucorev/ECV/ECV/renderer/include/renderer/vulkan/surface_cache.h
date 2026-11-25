@@ -71,6 +71,8 @@ struct Framebuffer {
     uint32_t height;
     vkutil::Image *raw_image = nullptr;
     std::shared_ptr<vkutil::Image> shell_fetch_snapshot;
+    // depth-stencil image used by the framebuffer (tracked by the sync tracker around render passes)
+    vkutil::Image *ds_image = nullptr;
 };
 
 struct CastedTexture {

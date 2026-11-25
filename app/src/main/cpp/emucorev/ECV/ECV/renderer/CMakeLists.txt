@@ -20,6 +20,7 @@ add_library(
 	src/vulkan/context.cpp
 	src/vulkan/context_snapshot.cpp
 	src/vulkan/creation.cpp
+	src/vulkan/gpu_caps.cpp
 	src/vulkan/gxm_to_vulkan.cpp
 	src/vulkan/pipeline_cache.cpp
 	src/vulkan/renderer.cpp

@@ -233,19 +233,13 @@ void VKSurfaceCache::record_pending_cast(PendingCast &cast, VKContext &context) 
     if (context.in_renderpass)
         context.stop_render_pass();
 
-    vk::ImageMemoryBarrier store_visible{
-        .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eShaderWrite,
-        .dstAccessMask = vk::AccessFlagBits::eTransferRead | vk::AccessFlagBits::eShaderRead,
-        .oldLayout = vk::ImageLayout::eGeneral,
-        .newLayout = vk::ImageLayout::eGeneral,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = cast.info->texture.image,
-        .subresourceRange = vkutil::color_subresource_range
-    };
-    context.render_cmd.pipelineBarrier(
-        vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eFragmentShader,
-        vk::PipelineStageFlagBits::eTransfer | vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, store_visible);
+    {
+        // the surface was just rendered: make it visible to the transfer / compute cast
+        vkutil::sync::Batch batch;
+        cast.info->texture.use_in_place(batch, vkutil::sync::S::eTransfer | vkutil::sync::S::eComputeShader,
+            vkutil::sync::A::eTransferRead | vkutil::sync::A::eShaderRead);
+        batch.flush(context.render_cmd);
+    }
 
     cast.record(context.render_cmd);
 }
@@ -1224,6 +1218,9 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
             .offset = { start_x / static_cast<float>(info.width), start_sourced_line / static_cast<float>(info.height) }
         };
 
+        // sampled directly by the draws of this scene: the pass dependencies must already cover it (counted if not)
+        vkutil::sync::Batch::observe(info.texture.sync, vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader,
+            vkutil::sync::A::eShaderRead, vk::ImageLayout::eGeneral);
         // if everything matches
         if (vk_format == info.texture.format && swizzle == info.swizzle)
             return TextureLookupResult{
@@ -1465,17 +1462,12 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
                     && vk::blockSize(info.raw_image->format) == vk::blockSize(casted->texture.format);
                 const vk::Image cast_src_image = cast_use_raw ? info.raw_image->image : info.texture.image;
 
-                vk::ImageMemoryBarrier src_barrier{
-                    .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eShaderWrite,
-                    .dstAccessMask = vk::AccessFlagBits::eTransferRead,
-                    .oldLayout = vk::ImageLayout::eGeneral,
-                    .newLayout = vk::ImageLayout::eGeneral,
-                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                    .image = cast_src_image,
-                    .subresourceRange = vkutil::color_subresource_range
-                };
-                cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eFragmentShader, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, src_barrier);
+                {
+                    vkutil::Image &cast_src = cast_use_raw ? *info.raw_image : info.texture;
+                    vkutil::sync::Batch batch;
+                    cast_src.use_in_place(batch, vkutil::sync::S::eTransfer, vkutil::sync::A::eTransferRead);
+                    batch.flush(cmd_buffer);
+                }
 
                 if (bit_copy) {
                     const vk::ImageCopy copy{
@@ -1543,19 +1535,12 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
                     }
 
                     // Make the freshly-rendered store visible to the compute read.
-                    vk::ImageMemoryBarrier store_to_compute{
-                        .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eShaderWrite,
-                        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
-                        .oldLayout = vk::ImageLayout::eGeneral,
-                        .newLayout = vk::ImageLayout::eGeneral,
-                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .image = reinterpret_src,
-                        .subresourceRange = vkutil::color_subresource_range
-                    };
-                    cmd_buffer.pipelineBarrier(
-                        vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eFragmentShader,
-                        vk::PipelineStageFlagBits::eComputeShader, {}, {}, {}, store_to_compute);
+                    {
+                        vkutil::Image &store_src = want_raw_src ? *info.raw_image : info.texture;
+                        vkutil::sync::Batch batch;
+                        store_src.use_in_place(batch, vkutil::sync::S::eComputeShader, vkutil::sync::A::eShaderRead);
+                        batch.flush(cmd_buffer);
+                    }
 
                     vk::DescriptorSet dset = reinterpret_desc_sets[reinterpret_desc_idx];
                     reinterpret_desc_idx = (reinterpret_desc_idx + 1) % static_cast<uint32_t>(reinterpret_desc_sets.size());
@@ -1608,29 +1593,20 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
                     };
                     const bool byte_use_raw = info.raw_image && !info.content_is_blended;
                     const vk::Image byte_src = byte_use_raw ? info.raw_image->image : info.texture.image;
-                    vk::ImageMemoryBarrier img_barrier{
-                        .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eShaderWrite,
-                        .dstAccessMask = vk::AccessFlagBits::eTransferRead,
-                        .oldLayout = vk::ImageLayout::eGeneral,
-                        .newLayout = vk::ImageLayout::eGeneral,
-                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .image = byte_src,
-                        .subresourceRange = vkutil::color_subresource_range
-                    };
-                    cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eFragmentShader, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, img_barrier);
+                    {
+                        vkutil::Image &byte_src_img = byte_use_raw ? *info.raw_image : info.texture;
+                        vkutil::sync::Batch batch;
+                        byte_src_img.use_in_place(batch, vkutil::sync::S::eTransfer, vkutil::sync::A::eTransferRead);
+                        // the staging buffer is written by the copy below and read by the buffer->image copy after it
+                        casted->transition_buffer.use(batch, vkutil::sync::S::eTransfer, vkutil::sync::A::eTransferWrite);
+                        batch.flush(cmd_buffer);
+                    }
                     cmd_buffer.copyImageToBuffer(byte_src, vk::ImageLayout::eGeneral, casted->transition_buffer.buffer, copy_image_buffer);
-
-                    vk::BufferMemoryBarrier buf_barrier{
-                        .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-                        .dstAccessMask = vk::AccessFlagBits::eTransferRead,
-                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .buffer = casted->transition_buffer.buffer,
-                        .offset = 0,
-                        .size = VK_WHOLE_SIZE
-                    };
-                    cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, buf_barrier, {});
+                    {
+                        vkutil::sync::Batch batch;
+                        casted->transition_buffer.use(batch, vkutil::sync::S::eTransfer, vkutil::sync::A::eTransferRead);
+                        batch.flush(cmd_buffer);
+                    }
 
                     copy_image_buffer
                         .setBufferOffset(src_byte_offset)
@@ -1656,7 +1632,9 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
             raw_bits_cast
         };
     } else {
-        // the renderpass external dependencies should take care of the barrier
+        // the renderpass external dependencies should take care of the barrier (the tracker verifies that and counts a miss)
+        vkutil::sync::Batch::observe(info.texture.sync, vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader,
+            vkutil::sync::A::eShaderRead, vk::ImageLayout::eGeneral);
         if (swizzle == info.swizzle && vk_format == info.texture.format)
             // we can use the same texture view
             return TextureLookupResult{
@@ -2086,6 +2064,10 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
     found_info->last_used_frame = reinterpret_cast<VKContext *>(state.context)->frame_timestamp;
     found_info->last_used_scene = reinterpret_cast<VKContext *>(state.context)->scene_timestamp;
 
+    // depth sampled as a texture by this scene's draws (Killzone depth of field): verify the pass dependencies cover it
+    vkutil::sync::Batch::observe(cached_info.texture.sync, vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader,
+        vkutil::sync::A::eShaderRead, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+
     // take MSAA into account
     if (cached_info.multisample_mode != SCE_GXM_MULTISAMPLE_NONE)
         height /= 2;
@@ -2324,6 +2306,7 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
     }
 
     auto &result = (framebuffer_array[key] = { fb_standard, fb_interlock, color_result.base_image, framebuffer_width, framebuffer_height, color_result.raw_image });
+    result.ds_image = ds_result.base_image;
     result.shell_fetch_snapshot = std::move(shell_snapshot);
     return result;
 }
@@ -2615,17 +2598,10 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
     vk::ImageLayout image_layout = vk::ImageLayout::eGeneral;
 
     {
-        vk::ImageMemoryBarrier sync_src_barrier{
-            .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eShaderWrite,
-            .dstAccessMask = vk::AccessFlagBits::eTransferRead,
-            .oldLayout = vk::ImageLayout::eGeneral,
-            .newLayout = vk::ImageLayout::eGeneral,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = image_to_copy,
-            .subresourceRange = vkutil::color_subresource_range
-        };
-        cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eFragmentShader, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, sync_src_barrier);
+        vkutil::Image &sync_src_image = sync_from_raw ? *last_written_surface->raw_image : last_written_surface->texture;
+        vkutil::sync::Batch batch;
+        sync_src_image.use_in_place(batch, vkutil::sync::S::eTransfer, vkutil::sync::A::eTransferRead);
+        batch.flush(cmd_buffer);
     }
 
     // this works for surface swizzles

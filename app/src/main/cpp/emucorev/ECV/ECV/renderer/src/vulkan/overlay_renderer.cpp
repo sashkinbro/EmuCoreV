@@ -180,8 +180,7 @@ bool OverlayRenderer::init(VKState &state) {
             .baseArrayLayer = 0,
             .layerCount = 1,
         };
-        vkutil::transition_image_layout_discard(cmd, m_dummy_texture_array.image,
-            m_dummy_texture_array.layout, vkutil::ImageLayout::TransferDst, range);
+        m_dummy_texture_array.transition_to_discard(cmd, vkutil::ImageLayout::TransferDst, range);
 
         const uint32_t white_pixel = 0xFFFFFFFF;
         vkutil::Buffer staging(4);
@@ -203,8 +202,7 @@ bool OverlayRenderer::init(VKState &state) {
         };
         cmd.copyBufferToImage(staging.buffer, m_dummy_texture_array.image,
             vk::ImageLayout::eTransferDstOptimal, region);
-        vkutil::transition_image_layout(cmd, m_dummy_texture_array.image,
-            vkutil::ImageLayout::TransferDst, vkutil::ImageLayout::SampledImage, range);
+        m_dummy_texture_array.transition_to(cmd, vkutil::ImageLayout::SampledImage, range);
         m_dummy_texture_array.layout = vkutil::ImageLayout::SampledImage;
 
         vkutil::end_single_time_command(device, state.general_queue, state.general_command_pool, cmd);
@@ -525,8 +523,7 @@ vk::ImageView OverlayRenderer::upload_font(vk::CommandBuffer cmd, const overlay:
         .baseArrayLayer = 0,
         .layerCount = dims.depth,
     };
-    vkutil::transition_image_layout_discard(cmd, entry.image.image,
-        entry.image.layout, vkutil::ImageLayout::TransferDst, range);
+    entry.image.transition_to_discard(cmd, vkutil::ImageLayout::TransferDst, range);
 
     std::vector<vk::BufferImageCopy> copies(dims.depth);
     for (uint32_t layer = 0; layer < dims.depth; ++layer) {
@@ -547,8 +544,7 @@ vk::ImageView OverlayRenderer::upload_font(vk::CommandBuffer cmd, const overlay:
     cmd.copyBufferToImage(staging.buffer, entry.image.image,
         vk::ImageLayout::eTransferDstOptimal, copies);
 
-    vkutil::transition_image_layout(cmd, entry.image.image,
-        vkutil::ImageLayout::TransferDst, vkutil::ImageLayout::SampledImage, range);
+    entry.image.transition_to(cmd, vkutil::ImageLayout::SampledImage, range);
     entry.image.layout = vkutil::ImageLayout::SampledImage;
 
     m_staging_garbage[m_active_frame_slot].push_back(std::move(staging));
@@ -631,8 +627,7 @@ void OverlayRenderer::upload_image(vk::CommandBuffer cmd, const overlay::image_i
         .baseArrayLayer = 0,
         .layerCount = 1,
     };
-    vkutil::transition_image_layout_discard(cmd, dst.image,
-        dst.layout, vkutil::ImageLayout::TransferDst, all_mips);
+    dst.transition_to_discard(cmd, vkutil::ImageLayout::TransferDst, all_mips);
 
     vk::BufferImageCopy region{
         .bufferOffset = 0,
@@ -655,8 +650,14 @@ void OverlayRenderer::upload_image(vk::CommandBuffer cmd, const overlay::image_i
                 .baseArrayLayer = 0,
                 .layerCount = 1,
             };
-            vkutil::transition_image_layout(cmd, dst.image,
-                vkutil::ImageLayout::TransferDst, vkutil::ImageLayout::TransferSrc, src_range);
+            {
+                // per-mip-level layouts: explicit sub-range barrier (the image-wide tracked state is set after the chain)
+                vkutil::sync::Batch mip_batch;
+                mip_batch.explicit_image(dst.image, src_range, { vkutil::sync::S::eTransfer, vkutil::sync::S::eTransfer,
+                    vkutil::sync::A::eTransferWrite, vkutil::sync::A::eTransferRead, vk::ImageLayout::eTransferDstOptimal,
+                    vk::ImageLayout::eTransferSrcOptimal, true });
+                mip_batch.flush(cmd);
+            }
 
             uint32_t next_w = std::max(mip_w / 2, 1u);
             uint32_t next_h = std::max(mip_h / 2, 1u);
@@ -695,8 +696,18 @@ void OverlayRenderer::upload_image(vk::CommandBuffer cmd, const overlay::image_i
             .baseArrayLayer = 0,
             .layerCount = 1,
         };
-        vkutil::transition_image_layout(cmd, dst.image,
-            vkutil::ImageLayout::TransferSrc, vkutil::ImageLayout::SampledImage, src_levels);
+        {
+            const vkutil::sync::Stage sampling = vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader | vkutil::sync::S::eComputeShader;
+            vkutil::sync::Batch mip_batch;
+            mip_batch.explicit_image(dst.image, src_levels, { vkutil::sync::S::eTransfer, sampling, vkutil::sync::A::eNone,
+                vkutil::sync::A::eShaderRead, vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, true });
+            mip_batch.explicit_image(dst.image, { vk::ImageAspectFlagBits::eColor, mip_levels - 1, 1, 0, 1 },
+                { vkutil::sync::S::eTransfer, sampling, vkutil::sync::A::eTransferWrite, vkutil::sync::A::eShaderRead,
+                    vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, true });
+            mip_batch.flush(cmd);
+            vkutil::sync::track_pass_end(dst.sync, vk::ImageLayout::eShaderReadOnlyOptimal, vkutil::sync::S::eTransfer,
+                vkutil::sync::A::eTransferWrite, sampling, vkutil::sync::A::eShaderRead);
+        }
 
         vk::ImageSubresourceRange last_level{
             .aspectMask = vk::ImageAspectFlagBits::eColor,
@@ -705,11 +716,9 @@ void OverlayRenderer::upload_image(vk::CommandBuffer cmd, const overlay::image_i
             .baseArrayLayer = 0,
             .layerCount = 1,
         };
-        vkutil::transition_image_layout(cmd, dst.image,
-            vkutil::ImageLayout::TransferDst, vkutil::ImageLayout::SampledImage, last_level);
+        (void)last_level;
     } else {
-        vkutil::transition_image_layout(cmd, dst.image,
-            vkutil::ImageLayout::TransferDst, vkutil::ImageLayout::SampledImage, all_mips);
+        dst.transition_to(cmd, vkutil::ImageLayout::SampledImage, all_mips);
     }
 
     dst.layout = vkutil::ImageLayout::SampledImage;

@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <vkutil/sync_tracker.h>
 #include <vkutil/vkutil.h>
 
 #include <bit>
@@ -36,6 +37,8 @@ struct Image {
     uint32_t height;
     vk::Format format;
     ImageLayout layout = ImageLayout::Undefined;
+    // tracked synchronisation state (layout, last writer, readers, visibility), see sync_tracker.h
+    sync::State sync;
 
     // should the existing image, view, sampler be destroyed when this image is destroyed?
     bool destroy_on_deletion = true;
@@ -59,6 +62,15 @@ struct Image {
     void transition_to(vk::CommandBuffer buffer, ImageLayout new_layout, const vk::ImageSubresourceRange &range = color_subresource_range);
     // use this when you don't care about the former content of the image
     void transition_to_discard(vk::CommandBuffer buffer, ImageLayout new_layout, const vk::ImageSubresourceRange &range = color_subresource_range);
+
+    // Tracked use of the whole image for a specific access (copy source, storage image, sampled in a given stage...).
+    // The barrier goes into `batch`, which the caller flushes before the command that needs it.
+    void use(sync::Batch &batch, sync::Stage stage, sync::Access access, vk::ImageLayout vk_layout, const vk::ImageSubresourceRange &range = color_subresource_range, bool discard = false);
+    // Same, in the layout the image already is in (general-layout colour surfaces).
+    void use_in_place(sync::Batch &batch, sync::Stage stage, sync::Access access, const vk::ImageSubresourceRange &range = color_subresource_range);
+    // Record that a render pass wrote this attachment and left it in `final_layout` (see sync::track_pass_end).
+    // Also the point where an unconditional layout field is kept in sync with the tracker.
+    void sync_reset();
 };
 
 struct Buffer {
@@ -66,6 +78,7 @@ struct Buffer {
     vk::Buffer buffer;
 
     vk::DeviceSize size = 0;
+    sync::State sync;
     // only useful is buffer is host visible
     void *mapped_data = nullptr;
 
@@ -84,6 +97,8 @@ struct Buffer {
     Buffer &operator=(Buffer const &) = delete;
 
     void init_buffer(vk::BufferUsageFlags usage_flags, const vma::AllocationCreateInfo &alloc_create_info = vma_auto_alloc);
+    // tracked use of the whole buffer
+    void use(sync::Batch &batch, sync::Stage stage, sync::Access access);
     // called by ~Image
     void destroy();
 };

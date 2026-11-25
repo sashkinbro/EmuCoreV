@@ -115,12 +115,14 @@ bool transfer_snapshot(const ImageSnapshotDevice &context, Image &image,
             .commandPool = context.command_pool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1});
         auto &command = commands.front();
         command->begin(vk::CommandBufferBeginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+        namespace sync = vkutil::sync;
+        sync::State staging_state;
         if (upload) {
-            const vk::BufferMemoryBarrier ready{.srcAccessMask = vk::AccessFlagBits::eHostWrite,
-                .dstAccessMask = vk::AccessFlagBits::eTransferRead,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = *buffer, .offset = 0, .size = VK_WHOLE_SIZE};
-            command->pipelineBarrier(vk::PipelineStageFlagBits::eHost, vk::PipelineStageFlagBits::eTransfer, {}, {}, ready, {});
+            // host-written staging buffer -> transfer read (tracked through a local state: the buffer lives for this call only)
+            sync::Batch batch;
+            batch.use_buffer(staging_state, *buffer, sync::S::eHost, sync::A::eHostWrite);
+            batch.use_buffer(staging_state, *buffer, sync::S::eTransfer, sync::A::eTransferRead);
+            batch.flush(*command);
         }
         const vk::ImageSubresourceRange range{.aspectMask = layout.aspects, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1};
         image.transition_to(*command, upload ? ImageLayout::TransferDst : ImageLayout::TransferSrc, range);
@@ -129,11 +131,10 @@ bool transfer_snapshot(const ImageSnapshotDevice &context, Image &image,
         else
             command->copyImageToBuffer(image.image, vk::ImageLayout::eTransferSrcOptimal, *buffer, layout.regions);
         if (!upload) {
-            const vk::BufferMemoryBarrier ready{.srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-                .dstAccessMask = vk::AccessFlagBits::eHostRead,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = *buffer, .offset = 0, .size = VK_WHOLE_SIZE};
-            command->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost, {}, {}, ready, {});
+            sync::Batch batch;
+            batch.use_buffer(staging_state, *buffer, sync::S::eTransfer, sync::A::eTransferWrite);
+            batch.use_buffer(staging_state, *buffer, sync::S::eHost, sync::A::eHostRead);
+            batch.flush(*command);
         }
         image.transition_to(*command, final_layout, range);
         command->end();

@@ -385,9 +385,9 @@ void VKTextureCache::prepare_staging_buffer(bool is_configure) {
 
     // if this is done during configure, layout is undefined, otherwise it is shader read only
     if (is_configure)
-        vkutil::transition_image_layout(cmd_buffer, current_texture->texture.image, vkutil::ImageLayout::Undefined, vkutil::ImageLayout::TransferDst, range);
+        current_texture->texture.transition_to(cmd_buffer, vkutil::ImageLayout::TransferDst, range);
     else
-        vkutil::transition_image_layout_discard(cmd_buffer, current_texture->texture.image, vkutil::ImageLayout::SampledImage, vkutil::ImageLayout::TransferDst, range);
+        current_texture->texture.transition_to_discard(cmd_buffer, vkutil::ImageLayout::TransferDst, range);
 
     is_texture_transfer_ready = true;
 }
@@ -753,8 +753,7 @@ void VKTextureCache::upload_done() {
         .baseArrayLayer = 0,
         .layerCount = current_texture->is_cube ? 6U : 1U
     };
-    vkutil::transition_image_layout(cmd_buffer, current_texture->texture.image, vkutil::ImageLayout::TransferDst, vkutil::ImageLayout::SampledImage, range);
-    current_texture->texture.layout = vkutil::ImageLayout::SampledImage;
+    current_texture->texture.transition_to(cmd_buffer, vkutil::ImageLayout::SampledImage, range);
     // this should not be necessary
     cmd_buffer = nullptr;
     is_texture_transfer_ready = false;

@@ -16,6 +16,8 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <renderer/vulkan/pipeline_cache.h>
+
+#include <cstring>
 #include <renderer/vulkan/render_pass_sync.h>
 
 #include <renderer/functions.h>
@@ -324,7 +326,7 @@ void PipelineCache::set_async_compilation(bool enable) {
 }
 
 // magic number put at the beginning of the pipeline cache file
-constexpr uint32_t pipeline_cache_magic = 0xBEEF4321;
+constexpr uint32_t pipeline_cache_magic = 0xBEEF4322; // 4322: pipeline keys are mixed with XXH3 instead of XOR (P14), old hash lists are meaningless
 
 void PipelineCache::read_pipeline_cache() {
     const std::string pipeline_cache_name = fmt::format("pipeline-cache-vk{}.dat", shader::CURRENT_VERSION);
@@ -360,6 +362,29 @@ void PipelineCache::read_pipeline_cache() {
     }
     pipeline_size -= hashes_size;
 
+    // P14: trust the blob only if this driver would accept it. The first bytes are VkPipelineCacheHeaderVersionOne
+    // (size, version, vendor, device, uuid); a driver update or another GPU makes it useless, and the hash list would then lie
+    // ("already compiled") and send every pipeline down the synchronous path.
+    {
+        const auto pos = pipeline_cache_file.tellg();
+        struct CacheHeader {
+            uint32_t size, version, vendor, device;
+            uint8_t uuid[VK_UUID_SIZE];
+        } header{};
+        pipeline_cache_file.seekg(static_cast<std::streamoff>(hashes_size));
+        pipeline_cache_file.read(reinterpret_cast<char *>(&header), sizeof(header));
+        const vk::PhysicalDeviceProperties props = state.physical_device.getProperties();
+        const bool accepted = pipeline_cache_file.gcount() == static_cast<std::streamsize>(sizeof(header))
+            && header.version == VK_PIPELINE_CACHE_HEADER_VERSION_ONE && header.vendor == props.vendorID && header.device == props.deviceID
+            && std::memcmp(header.uuid, props.pipelineCacheUUID.data(), VK_UUID_SIZE) == 0;
+        if (!accepted) {
+            LOG_WARN("Pipeline cache was written for another driver or GPU, ignoring it.");
+            pipeline_cache_file.close();
+            return;
+        }
+        pipeline_cache_file.clear();
+        pipeline_cache_file.seekg(pos);
+    }
     // insert hashes with null pipeline
     for (size_t i = 0; i < nb_hashes; i++) {
         uint64_t hash;
@@ -399,7 +424,9 @@ void PipelineCache::save_pipeline_cache() {
     const std::string pipeline_cache_name = fmt::format("pipeline-cache-vk{}.dat", shader::CURRENT_VERSION);
     const fs::path path = state.shaders_path / pipeline_cache_name;
 
-    fs::ofstream pipeline_cache_file(path, std::ios::out | std::ios::binary | std::ios::trunc);
+    // P14: write next to the real file and rename, a crash or a full disk can no longer leave a truncated cache
+    const fs::path tmp_path = fs::path(path.string() + ".tmp");
+    fs::ofstream pipeline_cache_file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
     if (!pipeline_cache_file.is_open())
         return;
 
@@ -418,6 +445,18 @@ void PipelineCache::save_pipeline_cache() {
     // then save the cache
     pipeline_cache_file.write(reinterpret_cast<const char *>(pipeline_data.data()), pipeline_data.size());
     pipeline_cache_file.close();
+    if (!pipeline_cache_file.good()) {
+        LOG_WARN("Could not write the pipeline cache, keeping the previous one.");
+        boost::system::error_code ignored;
+        fs::remove(tmp_path, ignored);
+        return;
+    }
+    boost::system::error_code rename_ec;
+    fs::rename(tmp_path, path, rename_ec);
+    if (rename_ec) {
+        LOG_WARN("Could not replace the pipeline cache: {}", rename_ec.message());
+        return;
+    }
     LOG_INFO("Pipeline cache saved");
 }
 
@@ -1059,18 +1098,16 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     uint64_t key = XXH3_64bits(&record, record_pipeline_len);
     key = alpha_surface_pipeline_key(key, record.color_surface.colorFormat);
 
-    // add the hash of the blending
+    // the blending, vertex-layout and primitive-type parts are mixed in below with a real hash (P14: they used to be XORed in,
+    // so e.g. two different blending/layout pairs with the same XOR collided onto one pipeline)
     SceGxmFragmentProgram &fragment_program_gxm = *record.fragment_program.get(mem);
     const VKFragmentProgram &fragment_program = *reinterpret_cast<VKFragmentProgram *>(
         fragment_program_gxm.renderer_data.get());
-    key ^= fragment_program.blending_hash;
-
-    // add the hash of the attribute and stream layout
     SceGxmVertexProgram &vertex_program_gxm = *record.vertex_program.get(mem);
-    key ^= vertex_program_gxm.key_hash;
-
-    // and also add the primitive type
-    key ^= static_cast<uint64_t>(type);
+    {
+        const uint64_t parts[4] = { key, fragment_program.blending_hash, vertex_program_gxm.key_hash, static_cast<uint64_t>(type) };
+        key = XXH3_64bits(parts, sizeof(parts));
+    }
 
     // the render pass is chosen per scene from the depth/stencil surface: its format and which tests exist change the pipeline,
     // and so does the facing variant of a draw split by facing

@@ -101,6 +101,8 @@ DISABLE_CLANG_WARNING_END
 
 #include <util/fs.h>
 
+#include <vkutil/sync_tracker.h>
+
 namespace vkutil {
 
 static constexpr vk::ImageSubresourceRange color_subresource_range = {
@@ -195,9 +197,10 @@ enum struct ImageLayout {
     StorageImage,
     DepthStencilReadOnly
 };
+// Renderer code must use vkutil::Image::transition_to() / use() (sync_tracker.h), which derive the barrier from the tracked state.
+// This stateless form (caller-owned layouts, table masks) exists only for external tools that read back images they do not track
+// (tools/oracles/core-hooks/ecv_perdraw.h); it still goes through the batch emitter (sync2/legacy, full-barrier fallback).
 void transition_image_layout(vk::CommandBuffer cmd_buffer, vk::Image image, ImageLayout src_layout, ImageLayout dst_layout, const vk::ImageSubresourceRange &range = color_subresource_range);
-// transition image layout assuming you don't care about the former image content
-void transition_image_layout_discard(vk::CommandBuffer cmd_buffer, vk::Image image, ImageLayout src_layout, ImageLayout dst_layout, const vk::ImageSubresourceRange &range = color_subresource_range);
 // Return the vulkan layout associated with ImageLayout
 vk::ImageLayout get_underlying_layout(ImageLayout layout);
 // Pipeline stages / access a transition into (dst) or out of (src) this layout synchronises against
