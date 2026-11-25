@@ -119,17 +119,17 @@ static constexpr ImageLayoutTransition layout_transitions[] = {
     // SampledImage
     {
         vk::ImageLayout::eShaderReadOnlyOptimal,
-        vk::PipelineStageFlagBits::eFragmentShader | vk::PipelineStageFlagBits::eComputeShader,
+        vk::PipelineStageFlagBits::eVertexShader | vk::PipelineStageFlagBits::eFragmentShader | vk::PipelineStageFlagBits::eComputeShader,
         vk::AccessFlagBits::eShaderRead },
     // StorageImage
     {
         vk::ImageLayout::eGeneral,
-        vk::PipelineStageFlagBits::eFragmentShader | vk::PipelineStageFlagBits::eComputeShader,
+        vk::PipelineStageFlagBits::eVertexShader | vk::PipelineStageFlagBits::eFragmentShader | vk::PipelineStageFlagBits::eComputeShader,
         vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite },
     // DepthStencilReadOnly
     {
         vk::ImageLayout::eDepthStencilReadOnlyOptimal,
-        vk::PipelineStageFlagBits::eFragmentShader,
+        vk::PipelineStageFlagBits::eVertexShader | vk::PipelineStageFlagBits::eFragmentShader,
         vk::AccessFlagBits::eShaderRead },
 };
 
@@ -161,6 +161,11 @@ void transition_image_layout_discard(vk::CommandBuffer cmd_buffer, vk::Image ima
 
 vk::ImageLayout get_underlying_layout(ImageLayout layout) {
     return layout_transitions[static_cast<int>(layout)].layout;
+}
+
+LayoutBarrierMasks get_layout_barrier_masks(ImageLayout layout) {
+    const ImageLayoutTransition &t = layout_transitions[static_cast<int>(layout)];
+    return { t.stages, t.access };
 }
 
 vk::ComponentMapping color_to_texture_swizzle(const vk::ComponentMapping &swizzle_color, const vk::ComponentMapping &swizzle_texture) {

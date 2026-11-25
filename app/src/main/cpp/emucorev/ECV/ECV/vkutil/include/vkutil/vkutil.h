@@ -200,6 +200,12 @@ void transition_image_layout(vk::CommandBuffer cmd_buffer, vk::Image image, Imag
 void transition_image_layout_discard(vk::CommandBuffer cmd_buffer, vk::Image image, ImageLayout src_layout, ImageLayout dst_layout, const vk::ImageSubresourceRange &range = color_subresource_range);
 // Return the vulkan layout associated with ImageLayout
 vk::ImageLayout get_underlying_layout(ImageLayout layout);
+// Pipeline stages / access a transition into (dst) or out of (src) this layout synchronises against
+struct LayoutBarrierMasks {
+    vk::PipelineStageFlags stages;
+    vk::AccessFlags access;
+};
+LayoutBarrierMasks get_layout_barrier_masks(ImageLayout layout);
 
 // given the swizzle of the color surface (which was written as rgba because vulkan doesn't support swizzle on framebuffers)
 // and the swizzle of the texture that's reading from the color surface

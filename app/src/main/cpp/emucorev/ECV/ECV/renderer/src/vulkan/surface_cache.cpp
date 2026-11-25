@@ -31,8 +31,13 @@
 
 #include <vulkan/vulkan_format_traits.hpp>
 
+#define XXH_INLINE_ALL
+#include <xxhash.h>
+
 #include <atomic>
 #include <cmath>
+#include <shared_mutex>
+#include <variant>
 #include <limits>
 #include <mem/functions.h>
 #include <util/align.h>
@@ -99,29 +104,42 @@ static bool protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
     const bool trap_reads = (info.tiling == SurfaceTiling::Linear
         && format_support_surface_sync(info.format));
 
-    uint32_t addr_start = align(info.data.address(), KiB(4));
-    uint32_t addr_end = align_down(info.data.address() + info.total_bytes, KiB(4));
-    bool small_surface = addr_start >= addr_end;
-    if (small_surface) {
-        // we still need to protect something, even if it's not completely accurate
-        addr_start = align_down(info.data.address(), KiB(4));
-        addr_end = align(info.data.address() + info.total_bytes, KiB(4));
-    }
+    // Every surface, whatever its size, is trapped over the whole page span that covers its bytes
+    // (B131: small surfaces used to be untracked and big ones skipped their first/last partial page).
+    // Faults from unrelated data sharing those pages are not guessed away: the fired trap is judged by
+    // refresh_guest_trap (exact write address, then a hash of the surface bytes).
+    const uint32_t addr_start = align_down(info.data.address(), KiB(4));
+    const uint32_t addr_end = align(info.data.address() + info.total_bytes, KiB(4));
+    const uint32_t surface_begin = info.data.address();
+    const uint32_t surface_end = info.data.address() + info.total_bytes;
+
+    if (!info.guest_trap)
+        info.guest_trap = std::make_shared<GuestTrapState>();
 
     // Use MemPerm::None to trap both reads and writes for surfaces that support sync,
     // MemPerm::ReadOnly to trap only writes for other surfaces
     MemPerm perm = trap_reads ? MemPerm::None : MemPerm::ReadOnly;
     std::shared_ptr<bool> need_sync = trap_reads ? info.need_surface_sync : nullptr;
-    // Don't track dirty for small surfaces to avoid false positives from unrelated writes
-    std::shared_ptr<bool> dirty = small_surface ? nullptr : info.dirty;
+    std::shared_ptr<bool> dirty = info.dirty;
+    std::shared_ptr<GuestTrapState> trap = info.guest_trap;
 
     return add_protect(mem, addr_start, addr_end - addr_start, perm,
-        [dirty, need_sync](Address, bool write) {
-            // ignore our own guest write-backs
-            if (write && surface_sync_internal_write)
+        [dirty, need_sync, trap, surface_begin, surface_end](Address fault, bool write) {
+            // the segment is one-shot: whatever happens below, the surface is unarmed from now on
+            trap->fired.store(true);
+            // ignore our own guest write-backs (the hash baseline is not used for synced surfaces)
+            if (write && surface_sync_internal_write) {
+                trap->emulator_wrote.store(true);
                 return true;
-            if (write && dirty) {
-                *dirty = true;
+            }
+            if (write) {
+                if (fault >= surface_begin && fault < surface_end) {
+                    trap->write_inside.store(true);
+                    // with an arm-time hash the bytes decide (refresh_guest_trap); without one the fault is the proof
+                    if (!trap->verify_by_hash.load())
+                        *dirty = true;
+                }
+                // else: a write to data sharing the page. It may still sweep into the surface; judged by hash
                 return true;
             }
             if (need_sync)
@@ -130,8 +148,51 @@ static bool protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
         });
 }
 
-bool VKSurfaceCache::protect_cached_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
+bool VKSurfaceCache::arm_guest_trap(MemState &mem, ColorSurfaceCacheInfo &info) {
+    if (!info.guest_trap)
+        info.guest_trap = std::make_shared<GuestTrapState>();
+    info.guest_trap->fired.store(false);
+    info.guest_trap->write_inside.store(false);
+    info.guest_trap->verify_by_hash.store(false);
+    info.guest_trap->emulator_wrote.store(false);
+
+    // Baseline first: while the surface is unarmed its bytes are readable without a trap (a linear
+    // surface's trap also catches reads). A CPU write in the few instructions before add_protect is
+    // not trapped; it is only missed if it also hits no later fault, and such a write targets memory
+    // the GPU image already superseded.
+    info.guest_hash_valid = false;
+    if (info.total_bytes != 0 && info.total_bytes <= surface_policy::verify_hash_limit_bytes
+        && is_valid_addr_range(mem, info.data.address(), info.data.address() + info.total_bytes)) {
+        info.guest_hash = XXH3_64bits(info.data.get(mem), info.total_bytes);
+        info.guest_hash_valid = true;
+        info.guest_trap->verify_by_hash.store(!(info.need_surface_sync && *info.need_surface_sync));
+    }
     return protect_surface(mem, info);
+}
+
+void VKSurfaceCache::refresh_guest_trap(MemState &mem, ColorSurfaceCacheInfo &info) {
+    if (!info.data || !info.guest_trap || !info.guest_trap->fired.load())
+        return;
+    // the fault handler flags the trap before it opens the pages: wait until it has finished
+    { const std::lock_guard<std::mutex> handler_done(mem.protect_mutex); }
+
+    surface_policy::TrapObservation observation;
+    observation.fired = true;
+    observation.write_inside_range = info.guest_trap->write_inside.load();
+    observation.baseline_valid = info.guest_hash_valid;
+    observation.gpu_writes_memory = info.need_surface_sync && *info.need_surface_sync;
+    observation.emulator_wrote = info.guest_trap->emulator_wrote.load();
+    if (observation.baseline_valid && !observation.gpu_writes_memory) {
+        observation.hash_differs = !is_valid_addr_range(mem, info.data.address(), info.data.address() + info.total_bytes)
+            || XXH3_64bits(info.data.get(mem), info.total_bytes) != info.guest_hash;
+    }
+    if (surface_policy::judge_trap(observation) == surface_policy::TrapVerdict::CpuWrote)
+        *info.dirty = true;
+    arm_guest_trap(mem, info);
+}
+
+bool VKSurfaceCache::protect_cached_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
+    return arm_guest_trap(mem, info);
 }
 
 ColorSurfaceCacheInfo::~ColorSurfaceCacheInfo() {
@@ -290,6 +351,185 @@ void VKSurfaceCache::destroy_surface(DepthStencilSurfaceCacheInfo &info) {
     }
 }
 
+uint64_t VKSurfaceCache::color_surface_gpu_bytes(const ColorSurfaceCacheInfo &info) const {
+    const auto image_bytes = [](const vkutil::Image &image) -> uint64_t {
+        if (!image.image || image.format == vk::Format::eUndefined)
+            return 0;
+        return static_cast<uint64_t>(image.width) * image.height * vk::blockSize(image.format);
+    };
+    uint64_t bytes = image_bytes(info.texture);
+    if (info.raw_image)
+        bytes += image_bytes(*info.raw_image);
+    if (info.blit_image)
+        bytes += image_bytes(*info.blit_image);
+    return bytes;
+}
+
+uint64_t VKSurfaceCache::ensure_surface_budget() {
+    if (surface_budget == 0) {
+        uint64_t heap = 0;
+        for (uint32_t i = 0; i < state.physical_device_memory.memoryHeapCount; i++) {
+            const auto &h = state.physical_device_memory.memoryHeaps[i];
+            if (h.flags & vk::MemoryHeapFlagBits::eDeviceLocal)
+                heap = std::max<uint64_t>(heap, h.size);
+        }
+        surface_budget = surface_policy::surface_budget_bytes(heap);
+        LOG_INFO("Surface cache budget: {} MiB (device-local heap {} MiB)", surface_budget >> 20, heap >> 20);
+    }
+    return surface_budget;
+}
+
+bool VKSurfaceCache::write_back_before_destroy(ColorSurfaceCacheInfo &info, MemState &mem) {
+    if (!info.texture.image || !info.data || info.total_bytes == 0)
+        return false;
+    refresh_guest_trap(mem, info);
+
+    surface_policy::WritebackInput input;
+    input.linear = info.tiling == SurfaceTiling::Linear;
+    input.sync_available = state.features.enable_memory_mapping && !state.disable_surface_sync
+        && format_support_surface_sync(info.format)
+        && is_valid_addr_range(mem, info.data.address(), info.data.address() + info.total_bytes);
+    input.cpu_newer = info.dirty && *info.dirty;
+    input.kept_in_sync = info.need_surface_sync && *info.need_surface_sync && !info.gpu_read_sync_only;
+    for (const auto &[address, other] : color_address_lookup) {
+        if (other == &info || !other->texture.image)
+            continue;
+        if (surface_policy::is_superseded(info.last_scene_rendered, other->last_scene_rendered,
+                surface_policy::ranges_overlap(info.data.address(), info.data.address() + info.total_bytes, address, address + other->total_bytes))) {
+            input.superseded = true;
+            break;
+        }
+    }
+
+    const surface_policy::Writeback decision = surface_policy::decide_writeback(input);
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::rt_surface("WRITEBACK", info.data.address(), info.total_bytes, info.original_width, info.original_height,
+            static_cast<uint32_t>(info.format), info.stride_bytes, static_cast<uint32_t>(info.tiling), input.cpu_newer,
+            decision == surface_policy::Writeback::Do, static_cast<uint64_t>(decision));
+#endif
+    if (decision == surface_policy::Writeback::Do) {
+        info.gpu_read_sync_only = false;
+        sync_for_eviction = true;
+        submit_immediate_surface_sync(info, &mem);
+        sync_for_eviction = false;
+
+        if (state.mapping_method == MappingMethod::DoubleBuffer && info.need_buffer_sync) {
+            // the scene-end path forwards the mirror buffer to guest memory through a BufferSyncRequest;
+            // a retired surface has no scene end, so do the same rows here, synchronously
+            info.need_buffer_sync = false;
+            const uint32_t bpp = gxm::bits_per_pixel(info.format) / 8;
+            const uint64_t x0 = static_cast<uint32_t>(std::max(info.post_sync_x0, 0));
+            const uint64_t y0 = static_cast<uint32_t>(std::max(info.post_sync_y0, 0));
+            const uint64_t row_bytes = static_cast<uint64_t>(info.post_sync_width) * bpp;
+            const uint64_t first = static_cast<uint64_t>(info.data.address()) + y0 * info.stride_bytes + x0 * bpp;
+            const auto span = surface_sync_rows_span(info.stride_bytes, row_bytes, info.post_sync_height);
+            auto mem_it = state.mapped_memories.lower_bound(static_cast<Address>(first));
+            if (bpp != 0 && span && *span != 0 && first + *span <= static_cast<uint64_t>(info.data.address()) + info.total_bytes
+                && mem_it != state.mapped_memories.end() && static_cast<Address>(first) >= mem_it->first
+                && std::holds_alternative<vkutil::Buffer>(mem_it->second.buffer_impl)) {
+                const uint64_t offset = first - mem_it->first;
+                if (offset <= mem_it->second.size && *span <= mem_it->second.size - offset) {
+                    const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
+                    const uint8_t *src = static_cast<const uint8_t *>(std::get<vkutil::Buffer>(mem_it->second.buffer_impl).mapped_data) + offset;
+                    uint8_t *dst = Ptr<void>(static_cast<Address>(first)).cast<uint8_t>().get(mem);
+                    surface_sync_internal_write = true;
+                    copy_surface_sync_rows(dst, *span, src, *span, info.stride_bytes, row_bytes, info.post_sync_height);
+                    surface_sync_internal_write = false;
+                }
+            }
+        }
+    }
+
+    const bool guest_authoritative = decision == surface_policy::Writeback::Do
+        || decision == surface_policy::Writeback::SkipAlreadySynced
+        || decision == surface_policy::Writeback::SkipCpuNewer;
+    if (guest_authoritative) {
+        VKContext &context = *static_cast<VKContext *>(state.context);
+        surface_policy::remember_preserved(preserved_ranges,
+            { info.data.address(), info.data.address() + info.total_bytes, context.frame_timestamp });
+    }
+    return decision == surface_policy::Writeback::Do;
+}
+
+void VKSurfaceCache::evict_color_surface(ColorSurfaceCacheInfo &info, MemState &mem) {
+    if (info.texture.image) {
+        write_back_before_destroy(info, mem);
+        destroy_surface(info);
+    }
+    if (info.data) {
+        auto it = color_address_lookup.find(info.data.address());
+        if (it != color_address_lookup.end() && it->second == &info)
+            color_address_lookup.erase(it);
+    }
+    if (last_written_surface == &info)
+        last_written_surface = nullptr;
+}
+
+ColorSurfaceCacheInfo &VKSurfaceCache::claim_color_slot(MemState &mem, uint64_t incoming_bytes) {
+    VKContext &context = *static_cast<VKContext *>(state.context);
+
+    // slots in LRU order (least recently used first); the queue links point from the LRU end towards the head
+    std::vector<ColorSurfaceCacheInfo *> order;
+    std::vector<surface_policy::SlotInfo> slots;
+    order.reserve(color_surface_queue.items.size());
+    const auto *item = color_surface_queue.head->prev;
+    for (size_t i = 0; i < color_surface_queue.items.size(); i++, item = item->prev) {
+        ColorSurfaceCacheInfo &c = const_cast<ColorSurfaceCacheInfo &>(item->content);
+        order.push_back(&c);
+        surface_policy::SlotInfo slot;
+        slot.occupied = c.texture.image != nullptr;
+        slot.bytes = slot.occupied ? color_surface_gpu_bytes(c) : 0;
+        const uint64_t scene = std::max(c.last_used_scene, c.last_scene_rendered);
+        const uint64_t frame = std::max(c.last_used_frame, c.last_frame_rendered);
+        slot.used_this_scene = slot.occupied && scene == context.scene_timestamp;
+        slot.used_this_frame = slot.occupied && frame == context.frame_timestamp;
+        slots.push_back(slot);
+    }
+
+    const surface_policy::SlotChoice choice = surface_policy::choose_slot(slots, incoming_bytes, ensure_surface_budget());
+    if (choice.forced)
+        LOG_WARN_ONCE("Surface cache: all {} colour surfaces are used by the current scene, reusing one", slots.size());
+
+    for (const int extra : choice.also_evict) {
+        LOG_INFO_ONCE("Surface cache over its memory budget: evicting {}x{} surface at 0x{:X}",
+            order[extra]->original_width, order[extra]->original_height, order[extra]->data.address());
+        evict_color_surface(*order[extra], mem);
+        color_surface_queue.set_as_lru(order[extra]);
+    }
+    ColorSurfaceCacheInfo &chosen = *order[choice.slot];
+    if (choice.slot_occupied) {
+        LOG_INFO_ONCE("Surface cache full: evicting {}x{} surface at 0x{:X}",
+            chosen.original_width, chosen.original_height, chosen.data.address());
+#if ECV_ORACLE
+        if (ecv::oracle::gpu::enabled())
+            ecv::oracle::gpu::rt_surface("EVICT", chosen.data.address(), chosen.total_bytes, chosen.original_width, chosen.original_height,
+                static_cast<uint32_t>(chosen.format), chosen.stride_bytes, static_cast<uint32_t>(chosen.tiling), chosen.dirty && *chosen.dirty, choice.forced, chosen.last_frame_rendered);
+#endif
+        evict_color_surface(chosen, mem);
+    }
+    return chosen;
+}
+
+DepthStencilSurfaceCacheInfo &VKSurfaceCache::claim_depth_slot() {
+    VKContext &context = *static_cast<VKContext *>(state.context);
+    std::vector<DepthStencilSurfaceCacheInfo *> order;
+    std::vector<surface_policy::SlotInfo> slots;
+    const auto *item = ds_surface_queue.head->prev;
+    for (size_t i = 0; i < ds_surface_queue.items.size(); i++, item = item->prev) {
+        DepthStencilSurfaceCacheInfo &d = const_cast<DepthStencilSurfaceCacheInfo &>(item->content);
+        order.push_back(&d);
+        surface_policy::SlotInfo slot;
+        slot.occupied = d.texture.image != nullptr;
+        slot.used_this_scene = slot.occupied && d.last_used_scene == context.scene_timestamp;
+        slot.used_this_frame = slot.occupied && d.last_used_frame == context.frame_timestamp;
+        slots.push_back(slot);
+    }
+    // depth surfaces carry no guest-visible content (no write-back exists) so only the slot rules apply
+    const surface_policy::SlotChoice choice = surface_policy::choose_slot(slots, 0, ~uint64_t{ 0 });
+    return *order[choice.slot];
+}
+
 VKSurfaceCache::VKSurfaceCache(VKState &state)
     : state(state) {
     color_surface_queue.init(max_surfaces_allowed);
@@ -307,6 +547,7 @@ void VKSurfaceCache::reset() {
     color_surface_queue.init(max_surfaces_allowed);
     ds_surface_queue.init(max_surfaces_allowed);
     cpu_surfaces_changed.clear();
+    preserved_ranges.clear();
     target = nullptr;
     last_written_surface = nullptr;
     pending_ds_scene = nullptr;
@@ -602,18 +843,28 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
         if (ite->first == address)
             surface_stat_changed = surface_extent_changed || info.width < width || base_format != info.format;
 
-        const bool invalidated = cache_probably_freed || surface_stat_changed || !addr_in_range_of_cache;
+        (void)cache_probably_freed;
+        (void)surface_stat_changed;
+        // B131: the decision is a pure rule (surface_policy::framebuffer_action); both replace actions
+        // save the old content to guest memory before the image goes away (evict_color_surface)
+        surface_policy::FramebufferRequest request;
+        request.same_base = ite->first == address;
+        request.new_range_inside_old = addr_in_range_of_cache;
+        request.extent_or_layout_changed = surface_extent_changed;
+        request.wider_or_other_format = info.width < width || base_format != info.format;
+        const bool invalidated = surface_policy::framebuffer_action(request) != surface_policy::FramebufferAction::Reuse;
 #if ECV_ORACLE
         if (ecv::oracle::gpu::enabled())
             ecv::oracle::gpu::rt_surface("INVALIDATE", ite->first, info.total_bytes, info.original_width, info.original_height,
                 static_cast<uint32_t>(info.format), info.stride_bytes, static_cast<uint32_t>(info.tiling), *info.dirty, false, info.last_frame_rendered);
 #endif
         if (invalidated) {
-            destroy_surface(info);
-            color_address_lookup.erase(ite);
+            evict_color_surface(info, mem);
             color_surface_queue.set_as_lru(&info);
         } else {
             color_surface_queue.set_as_mru(&info);
+            info.last_used_frame = context->frame_timestamp;
+            info.last_used_scene = context->scene_timestamp;
             if (context->render_target) {
                 const uint32_t rt_w = static_cast<uint32_t>(std::lround(context->render_target->width / state.res_multiplier));
                 const uint32_t rt_h = static_cast<uint32_t>(std::lround(context->render_target->height / state.res_multiplier));
@@ -625,9 +876,10 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
             const bool oracle_was_dirty = info.data && *info.dirty;
             const uint64_t oracle_prev_lfr = info.last_frame_rendered;
 #endif
+            refresh_guest_trap(mem, info);
             if (info.data && *info.dirty) {
                 try_upload_guest_content(info, mem);
-                protect_surface(mem, info);
+                arm_guest_trap(mem, info);
             }
             *info.dirty = false;
 
@@ -664,21 +916,20 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
         }
     }
 
-    // get the least recently used (probably unused) color surface
-    ColorSurfaceCacheInfo &info_added = *color_surface_queue.get_lru();
-    if (info_added.texture.image) {
-        // deferred destruction of the existing surface
-        destroy_surface(info_added);
-    }
+    // B130: take a free slot, else evict by the byte budget / slot rules (never a surface the recording
+    // scene uses); an evicted surface is written back to guest memory first
+    const bool carries_raw_image = state.features.preserve_f16_nan_as_u16 && base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16;
+    const uint64_t incoming_bytes = static_cast<uint64_t>(width) * height * vk::blockSize(vk_format) * (carries_raw_image ? 2 : 1);
+    ColorSurfaceCacheInfo &info_added = claim_color_slot(mem, incoming_bytes);
     const bool reused_for_other_store = info_added.data && info_added.data.address() != address;
-    if (info_added.data)
-        color_address_lookup.erase(info_added.data.address());
     if (reused_for_other_store)
         info_added.has_phase_view = false;
 
     color_surface_queue.set_as_mru(&info_added);
     info_added.last_frame_rendered = context->frame_timestamp;
     info_added.last_scene_rendered = context->scene_timestamp;
+    info_added.last_used_frame = context->frame_timestamp;
+    info_added.last_used_scene = context->scene_timestamp;
     info_added.rendered_w = 0;
     info_added.rendered_h = 0;
     info_added.written_x0 = INT32_MAX;
@@ -748,13 +999,16 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
     // memory — load it so CPU-prepared content isn't lost. Restricted to atlas-class
     // surfaces (the streamed-tile pattern this addresses); ordinary scene targets keep
     // the clear-to-black behavior.
-    if (info_added.data && original_width >= 1024 && original_height >= 1024) {
+    // A range whose previous surface was retired with a write-back (or was already in sync) is
+    // authoritative in guest memory, so the new surface starts from it (B131).
+    const bool restore_preserved = surface_policy::consume_preserved(preserved_ranges, address, address + total_surface_size, context->frame_timestamp);
+    if (info_added.data && ((original_width >= 1024 && original_height >= 1024) || restore_preserved)) {
         try_upload_guest_content(info_added, mem);
     }
 #if ECV_ORACLE
     if (ecv::oracle::gpu::enabled())
         ecv::oracle::gpu::rt_surface("NEW", address, total_surface_size, original_width, original_height, static_cast<uint32_t>(base_format),
-            bytes_per_stride, static_cast<uint32_t>(tiling), false, info_added.data && original_width >= 1024 && original_height >= 1024, 0);
+            bytes_per_stride, static_cast<uint32_t>(tiling), false, info_added.data && ((original_width >= 1024 && original_height >= 1024) || restore_preserved), 0);
 #endif
 
     if (state.features.preserve_f16_nan_as_u16 && base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16) {
@@ -775,6 +1029,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
     info_added.need_surface_sync.reset();
     info_added.need_surface_sync = std::make_shared<bool>(false);
     info_added.dirty = std::make_shared<bool>(false);
+    info_added.guest_trap = std::make_shared<GuestTrapState>();
     info_added.gpu_read_sync_only = false;
     info_added.content_is_blended = false;
     info_added.reinterpret_view_is_raw = false;
@@ -784,7 +1039,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
         // Without protection, write back every linear surface.
         *info_added.need_surface_sync = color->surfaceType == SCE_GXM_COLOR_SURFACE_LINEAR;
     } else {
-        protect_surface(mem, info_added);
+        arm_guest_trap(mem, info_added);
     }
     // A first-read trap only requests future writeback. Games that CPU-copy a
     // one-shot render target need its initial scene written before notification.
@@ -861,7 +1116,12 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
             oracle_info.need_surface_sync && *oracle_info.need_surface_sync, address - ite->first);
     }
 #endif
-    if (*ite->second->dirty && ite->second->last_frame_rendered + 2 <= reinterpret_cast<VKContext *>(state.context)->frame_timestamp) {
+    // B131: the GPU image stands in for guest memory only while the GPU is the last writer. A CPU write
+    // seen by the trap (refresh_guest_trap proves it, also for small surfaces and after a trap that was
+    // consumed by a read) hands the address to the texture cache at once; the old 2-frame grace sampled
+    // the stale image and then flipped to the new data.
+    refresh_guest_trap(reinterpret_cast<VKContext *>(state.context)->mem, *ite->second);
+    if (surface_policy::texture_source(*ite->second->dirty) == surface_policy::TextureSource::TextureCache) {
         return std::nullopt;
     }
 
@@ -885,7 +1145,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
     }
 
     // Check if we can use this surface
-    bool addr_in_range_of_cache = ((address + total_surface_size) <= (ite->first + info.total_bytes + 4));
+    bool addr_in_range_of_cache = surface_policy::texture_fits_surface(ite->first, info.total_bytes, address, total_surface_size);
 
     if (ite->first != address && !addr_in_range_of_cache) {
         return std::nullopt;
@@ -945,6 +1205,8 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
 
     // We should be able to use this texture, so set it as mru
     color_surface_queue.set_as_mru(&info);
+    info.last_used_frame = reinterpret_cast<VKContext *>(state.context)->frame_timestamp;
+    info.last_used_scene = reinterpret_cast<VKContext *>(state.context)->scene_timestamp;
 
     const vk::ImageView color_handle_view = reinterpret_cast<VKContext *>(state.context)->current_color_view;
     const bool is_same_image = (color_handle_view == info.texture.view) || (color_handle_view == info.alternate_view);
@@ -1561,6 +1823,8 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
     if (cached_info != nullptr) {
         // this the most recently used depth-stencil surface
         ds_surface_queue.set_as_mru(cached_info);
+        cached_info->last_used_frame = reinterpret_cast<VKContext *>(state.context)->frame_timestamp;
+        cached_info->last_used_scene = reinterpret_cast<VKContext *>(state.context)->scene_timestamp;
 
         const bool need_remake = cached_info->texture.width < width
             || cached_info->texture.height < height
@@ -1630,8 +1894,8 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
             };
         }
     } else {
-        // retrieve a new depth stencil
-        cached_info = ds_surface_queue.get_lru();
+        // retrieve a new depth stencil (B130: a free slot, else the oldest one the recording scene does not use)
+        cached_info = &claim_depth_slot();
     }
 
     // erase it if it was used previously
@@ -1644,6 +1908,8 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
 
     // update the lookup info
     ds_surface_queue.set_as_mru(cached_info);
+    cached_info->last_used_frame = reinterpret_cast<VKContext *>(state.context)->frame_timestamp;
+    cached_info->last_used_scene = reinterpret_cast<VKContext *>(state.context)->scene_timestamp;
     if (depth_stencil->depth_data)
         depth_address_lookup[depth_stencil->depth_data.address()] = cached_info;
     if (depth_stencil->stencil_data)
@@ -1808,6 +2074,8 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
 
     // we sample from it, set the surface as most recently used
     ds_surface_queue.set_as_mru(found_info);
+    found_info->last_used_frame = reinterpret_cast<VKContext *>(state.context)->frame_timestamp;
+    found_info->last_used_scene = reinterpret_cast<VKContext *>(state.context)->scene_timestamp;
 
     // take MSAA into account
     if (cached_info.multisample_mode != SCE_GXM_MULTISAMPLE_NONE)
@@ -2368,7 +2636,7 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
     uint32_t sync_w = last_written_surface->original_width;
     uint32_t sync_h = last_written_surface->original_height;
 
-    if (state.res_multiplier != 1.0f
+    if (!sync_for_eviction && state.res_multiplier != 1.0f
         && context->render_target && context->render_target->has_macroblock_sync
         && !sync_from_raw && !needs_copy_buffer
         && context->rendered_rect_x1 > context->rendered_rect_x0
@@ -2430,7 +2698,7 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
         }
     }
     bool partial_scene_sync = false;
-    if (is_small_linear_writeback_surface(*last_written_surface)) {
+    if (!sync_for_eviction && is_small_linear_writeback_surface(*last_written_surface)) {
         const ColorSurfaceCacheInfo &surface = *last_written_surface;
         const bool covers_surface = surface.written_x0 <= 0 && surface.written_y0 <= 0
             && surface.written_x1 >= static_cast<int32_t>(surface.original_width)

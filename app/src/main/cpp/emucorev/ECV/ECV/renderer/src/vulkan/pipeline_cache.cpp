@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <renderer/vulkan/pipeline_cache.h>
+#include <renderer/vulkan/render_pass_sync.h>
 
 #include <renderer/functions.h>
 #include <renderer/program_source.h>
@@ -676,59 +677,12 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
 
     std::array<vk::SubpassDependency, 5> dependencies;
 
-    // Render targets written by an earlier render pass are sampled directly by later passes
-    // (surface cache SURF_COLOR / SURF_DEPTH views, no copy and no pipeline barrier). Those
-    // attachment writes must be made visible to fragment-shader reads as well, not only to
-    // attachment access, otherwise a tiler may sample data its store/resolve has not finished.
-    constexpr vk::PipelineStageFlags attachment_write_stages = vk::PipelineStageFlagBits::eColorAttachmentOutput
-        | vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests;
-    constexpr vk::AccessFlags attachment_access = vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite
-        | vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-
-    // external dependency
-    // we want the previous render pass to be done when we reach the fragment stage / stencil*depth testing
-    dependencies[0] = {
-        .srcSubpass = VK_SUBPASS_EXTERNAL,
-        .dstSubpass = 0,
-        .srcStageMask = attachment_write_stages,
-        .dstStageMask = attachment_write_stages | vk::PipelineStageFlagBits::eFragmentShader,
-        .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-        .dstAccessMask = attachment_access | vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eInputAttachmentRead
-    };
-
-    // BUG: This is dead code (as immediately overwritten below)
-    if (state.features.support_shader_interlock && no_color) {
-        // we must wait for the previous shaders to be done
-        dependencies[1].dstStageMask = vk::PipelineStageFlagBits::eFragmentShader;
-        dependencies[1].dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite;
-    }
-
-    // if an attachment is sampled from, we want it to be done before the next render pass fragment shader
-    dependencies[1] = {
-        .srcSubpass = VK_SUBPASS_EXTERNAL,
-        .dstSubpass = 0,
-        .srcStageMask = vk::PipelineStageFlagBits::eFragmentShader,
-        .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eLateFragmentTests,
-        .srcAccessMask = vk::AccessFlagBits::eShaderRead,
-        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite
-    };
-
-    if (state.features.support_shader_interlock && !no_color) {
-        // we must wait for the shader interlock shader to be done
-        dependencies[1].srcAccessMask |= vk::AccessFlagBits::eShaderWrite;
-    }
-
-    // outgoing dependency: without it the implicit one (dst = BOTTOM_OF_PIPE, no access) leaves the
-    // final layout transition and the store unordered against a later pass that samples this target
-    dependencies[2] = {
-        .srcSubpass = 0,
-        .dstSubpass = VK_SUBPASS_EXTERNAL,
-        .srcStageMask = attachment_write_stages | vk::PipelineStageFlagBits::eFragmentShader,
-        .dstStageMask = attachment_write_stages | vk::PipelineStageFlagBits::eFragmentShader | vk::PipelineStageFlagBits::eTransfer,
-        .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eShaderWrite,
-        .dstAccessMask = attachment_access | vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eInputAttachmentRead
-            | vk::AccessFlagBits::eTransferRead | vk::AccessFlagBits::eTransferWrite
-    };
+    // Render targets are sampled directly by later passes (surface cache SURF_COLOR / SURF_DEPTH views, no
+    // copy and no pipeline barrier): see render_pass_sync.h for what each external dependency covers.
+    const auto target_dependencies = render_target_dependencies(state.features.support_shader_interlock && !no_color);
+    dependencies[0] = target_dependencies[0];
+    dependencies[1] = target_dependencies[1];
+    dependencies[2] = target_dependencies[2];
 
     // self-dependency
     // this allows us to use a pipeline barrier in the render pass for programmable blending

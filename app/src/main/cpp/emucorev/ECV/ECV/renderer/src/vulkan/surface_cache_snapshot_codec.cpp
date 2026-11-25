@@ -461,10 +461,8 @@ bool validate_surface_cache_snapshot(const SurfaceCacheSnapshot &snapshot, std::
     return true;
 }
 
-bool encode_surface_cache_snapshot(const SurfaceCacheSnapshot &snapshot, std::vector<uint8_t> &data, std::string &error) {
-    error.clear();
-    if (!validate_surface_cache_snapshot(snapshot, error))
-        return false;
+namespace {
+void encode_body(const SurfaceCacheSnapshot &snapshot, std::vector<uint8_t> &data) {
     SnapshotWriter writer;
     writer.u32(surface_snapshot_magic);
     writer.u32(surface_snapshot_version);
@@ -487,6 +485,52 @@ bool encode_surface_cache_snapshot(const SurfaceCacheSnapshot &snapshot, std::ve
     writer.u8(snapshot.pending_depth_stencil_slot);
     writer.boolean(snapshot.pending_depth_stencil_stores);
     data = std::move(writer.data);
+}
+
+// Pad a pre-B130 snapshot to the current slot count: the extra slots are empty and become the
+// least recently used ones (the order lists run most recent first).
+void upgrade_legacy_slots(SurfaceCacheSnapshot &snapshot) {
+    snapshot.colors.resize(surface_cache_snapshot_slots);
+    snapshot.depth_stencil.resize(surface_cache_snapshot_slots);
+    for (uint32_t slot = surface_cache_snapshot_legacy_slots; slot < surface_cache_snapshot_slots; ++slot) {
+        snapshot.color_mru_order.push_back(static_cast<uint8_t>(slot));
+        snapshot.depth_stencil_mru_order.push_back(static_cast<uint8_t>(slot));
+    }
+}
+} // namespace
+
+bool encode_surface_cache_snapshot(const SurfaceCacheSnapshot &snapshot, std::vector<uint8_t> &data, std::string &error) {
+    error.clear();
+    if (!validate_surface_cache_snapshot(snapshot, error))
+        return false;
+    encode_body(snapshot, data);
+    return true;
+}
+
+bool encode_surface_cache_snapshot_legacy_layout(const SurfaceCacheSnapshot &snapshot, std::vector<uint8_t> &data, std::string &error) {
+    error.clear();
+    if (!validate_surface_cache_snapshot(snapshot, error))
+        return false;
+    SurfaceCacheSnapshot legacy = snapshot;
+    for (uint32_t slot = surface_cache_snapshot_legacy_slots; slot < surface_cache_snapshot_slots; ++slot) {
+        if (snapshot.colors[slot].active || snapshot.depth_stencil[slot].active) {
+            error = "slot beyond the legacy layout is in use";
+            return false;
+        }
+    }
+    const auto keep_legacy = [](std::vector<uint8_t> &order) {
+        order.erase(std::remove_if(order.begin(), order.end(), [](uint8_t slot) { return slot >= surface_cache_snapshot_legacy_slots; }), order.end());
+    };
+    keep_legacy(legacy.color_mru_order);
+    keep_legacy(legacy.depth_stencil_mru_order);
+    legacy.colors.resize(surface_cache_snapshot_legacy_slots);
+    legacy.depth_stencil.resize(surface_cache_snapshot_legacy_slots);
+    if ((legacy.last_written_color_slot != no_slot && legacy.last_written_color_slot >= surface_cache_snapshot_legacy_slots)
+        || (legacy.pending_depth_stencil_slot != no_slot && legacy.pending_depth_stencil_slot >= surface_cache_snapshot_legacy_slots)) {
+        error = "slot beyond the legacy layout is referenced";
+        return false;
+    }
+    encode_body(legacy, data);
     return true;
 }
 
@@ -500,10 +544,11 @@ bool decode_surface_cache_snapshot(const std::vector<uint8_t> &data, SurfaceCach
     SnapshotReader reader(data);
     uint32_t magic, version, count;
     if (!reader.u32(magic) || !reader.u32(version) || magic != surface_snapshot_magic || version != surface_snapshot_version
-        || !reader.u32(count) || count != surface_cache_snapshot_slots) {
+        || !reader.u32(count) || (count != surface_cache_snapshot_slots && count != surface_cache_snapshot_legacy_slots)) {
         error = "invalid surface-cache snapshot header";
         return false;
     }
+    const uint32_t slot_count = count;
     SurfaceCacheSnapshot staged;
     staged.colors.resize(count);
     uint64_t aggregate_bytes = 0;
@@ -513,7 +558,7 @@ bool decode_surface_cache_snapshot(const std::vector<uint8_t> &data, SurfaceCach
             return false;
         }
     }
-    if (!reader.u32(count) || count != surface_cache_snapshot_slots) {
+    if (!reader.u32(count) || count != slot_count) {
         error = "invalid color surface-cache LRU count";
         return false;
     }
@@ -524,7 +569,7 @@ bool decode_surface_cache_snapshot(const std::vector<uint8_t> &data, SurfaceCach
             return false;
         }
     }
-    if (!reader.u32(count) || count != surface_cache_snapshot_slots) {
+    if (!reader.u32(count) || count != slot_count) {
         error = "invalid depth surface-cache entry count";
         return false;
     }
@@ -535,7 +580,7 @@ bool decode_surface_cache_snapshot(const std::vector<uint8_t> &data, SurfaceCach
             return false;
         }
     }
-    if (!reader.u32(count) || count != surface_cache_snapshot_slots) {
+    if (!reader.u32(count) || count != slot_count) {
         error = "invalid depth surface-cache LRU count";
         return false;
     }
@@ -562,6 +607,8 @@ bool decode_surface_cache_snapshot(const std::vector<uint8_t> &data, SurfaceCach
         error = "truncated or trailing surface-cache snapshot data";
         return false;
     }
+    if (slot_count == surface_cache_snapshot_legacy_slots)
+        upgrade_legacy_slots(staged);
     if (!validate_surface_cache_snapshot(staged, error))
         return false;
     snapshot = std::move(staged);

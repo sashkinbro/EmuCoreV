@@ -37,7 +37,8 @@ add_executable(core_host_tests
     hle_stub_batch4_tests.cpp
     rear_touch_tests.cpp
     save_data_write_tests.cpp
-    fragment_output_tests.cpp)
+    fragment_output_tests.cpp
+    surface_policy_tests.cpp)
 target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/kernel/include"
     "${CORE_ROOT}/ngs/include"
@@ -123,3 +124,24 @@ target_compile_definitions(savestate_host_tests PRIVATE ${SS_DEFINES})
 set_target_properties(savestate_host_tests PROPERTIES CXX_STANDARD 23) # kernel headers use std::expected
 target_link_libraries(savestate_host_tests PRIVATE gtest_host boost_fs_host ss_third_party_host)
 target_link_options(savestate_host_tests PRIVATE -static -Wl,/force:unresolved)
+
+# Surface-cache snapshot layout compatibility (B130: 20 -> 64 slots). Only the codec is compiled.
+# Build and run with run-core-host-tests.ps1 -Target surface_codec_host_tests.
+add_executable(surface_codec_host_tests EXCLUDE_FROM_ALL
+    surface_codec_compat_tests.cpp
+    "${RENDERER_SRC}/vulkan/surface_cache_snapshot_codec.cpp" "${CORE_ROOT}/vkutil/src/image_snapshot.cpp")
+target_include_directories(surface_codec_host_tests PRIVATE ${SS_INCLUDES})
+target_compile_definitions(surface_codec_host_tests PRIVATE ${SS_DEFINES})
+set_target_properties(surface_codec_host_tests PROPERTIES CXX_STANDARD 23)
+target_link_libraries(surface_codec_host_tests PRIVATE gtest_host boost_fs_host ss_third_party_host)
+target_link_options(surface_codec_host_tests PRIVATE -static -Wl,/force:unresolved)
+
+# B132 render-pass / layout-table sync masks (vulkan.hpp structs only, no device).
+# Build and run with run-core-host-tests.ps1 -Target render_sync_host_tests.
+add_executable(render_sync_host_tests EXCLUDE_FROM_ALL
+    render_pass_sync_tests.cpp "${CORE_ROOT}/vkutil/src/vkutil.cpp")
+target_include_directories(render_sync_host_tests PRIVATE ${SS_INCLUDES})
+target_compile_definitions(render_sync_host_tests PRIVATE ${SS_DEFINES})
+set_target_properties(render_sync_host_tests PROPERTIES CXX_STANDARD 23)
+target_link_libraries(render_sync_host_tests PRIVATE gtest_host boost_fs_host ss_third_party_host)
+target_link_options(render_sync_host_tests PRIVATE -static -Wl,/force:unresolved)

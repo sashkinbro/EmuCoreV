@@ -17,7 +17,10 @@
 
 namespace renderer::vulkan {
 
-inline constexpr uint32_t surface_cache_snapshot_slots = 20;
+// B130: the cache holds more than the 20 surfaces it used to; the byte budget, not the slot count, bounds memory.
+inline constexpr uint32_t surface_cache_snapshot_slots = surface_policy::max_cache_slots;
+// Save states written before B130 carry this many slots; decode pads them to surface_cache_snapshot_slots.
+inline constexpr uint32_t surface_cache_snapshot_legacy_slots = surface_policy::legacy_cache_slots;
 
 // Image creation details needed to build a fresh, compatible Vulkan image on restore.
 // The Vulkan image/view/allocation handles themselves are deliberately absent.
@@ -106,6 +109,9 @@ struct SurfaceCacheSnapshot {
 bool validate_surface_cache_snapshot(const SurfaceCacheSnapshot &snapshot, std::string &error);
 bool encode_surface_cache_snapshot(const SurfaceCacheSnapshot &snapshot, std::vector<uint8_t> &data, std::string &error);
 bool decode_surface_cache_snapshot(const std::vector<uint8_t> &data, SurfaceCacheSnapshot &snapshot, std::string &error);
+// Writes the pre-B130 20-slot layout (slots >= 20 must be empty). Exists so the compatibility of old
+// save states stays testable; decode_surface_cache_snapshot accepts both layouts.
+bool encode_surface_cache_snapshot_legacy_layout(const SurfaceCacheSnapshot &snapshot, std::vector<uint8_t> &data, std::string &error);
 
 // Caller must freeze rendering and submit all recorded work before capture. This
 // function copies native GPU images only; it does not flush surfaces to guest RAM

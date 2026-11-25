@@ -20,6 +20,7 @@
 #include <gxm/types.h>
 #include <mem/ptr.h>
 #include <renderer/gxm_types.h>
+#include <renderer/vulkan/surface_policy.h>
 #include <util/containers.h>
 #include <vkutil/objects.h>
 
@@ -88,6 +89,17 @@ struct CastedTexture {
     SceGxmColorBaseFormat format;
 };
 
+// written by the memory-trap callback (fault thread), read by the render thread
+struct GuestTrapState {
+    std::atomic<bool> fired{ false };
+    // a write fault whose address lies inside the surface bytes
+    std::atomic<bool> write_inside{ false };
+    // the surface has an arm-time hash and is not kept in sync by the GPU: bytes, not the fault, decide
+    std::atomic<bool> verify_by_hash{ false };
+    // a write fault raised by the emulator's own surface write-back (not a guest write)
+    std::atomic<bool> emulator_wrote{ false };
+};
+
 struct ColorSurfaceCacheInfo : public SurfaceCacheInfo {
     uint16_t width;
     uint16_t height;
@@ -96,6 +108,10 @@ struct ColorSurfaceCacheInfo : public SurfaceCacheInfo {
     uint32_t stride_bytes;
     uint64_t last_frame_rendered;
     uint64_t last_scene_rendered = 0;
+    // last frame/scene that rendered into OR sampled this surface (eviction must not take a surface
+    // the scene being recorded still uses)
+    uint64_t last_used_frame = 0;
+    uint64_t last_used_scene = 0;
     uint16_t rendered_w = 0;
     uint16_t rendered_h = 0;
     int32_t written_x0 = INT32_MAX;
@@ -166,6 +182,12 @@ struct ColorSurfaceCacheInfo : public SurfaceCacheInfo {
     bool gpu_read_sync_only = false;
     std::shared_ptr<bool> dirty = std::make_shared<bool>(false);
 
+    // CPU-write tracking state shared with the memory trap callback (see GuestTrapState / B131)
+    std::shared_ptr<GuestTrapState> guest_trap;
+    // XXH3 of the surface's guest bytes taken when the trap was armed (0 and invalid above the size limit)
+    uint64_t guest_hash = 0;
+    bool guest_hash_valid = false;
+
     ColorSurfaceCacheInfo() = default;
     ~ColorSurfaceCacheInfo();
 };
@@ -192,6 +214,8 @@ struct DepthStencilSurfaceCacheInfo : public SurfaceCacheInfo {
     // stride in samples
     uint32_t stride_samples;
     SceGxmMultisampleMode multisample_mode;
+    uint64_t last_used_frame = 0;
+    uint64_t last_used_scene = 0;
 
     bool depth_content_stored = true;
     Address last_scene_color_addr = 0;
@@ -242,8 +266,16 @@ private:
 
     VKState &state;
 
-    // only have 20 color surfaces and 20 depth surfaces allocated at most at a given time
-    static constexpr uint32_t max_surfaces_allowed = 20;
+    // slot count of the colour and the depth queue; the memory they may hold is bounded by the byte budget
+    static constexpr uint32_t max_surfaces_allowed = surface_policy::max_cache_slots;
+
+    // memory budget of the colour surfaces (bytes), derived from the device-local heap on first use
+    uint64_t surface_budget = 0;
+    // ranges whose surface was retired with a write-back: new surfaces there start from guest memory
+    std::vector<surface_policy::PreservedRange> preserved_ranges;
+    // set while a surface is written back for eviction: the sync must cover the surface's own written
+    // region, not the rect of the scene that happens to be recording
+    bool sync_for_eviction = false;
 
     std::map<Address, ColorSurfaceCacheInfo *> color_address_lookup;
 
@@ -283,6 +315,23 @@ private:
 
     void destroy_surface(ColorSurfaceCacheInfo &info);
     void destroy_surface(DepthStencilSurfaceCacheInfo &info);
+
+    // GPU memory held by a colour surface (image + raw image + blit image estimate)
+    uint64_t color_surface_gpu_bytes(const ColorSurfaceCacheInfo &info) const;
+    uint64_t ensure_surface_budget();
+    // Pick (and empty) the slot for a new colour surface of `incoming_bytes`, evicting with write-back.
+    ColorSurfaceCacheInfo &claim_color_slot(MemState &mem, uint64_t incoming_bytes);
+    // Pick (and empty) the slot for a new depth surface.
+    DepthStencilSurfaceCacheInfo &claim_depth_slot();
+    // Write the surface content to guest memory when the GPU image is its only up-to-date copy.
+    // Returns true when guest memory was written.
+    bool write_back_before_destroy(ColorSurfaceCacheInfo &info, MemState &mem);
+    // Write back, destroy and unlink a colour surface; the slot is left empty.
+    void evict_color_surface(ColorSurfaceCacheInfo &info, MemState &mem);
+    // Resolve a fired CPU-write trap (hash check), then arm the trap again.
+    void refresh_guest_trap(MemState &mem, ColorSurfaceCacheInfo &info);
+    // Arm the memory trap and record the arm-time hash of the guest bytes.
+    bool arm_guest_trap(MemState &mem, ColorSurfaceCacheInfo &info);
     // Re-register a restored color surface's guest-memory trap after RAM is restored.
     bool protect_cached_surface(MemState &mem, ColorSurfaceCacheInfo &info);
 
