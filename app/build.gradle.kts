@@ -3,6 +3,7 @@
 import com.android.build.api.artifact.SingleArtifact
 import java.io.File
 import java.util.Properties
+import java.security.MessageDigest
 import java.util.zip.ZipFile
 
 val androidOpenSslRoot = rootProject.layout.projectDirectory.dir("tools/openssl-test/out").asFile
@@ -340,15 +341,25 @@ androidComponents {
                 val allowedFontPrefixes = listOf("assets/data/fonts/", "res/font/")
                 val forbiddenNames = setOf("images.json", "fonts.json", "sounds.json", "effects.json", "lookups.json",
                     "startup-busy.png")
+                // Our own OFL fonts (res/font) are renamed by release resource shrinking (res/8P.ttf):
+                // a .ttf anywhere is allowed only when its bytes equal one of them.
+                val ownFontHashes = project.file("src/main/res/font").listFiles().orEmpty()
+                    .filter { it.isFile }
+                    .map { MessageDigest.getInstance("SHA-256").digest(it.readBytes()).joinToString("") { b -> "%02x".format(b) } }
+                    .toSet()
                 val offenders = mutableListOf<String>()
                 apkDirectory.get().asFile.walkTopDown().filter { it.isFile && it.extension == "apk" }.forEach { apk ->
                     ZipFile(apk).use { zip ->
                         for (entry in zip.entries()) {
                             val name = entry.name.lowercase()
                             val leaf = name.substringAfterLast('/')
+                            val ownFont = name.endsWith(".ttf") && zip.getInputStream(entry).use { input ->
+                                MessageDigest.getInstance("SHA-256").digest(input.readBytes())
+                                    .joinToString("") { b -> "%02x".format(b) }
+                            } in ownFontHashes
                             val bad = name.startsWith("assets/native-ui") ||
                                 forbiddenExtensions.any { name.endsWith(it) } ||
-                                (name.endsWith(".ttf") && allowedFontPrefixes.none { name.startsWith(it) }) ||
+                                (name.endsWith(".ttf") && !ownFont && allowedFontPrefixes.none { name.startsWith(it) }) ||
                                 leaf in forbiddenNames
                             if (bad) offenders += "${apk.name}: ${entry.name}"
                         }
