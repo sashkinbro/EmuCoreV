@@ -3176,7 +3176,9 @@ void VKSurfaceCache::perform_post_surface_sync(const MemState &mem, ColorSurface
         const uint32_t guest_bpp = gxm::bits_per_pixel(surface->format) / 8;
         if (colourmodel::host_to_guest_extra(fallback, pixels, static_cast<const uint8_t *>(surface->copy_buffer->mapped_data), pixel_stride * surface->original_height, guest_bpp)) {
             // component swizzles of the plain component formats are applied on the guest data after the repack
-            const bool identity = surface->swizzle.r == vk::ComponentSwizzle::eR;
+            // (only two and four component surfaces have a component swizzle to apply)
+            const uint32_t host_components = vk::componentCount(surface->texture.format);
+            const bool identity = surface->swizzle.r == vk::ComponentSwizzle::eR || (host_components != 2 && host_components != 4);
             if (!identity && (fallback == colourmodel::Repack::Unorm16_F32 || fallback == colourmodel::Repack::Snorm16_F32))
                 swizzle_text_T<uint16_t>(reinterpret_cast<uint16_t *>(pixels), nb_pixels, surface);
             else if (!identity && fallback == colourmodel::Repack::Snorm8_F16)
