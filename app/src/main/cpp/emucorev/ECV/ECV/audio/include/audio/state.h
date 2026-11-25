@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <audio/in_settings.h>
+
 #include <util/types.h>
 
 #include <atomic>
@@ -81,7 +83,22 @@ struct AudioInPort {
     // Set from the UI thread when RECORD_AUDIO was granted after the port opened; sceAudioInInput
     // then re-opens the capture device.
     std::atomic<bool> reopen_requested{ false };
+    // Guards `id` against the UI thread releasing the capture stream (suspend / setting off) while the
+    // guest thread reads it.
+    std::mutex capture_mutex;
+    // Values the guest stored through sceAudioInSetMicGain / sceAudioInSelectInput (provisional ranges).
+    std::atomic<int> guest_mic_gain{ 0 };
+    std::atomic<int> guest_input{ 0 };
+    // Consecutive empty grains while a stream exists (guest thread, under capture_mutex).
+    int stalled_grains = 0;
 };
+
+// Capture control for the UI/JNI thread; all safe to call from any thread.
+void audio_in_release_capture(AudioInPort &in);
+// Menu pause / background: releases the capture stream and asks for a re-open on resume.
+void audio_in_set_suspended(AudioInPort &in, bool suspended);
+// The microphone setting (enabled / device) changed: release the stream, or ask the open port to re-open.
+void audio_in_settings_changed(AudioInPort &in);
 
 struct ThreadState;
 struct AudioState;

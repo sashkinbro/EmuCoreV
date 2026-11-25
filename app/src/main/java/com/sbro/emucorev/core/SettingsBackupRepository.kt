@@ -285,6 +285,9 @@ class SettingsBackupRepository(
         .put("audioBackend", audioBackend)
         .put("audioVolume", audioVolume)
         .put("bgmVolume", bgmVolume)
+        .put("micEnabled", micEnabled)
+        .put("micGainPercent", micGainPercent)
+        .put("micInputDevice", micInputDevice)
         .put("ngsEnable", ngsEnable)
         .put("showTouchpadCursor", showTouchpadCursor)
         .put("sysButton", sysButton)
@@ -382,6 +385,9 @@ class SettingsBackupRepository(
         audioBackend = optString("audioBackend", defaults.audioBackend),
         audioVolume = optInt("audioVolume", defaults.audioVolume),
         bgmVolume = optInt("bgmVolume", defaults.bgmVolume),
+        micEnabled = optBoolean("micEnabled", defaults.micEnabled),
+        micGainPercent = optInt("micGainPercent", defaults.micGainPercent),
+        micInputDevice = optString("micInputDevice", defaults.micInputDevice),
         ngsEnable = optBoolean("ngsEnable", defaults.ngsEnable),
         showTouchpadCursor = optBoolean("showTouchpadCursor", defaults.showTouchpadCursor),
         sysButton = optInt("sysButton", defaults.sysButton),
@@ -411,7 +417,7 @@ class SettingsBackupRepository(
         screenshotFormat = optInt("screenshotFormat", defaults.screenshotFormat),
         showWelcome = optBoolean("showWelcome", defaults.showWelcome),
         warnMissingFirmware = optBoolean("warnMissingFirmware", defaults.warnMissingFirmware)
-    )
+    ).withValidCameraSources()
 
     private fun JSONObject.optFloat(name: String, fallback: Float): Float {
         return if (has(name)) optDouble(name, fallback.toDouble()).toFloat() else fallback

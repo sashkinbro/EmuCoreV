@@ -286,7 +286,10 @@ class VitaGameSettingsRepository(private val context: Context) {
                 showTouchpadCursor = own.boolAttr("show-touchpad-cursor", config.showTouchpadCursor),
                 turboMode = own.boolAttr("turbo-mode", config.turboMode),
                 showInfoBar = own.boolAttr("show-info-bar", config.showInfoBar),
-                bgmVolume = own.intAttr("bgm-volume", config.bgmVolume)
+                bgmVolume = own.intAttr("bgm-volume", config.bgmVolume),
+                micEnabled = own.boolAttr("mic-enabled", config.micEnabled),
+                micGainPercent = own.intAttr("mic-gain", config.micGainPercent),
+                micInputDevice = own.stringAttr("mic-input-device", config.micInputDevice)
             )
         }
 
@@ -405,6 +408,9 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("turbo-mode", config.turboMode.toString())
             setAttribute("show-info-bar", config.showInfoBar.toString())
             setAttribute("bgm-volume", config.bgmVolume.toString())
+            setAttribute("mic-enabled", config.micEnabled.toString())
+            setAttribute("mic-gain", config.micGainPercent.toString())
+            setAttribute("mic-input-device", config.micInputDevice)
             if (keyboardMouse != null) {
                 appendChild(doc.createElement("keyboard-mouse").apply {
                     textContent = KeyboardMouseSettingsCodec.encode(keyboardMouse).toString()

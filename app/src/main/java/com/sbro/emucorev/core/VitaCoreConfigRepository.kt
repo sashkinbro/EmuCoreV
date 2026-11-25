@@ -69,6 +69,11 @@ data class VitaCoreConfig(
     val audioBackend: String = "SDL",
     val audioVolume: Int = 100,
     val bgmVolume: Int = 100,
+    // Microphone (sceAudioIn). Default on; the per-game profile overrides these like any other setting.
+    val micEnabled: Boolean = true,
+    val micGainPercent: Int = MIC_GAIN_DEFAULT,
+    // Input device key ("<AudioDeviceInfo type>:<product name>"); blank = system default.
+    val micInputDevice: String = "",
     val ngsEnable: Boolean = true,
     val showTouchpadCursor: Boolean = true,
     val sysButton: Int = 1,
@@ -139,6 +144,9 @@ class VitaCoreConfigRepository(private val context: Context) {
         "audio-volume",
         "backend-renderer",
         "bgm-volume",
+        "mic-enabled",
+        "mic-gain",
+        "mic-input-device",
         "boot-apps-full-screen",
         "check-for-updates",
         "color-surface-debug",
@@ -304,6 +312,9 @@ class VitaCoreConfigRepository(private val context: Context) {
                 audioBackend = values["audio-backend"] ?: defaults.audioBackend,
                 audioVolume = values["audio-volume"]?.toIntOrNull() ?: defaults.audioVolume,
                 bgmVolume = values["bgm-volume"]?.toIntOrNull() ?: defaults.bgmVolume,
+                micEnabled = values["mic-enabled"]?.toBooleanStrictOrNull() ?: defaults.micEnabled,
+                micGainPercent = values["mic-gain"]?.toIntOrNull() ?: defaults.micGainPercent,
+                micInputDevice = values["mic-input-device"].sanitizeNullableString().orEmpty(),
                 ngsEnable = values["ngs-enable"]?.toBooleanStrictOrNull() ?: defaults.ngsEnable,
                 showTouchpadCursor = values["show-touchpad-cursor"]?.toBooleanStrictOrNull() ?: defaults.showTouchpadCursor,
                 sysButton = values["sys-button"]?.toIntOrNull() ?: defaults.sysButton,
@@ -446,6 +457,9 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["audio-backend"] = config.audioBackend
         values["audio-volume"] = config.audioVolume.toString()
         values["bgm-volume"] = config.bgmVolume.toString()
+        values["mic-enabled"] = config.micEnabled.toString()
+        values["mic-gain"] = config.micGainPercent.toString()
+        values["mic-input-device"] = config.micInputDevice
         values["ngs-enable"] = config.ngsEnable.toString()
         values["show-touchpad-cursor"] = config.showTouchpadCursor.toString()
         values["sys-button"] = config.sysButton.toString()
@@ -675,6 +689,9 @@ class VitaCoreConfigRepository(private val context: Context) {
 // hand-edited config.yml or a restored backup and must never reach the core unclamped.
 internal const val AUDIO_VOLUME_MIN = 0
 internal const val AUDIO_VOLUME_MAX = 100
+internal const val MIC_GAIN_MIN = 0
+internal const val MIC_GAIN_MAX = 300
+internal const val MIC_GAIN_DEFAULT = 100
 internal const val OVERLAY_SCALE_MIN = 0.5f
 internal const val OVERLAY_SCALE_MAX = 2f
 internal const val OVERLAY_OPACITY_MIN = 10
@@ -688,6 +705,7 @@ private fun Float.clampedOr(min: Float, max: Float, fallback: Float): Float =
 internal fun VitaCoreConfig.clampedToUiRanges(): VitaCoreConfig = copy(
     audioVolume = audioVolume.coerceIn(AUDIO_VOLUME_MIN, AUDIO_VOLUME_MAX),
     bgmVolume = bgmVolume.coerceIn(AUDIO_VOLUME_MIN, AUDIO_VOLUME_MAX),
+    micGainPercent = micGainPercent.coerceIn(MIC_GAIN_MIN, MIC_GAIN_MAX),
     overlayScale = overlayScale.clampedOr(OVERLAY_SCALE_MIN, OVERLAY_SCALE_MAX, 0.9f),
     overlayOpacity = overlayOpacity.coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX),
     resolutionMultiplier = resolutionMultiplier.clampedOr(RESOLUTION_MULTIPLIER_MIN, RESOLUTION_MULTIPLIER_MAX, 1f)

@@ -340,7 +340,7 @@ static int camera_get_attribute(EmuEnvState &emuenv, SceUID thread_id, const cha
         ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_START));
 
     *pValue = camera.get_attribute(attribute);
-    ECV_CAMERA_DIAG_RETURN(STUBBED("Default value"));
+    ECV_CAMERA_DIAG_RETURN(0);
 }
 
 static int camera_set_attribute(EmuEnvState &emuenv, SceUID thread_id, const char *export_name, SceCameraDevice devnum, CameraAttributes attribute, int value) {
@@ -358,7 +358,7 @@ static int camera_set_attribute(EmuEnvState &emuenv, SceUID thread_id, const cha
     if (!camera.is_started)
         ECV_CAMERA_DIAG_RETURN(RET_ERROR(SCE_CAMERA_ERROR_NOT_START));
 
-    UNIMPLEMENTED();
+    // Stored and reported back by the virtual camera; zoom, tone, effect and reverse change the pixels.
     ECV_CAMERA_DIAG_RETURN(camera.set_attribute(attribute, value));
 }
 

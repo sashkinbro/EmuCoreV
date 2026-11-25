@@ -18,6 +18,7 @@
 #include <module/module.h>
 
 #include <SDL3/SDL_audio.h>
+#include <SDL3/SDL_hints.h>
 #include <audio/state.h>
 #include <util/tracy.h>
 
@@ -29,6 +30,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <string>
 #include <thread>
 
 #define PORT_ID 0
@@ -118,29 +120,67 @@ static bool call_activity_method(const char *name, bool *result) {
 }
 #endif
 
-// Opens the capture stream if the platform allows it. On Android RECORD_AUDIO is checked first and,
-// when missing, requested asynchronously (the Kotlin side asks once per session); the port then feeds
-// silence until the grant re-triggers this via reopen_requested. Never blocks the guest thread on a prompt.
-static void open_capture_stream(AudioInPort &in, int freq) {
+// True unless the platform reports the microphone permission as missing (no question asked here).
+static bool record_permission_granted() {
 #ifdef __ANDROID__
     bool granted = true;
-    if (call_activity_method("hasRecordAudioPermission", &granted) && !granted) {
+    if (call_activity_method("hasRecordAudioPermission", &granted))
+        return granted;
+#endif
+    return true;
+}
+
+// Opens the capture stream if the user setting, the host state and the platform allow it. On Android
+// RECORD_AUDIO is checked first and, when missing, requested asynchronously (the Kotlin side asks once
+// per session); the port then feeds silence until the grant re-triggers this via reopen_requested.
+// Never blocks the guest thread on a prompt and never prompts while the microphone is disabled.
+static void open_capture_stream(AudioInPort &in, int freq) {
+    const auto &cfg = ecv_audio_in::settings();
+    if (!cfg.enabled.load()) {
+        LOG_INFO("AudioIn: capture disabled by setting, feeding silence");
+        in.reopen_requested = true; // retried when the user enables the microphone
+        return;
+    }
+    if (cfg.suspended.load()) {
+        in.reopen_requested = true; // retried after the resume
+        return;
+    }
+    // Chosen input device (AudioDeviceInfo id); read by the Android AAudio driver, 0 = system default.
+    const int device_id = cfg.device_id.load();
+#ifdef __ANDROID__
+    if (!record_permission_granted()) {
         call_activity_method("requestRecordAudioPermission", nullptr);
         LOG_WARN("AudioIn: RECORD_AUDIO not granted yet, feeding silence until it is");
         return;
     }
+    if (device_id > 0) {
+        call_activity_method("prepareMicrophoneRouting", nullptr); // Bluetooth headset mics need their SCO route
+        SDL_SetHint("ECV_AAUDIO_INPUT_DEVICE_ID", std::to_string(device_id).c_str());
+    } else
+        SDL_ResetHint("ECV_AAUDIO_INPUT_DEVICE_ID");
 #endif
     SDL_AudioSpec desired = {
         .format = SDL_AUDIO_S16LE,
         .channels = 1,
         .freq = freq
     };
-    in.id = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &desired, nullptr, nullptr);
-    if (in.id) {
-        SDL_ResumeAudioStreamDevice(static_cast<SDL_AudioStream *>(in.id));
-    } else {
-        LOG_WARN("AudioIn: capture device unavailable ({}), feeding silence", SDL_GetError());
+    auto *stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &desired, nullptr, nullptr);
+#ifdef __ANDROID__
+    if (!stream && device_id > 0) {
+        // The chosen device vanished (unplugged USB / Bluetooth): fall back to the system default.
+        LOG_WARN("AudioIn: input device {} unavailable ({}), using the default", device_id, SDL_GetError());
+        SDL_ResetHint("ECV_AAUDIO_INPUT_DEVICE_ID");
+        stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &desired, nullptr, nullptr);
     }
+#endif
+    if (!stream) {
+        LOG_WARN("AudioIn: capture device unavailable ({}), feeding silence", SDL_GetError());
+        return;
+    }
+    SDL_ResumeAudioStreamDevice(stream);
+    const std::lock_guard<std::mutex> lock(in.capture_mutex);
+    in.id = stream;
+    in.stalled_grains = 0;
 }
 
 EXPORT(int, sceAudioInGetAdopt, SceAudioInPortType portType) {
@@ -151,14 +191,16 @@ EXPORT(int, sceAudioInGetAdopt, SceAudioInPortType portType) {
     return 1;
 }
 
+// The SDK signatures of GetInput / SelectInput / Get/SetMicGain are not recovered from firmware:
+// provisional, they store and report back the guest's own selection (see ecv_audio_in::valid_guest_*).
 EXPORT(int, sceAudioInGetInput) {
     TRACY_FUNC(sceAudioInGetInput);
-    return UNIMPLEMENTED();
+    return emuenv.audio.in_port.guest_input.load();
 }
 
 EXPORT(int, sceAudioInGetMicGain) {
     TRACY_FUNC(sceAudioInGetMicGain);
-    return UNIMPLEMENTED();
+    return emuenv.audio.in_port.guest_mic_gain.load();
 }
 
 EXPORT(int, sceAudioInGetStatus, int select) {
@@ -166,7 +208,8 @@ EXPORT(int, sceAudioInGetStatus, int select) {
     if (select != SCE_AUDIO_IN_GETSTATUS_MUTE) {
         return RET_ERROR(SCE_AUDIO_IN_ERROR_INVALID_PARAMETER);
     }
-    return emuenv.audio.in_port.running ? 0 : 1;
+    // 1 = the guest cannot hear the microphone: disabled in the settings or RECORD_AUDIO missing.
+    return ecv_audio_in::mute_status(ecv_audio_in::settings().enabled.load(), record_permission_granted());
 }
 
 EXPORT(int, sceAudioInInput, int port, void *destPtr) {
@@ -202,30 +245,50 @@ EXPORT(int, sceAudioInInput, int port, void *destPtr) {
     for (int64_t remaining = deadline - now_us(); remaining > 0; remaining = deadline - now_us())
         std::this_thread::sleep_for(std::chrono::microseconds(std::min<int64_t>(remaining, 2000)));
 
-    // RECORD_AUDIO was granted after the port opened: start capturing without a restart.
-    if (!in.id && in.reopen_requested.exchange(false))
+    const auto &cfg = ecv_audio_in::settings();
+    const bool want = ecv_audio_in::capture_wanted(cfg.enabled.load(), cfg.suspended.load());
+
+    // RECORD_AUDIO was granted after the port opened, or the capture was released (resume after a pause,
+    // setting turned on, input device changed, stalled stream): start capturing without a restart.
+    if (want && !in.id && in.reopen_requested.exchange(false))
         open_capture_stream(in, freq);
 
     int filled = 0;
-    if (auto *stream = static_cast<SDL_AudioStream *>(in.id)) {
-        // Keep latency bounded if the device ran ahead of the guest.
-        if (SDL_GetAudioStreamAvailable(stream) > len * 4)
-            SDL_ClearAudioStream(stream);
-        const int got = SDL_GetAudioStreamData(stream, destPtr, len);
-        if (got < 0) {
-            LOG_ERROR("AudioIn: Error while reading audio stream: {}", SDL_GetError());
-        } else {
-            filled = got;
+    bool stalled = false;
+    if (want) {
+        const std::lock_guard<std::mutex> lock(in.capture_mutex);
+        if (auto *stream = static_cast<SDL_AudioStream *>(in.id)) {
+            // Keep latency bounded if the device ran ahead of the guest.
+            if (SDL_GetAudioStreamAvailable(stream) > len * 4)
+                SDL_ClearAudioStream(stream);
+            const int got = SDL_GetAudioStreamData(stream, destPtr, len);
+            if (got < 0) {
+                LOG_ERROR("AudioIn: Error while reading audio stream: {}", SDL_GetError());
+            } else {
+                filled = got;
+            }
+            // A stream that delivers nothing for a long time is dead (e.g. the OS silenced a background
+            // app's capture): drop it and open a new one.
+            in.stalled_grains = filled > 0 ? 0 : in.stalled_grains + 1;
+            stalled = ecv_audio_in::stream_stalled(in.stalled_grains);
         }
     }
     if (filled < len)
         std::memset(static_cast<char *>(destPtr) + filled, 0, len - filled);
+    if (filled > 0)
+        ecv_audio_in::apply_gain(static_cast<int16_t *>(destPtr), static_cast<size_t>(filled) / 2, cfg.gain_percent.load());
+    if (stalled) {
+        LOG_WARN("AudioIn: capture stalled, re-opening");
+        audio_in_release_capture(in);
+        in.reopen_requested = true;
+    }
     return 0;
 }
 
-EXPORT(int, sceAudioInInputWithInputDeviceState) {
-    TRACY_FUNC(sceAudioInInputWithInputDeviceState);
-    return UNIMPLEMENTED();
+// Provisional signature: the optional device-state out parameter is not read (its layout is unproven).
+EXPORT(int, sceAudioInInputWithInputDeviceState, int port, void *destPtr) {
+    TRACY_FUNC(sceAudioInInputWithInputDeviceState, port, destPtr);
+    return CALL_EXPORT(sceAudioInInput, port, destPtr);
 }
 
 EXPORT(int, sceAudioInOpenPort, SceAudioInPortType portType, int grain, int freq, SceAudioInParam param) {
@@ -259,6 +322,7 @@ EXPORT(int, sceAudioInOpenPort, SceAudioInPortType portType, int grain, int freq
     // Capture may be unavailable (permission pending/denied, no microphone): the port stays open and
     // sceAudioInInput delivers silence so the game keeps running.
     emuenv.audio.in_port.reopen_requested = false;
+    emuenv.audio.in_port.stalled_grains = 0;
     open_capture_stream(emuenv.audio.in_port, freq);
 
     emuenv.audio.in_port.len_bytes = grain * 2;
@@ -282,20 +346,29 @@ EXPORT(int, sceAudioInReleasePort, int port) {
         return RET_ERROR(SCE_AUDIO_IN_ERROR_NOT_OPENED);
     }
     emuenv.audio.in_port.running = false;
-    if (emuenv.audio.in_port.id)
-        SDL_DestroyAudioStream(static_cast<SDL_AudioStream *>(emuenv.audio.in_port.id));
-    emuenv.audio.in_port.id = nullptr;
+    audio_in_release_capture(emuenv.audio.in_port);
+#ifdef __ANDROID__
+    call_activity_method("releaseMicrophoneRouting", nullptr);
+#endif
     return 0;
 }
 
-EXPORT(int, sceAudioInSelectInput) {
-    TRACY_FUNC(sceAudioInSelectInput);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAudioInSelectInput, int input) {
+    TRACY_FUNC(sceAudioInSelectInput, input);
+    if (!ecv_audio_in::valid_guest_input(input)) {
+        return RET_ERROR(SCE_AUDIO_IN_ERROR_INVALID_PARAMETER);
+    }
+    emuenv.audio.in_port.guest_input = input;
+    return 0;
 }
 
-EXPORT(int, sceAudioInSetMicGain) {
-    TRACY_FUNC(sceAudioInSetMicGain);
-    return UNIMPLEMENTED();
+EXPORT(int, sceAudioInSetMicGain, int gain) {
+    TRACY_FUNC(sceAudioInSetMicGain, gain);
+    if (!ecv_audio_in::valid_guest_gain(gain)) {
+        return RET_ERROR(SCE_AUDIO_IN_ERROR_INVALID_PARAMETER);
+    }
+    emuenv.audio.in_port.guest_mic_gain = gain;
+    return 0;
 }
 
 EXPORT(int, sceAudioInSetMute) {

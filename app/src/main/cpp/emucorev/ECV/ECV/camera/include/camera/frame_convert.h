@@ -1,6 +1,8 @@
 // Internal camera surface conversion shared by production and real SDL regressions.
 #pragma once
 
+#include "camera_policy.h"
+
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_surface.h>
 #include <memory>
@@ -36,15 +38,34 @@ static SDL_Surface *ecv_camera_rotate_argb(SDL_Surface *src, int rotation_cw) {
     return dst;
 }
 
-// rotation_cw (0/90/180/270) is applied to the decoded image before it is scaled to width x height.
+// Centre-crops an ARGB8888 surface to `crop` and scales it to width x height (no distortion when the crop
+// has the destination aspect ratio, see ecv_camera::center_crop).
+static SDL_Surface *ecv_camera_crop_scale_argb(SDL_Surface *src, const ecv_camera::Rect &crop, int width, int height) {
+    SDL_Surface *dst = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_ARGB8888);
+    if (!dst) return nullptr;
+    SDL_SetSurfaceColorspace(dst, SDL_GetSurfaceColorspace(src));
+    SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_NONE);
+    const SDL_Rect src_rect{ crop.x, crop.y, crop.w, crop.h };
+    if (!SDL_BlitSurfaceScaled(src, &src_rect, dst, nullptr, SDL_SCALEMODE_LINEAR)) {
+        SDL_DestroySurface(dst);
+        return nullptr;
+    }
+    return dst;
+}
+
+// rotation_cw (0/90/180/270) is applied to the decoded image first. The result is then centre-cropped to the
+// aspect ratio of width x height (and by the digital zoom, zoom_x10 = 10 is 1.0x) before it is scaled, so a
+// source of a different aspect ratio is never stretched. `adjust` (optional) applies the camera tone attributes.
 static SDL_Surface *ecv_camera_convert_surface(SDL_Surface *source, SDL_PixelFormat format,
-    SDL_Colorspace colorspace, int width, int height, int rotation_cw = 0) {
+    SDL_Colorspace colorspace, int width, int height, int rotation_cw = 0,
+    int zoom_x10 = ecv_camera::kZoomMin, const ecv_camera::Adjust *adjust = nullptr) {
     if (!source || width <= 0 || height <= 0) {
         SDL_SetError("Invalid camera frame conversion input");
         return nullptr;
     }
     const SDL_Colorspace source_colorspace = SDL_GetSurfaceColorspace(source);
-    if (rotation_cw == 0 && source->w == width && source->h == height && source_colorspace == colorspace)
+    const bool adjusting = adjust && !adjust->identity();
+    if (rotation_cw == 0 && zoom_x10 <= ecv_camera::kZoomMin && !adjusting && source->w == width && source->h == height && source_colorspace == colorspace)
         return SDL_ConvertSurfaceAndColorspace(source, format, nullptr, colorspace, 0);
 
     using Surface = std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)>;
@@ -60,9 +81,23 @@ static SDL_Surface *ecv_camera_convert_surface(SDL_Surface *source, SDL_PixelFor
     }
 
     // SDL cannot directly scale FOURCC surfaces; scale only decoded RGB pixels.
-    if (rgb->w != width || rgb->h != height) {
+    const ecv_camera::Rect full{ 0, 0, rgb->w, rgb->h };
+    const ecv_camera::Rect crop = ecv_camera::center_crop(rgb->w, rgb->h, width, height, zoom_x10);
+    if (crop.w <= 0 || crop.h <= 0) {
+        SDL_SetError("Invalid camera frame crop");
+        return nullptr;
+    }
+    if (!(crop == full)) {
+        rgb.reset(ecv_camera_crop_scale_argb(rgb.get(), crop, width, height));
+        if (!rgb) return nullptr;
+    } else if (rgb->w != width || rgb->h != height) {
         rgb.reset(SDL_ScaleSurface(rgb.get(), width, height, SDL_SCALEMODE_LINEAR));
         if (!rgb) return nullptr;
+    }
+
+    if (adjusting && SDL_LockSurface(rgb.get())) {
+        ecv_camera::adjust_argb(static_cast<unsigned char *>(rgb->pixels), rgb->w, rgb->h, rgb->pitch, *adjust);
+        SDL_UnlockSurface(rgb.get());
     }
 
     if (SDL_ISPIXELFORMAT_FOURCC(format)) {

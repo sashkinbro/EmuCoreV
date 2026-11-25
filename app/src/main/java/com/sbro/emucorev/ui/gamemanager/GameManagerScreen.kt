@@ -685,6 +685,30 @@ private fun AudioProfileSection(
         )
         ToggleRow(stringResource(R.string.settings_core_ngs_enable), config.ngsEnable, stringResource(R.string.settings_help_ngs_enable), { onUpdate { it.copy(ngsEnable = defaults.ngsEnable) } }) { onUpdate { cfg -> cfg.copy(ngsEnable = it) } }
     }
+    // Per-game microphone override; the permission status and the level test live in the global Settings.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val micDevices = remember { com.sbro.emucorev.core.MicrophoneSupport.listInputDevices(context) }
+    val micAuto = stringResource(R.string.settings_mic_input_auto)
+    val micLabels = micDevices.map { com.sbro.emucorev.ui.settings.micDeviceLabel(it) }
+    SectionCard(title = stringResource(R.string.settings_mic_title)) {
+        ToggleRow(stringResource(R.string.settings_mic_enable), config.micEnabled, stringResource(R.string.settings_help_mic_enable), { onUpdate { it.copy(micEnabled = defaults.micEnabled) } }) { onUpdate { cfg -> cfg.copy(micEnabled = it) } }
+        if (micDevices.isNotEmpty()) {
+            val selected = micDevices.indexOfFirst { it.key == config.micInputDevice }.let { if (it >= 0) micLabels[it] else micAuto }
+            ChoiceRow(stringResource(R.string.settings_mic_input_device), stringResource(R.string.settings_help_mic_input_device), selected, listOf(micAuto) + micLabels, { onUpdate { it.copy(micInputDevice = defaults.micInputDevice) } }) { label ->
+                val index = micLabels.indexOf(label)
+                onUpdate { cfg -> cfg.copy(micInputDevice = if (index >= 0) micDevices[index].key else "") }
+            }
+        }
+        SliderRow(
+            title = stringResource(R.string.settings_mic_gain),
+            description = stringResource(R.string.settings_help_mic_gain),
+            valueText = stringResource(R.string.settings_mic_gain_value, config.micGainPercent),
+            value = config.micGainPercent.toFloat(),
+            valueRange = com.sbro.emucorev.core.MIC_GAIN_MIN.toFloat()..com.sbro.emucorev.core.MIC_GAIN_MAX.toFloat(),
+            onReset = { onUpdate { it.copy(micGainPercent = defaults.micGainPercent) } },
+            onChange = { value -> onUpdate { it.copy(micGainPercent = value.toInt()) } }
+        )
+    }
 }
 
 @Composable

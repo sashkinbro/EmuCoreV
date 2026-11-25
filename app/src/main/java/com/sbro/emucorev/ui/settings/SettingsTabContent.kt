@@ -37,6 +37,8 @@ import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Mic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,6 +84,12 @@ import com.sbro.emucorev.R
 import com.sbro.emucorev.BuildConfig
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.CameraSourceSupport
+import com.sbro.emucorev.core.MIC_GAIN_MAX
+import com.sbro.emucorev.core.MIC_GAIN_MIN
+import com.sbro.emucorev.core.MicDeviceKind
+import com.sbro.emucorev.core.MicInputDevice
+import com.sbro.emucorev.core.MicrophoneSupport
+import com.sbro.emucorev.core.resolveMicDeviceId
 import com.sbro.emucorev.core.DeviceCamera
 import com.sbro.emucorev.core.CHEATS_ENABLED
 import com.sbro.emucorev.core.GpuDriverCompatibility
@@ -437,6 +445,7 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
             Text(stringResource(R.string.settings_core_reload))
         }
     }
+    MicrophoneSection(uiState, defaults, viewModel)
 }
 
 @Composable
@@ -633,62 +642,52 @@ private fun ControlsTab(
 
 @Composable
 private fun CameraTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
-    SectionCard(title = stringResource(R.string.settings_camera_front), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
-        Chips(
-            title = stringResource(R.string.settings_camera_source),
-            description = stringResource(R.string.settings_help_camera_source),
-            onResetDefault = {
-                viewModel.updateCoreSettings { it.copy(frontCameraType = defaults.frontCameraType) }
-            }
-        ) {
-            IntChip(VitaCoreConfig.CAMERA_SOURCE_SOLID, stringResource(R.string.settings_camera_source_solid), uiState.coreConfig.frontCameraType, viewModel) { c, v -> c.copy(frontCameraType = v) }
-            IntChip(VitaCoreConfig.CAMERA_SOURCE_IMAGE, stringResource(R.string.settings_camera_source_image), uiState.coreConfig.frontCameraType, viewModel) { c, v -> c.copy(frontCameraType = v) }
-            IntChip(VitaCoreConfig.CAMERA_SOURCE_REAL, stringResource(R.string.settings_camera_source_real), uiState.coreConfig.frontCameraType, viewModel) { c, v -> c.copy(frontCameraType = v) }
-        }
-        CameraSourceExtras(
-            slot = "front",
-            type = uiState.coreConfig.frontCameraType,
-            cameraId = uiState.coreConfig.frontCameraId,
-            imagePath = uiState.coreConfig.frontCameraImage,
-            onCameraId = { id -> viewModel.updateCoreSettings { it.copy(frontCameraId = id) } },
-            onImagePath = { path -> viewModel.updateCoreSettings { it.copy(frontCameraImage = path) } }
-        )
-    }
-    SectionCard(title = stringResource(R.string.settings_camera_back), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
-        Chips(
-            title = stringResource(R.string.settings_camera_source),
-            description = stringResource(R.string.settings_help_camera_source),
-            onResetDefault = {
-                viewModel.updateCoreSettings { it.copy(backCameraType = defaults.backCameraType) }
-            }
-        ) {
-            IntChip(VitaCoreConfig.CAMERA_SOURCE_SOLID, stringResource(R.string.settings_camera_source_solid), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
-            IntChip(VitaCoreConfig.CAMERA_SOURCE_IMAGE, stringResource(R.string.settings_camera_source_image), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
-            IntChip(VitaCoreConfig.CAMERA_SOURCE_REAL, stringResource(R.string.settings_camera_source_real), uiState.coreConfig.backCameraType, viewModel) { c, v -> c.copy(backCameraType = v) }
-        }
-        CameraSourceExtras(
-            slot = "back",
-            type = uiState.coreConfig.backCameraType,
-            cameraId = uiState.coreConfig.backCameraId,
-            imagePath = uiState.coreConfig.backCameraImage,
-            onCameraId = { id -> viewModel.updateCoreSettings { it.copy(backCameraId = id) } },
-            onImagePath = { path -> viewModel.updateCoreSettings { it.copy(backCameraImage = path) } }
-        )
-    }
+    CameraSourceCard(
+        title = stringResource(R.string.settings_camera_front),
+        slot = "front",
+        type = uiState.coreConfig.frontCameraType,
+        cameraId = uiState.coreConfig.frontCameraId,
+        imagePath = uiState.coreConfig.frontCameraImage,
+        onType = { value -> viewModel.updateCoreSettings { it.copy(frontCameraType = value) } },
+        onResetType = { viewModel.updateCoreSettings { it.copy(frontCameraType = defaults.frontCameraType) } },
+        onCameraId = { id -> viewModel.updateCoreSettings { it.copy(frontCameraId = id) } },
+        onImagePath = { path -> viewModel.updateCoreSettings { it.copy(frontCameraImage = path) } }
+    )
+    CameraSourceCard(
+        title = stringResource(R.string.settings_camera_back),
+        slot = "back",
+        type = uiState.coreConfig.backCameraType,
+        cameraId = uiState.coreConfig.backCameraId,
+        imagePath = uiState.coreConfig.backCameraImage,
+        onType = { value -> viewModel.updateCoreSettings { it.copy(backCameraType = value) } },
+        onResetType = { viewModel.updateCoreSettings { it.copy(backCameraType = defaults.backCameraType) } },
+        onCameraId = { id -> viewModel.updateCoreSettings { it.copy(backCameraId = id) } },
+        onImagePath = { path -> viewModel.updateCoreSettings { it.copy(backCameraImage = path) } }
+    )
 }
 
-/** Image picker (static image source) or device camera chooser (real camera source). */
+/**
+ * One Vita camera slot. Every unusable source ends in a dark frame in the core (no host camera, no
+ * permission, missing image), so the UI only has to be honest about it: the Real chip is disabled on a
+ * phone without a camera, the Image chip asks for a picture first, and the camera permission is requested
+ * here (not in the middle of a game) with a clear state and a way to the app settings.
+ */
 @Composable
-private fun CameraSourceExtras(
+private fun CameraSourceCard(
+    title: String,
     slot: String,
     type: Int,
     cameraId: String,
     imagePath: String,
+    onType: (Int) -> Unit,
+    onResetType: () -> Unit,
     onCameraId: (String) -> Unit,
     onImagePath: (String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val cameras = remember { CameraSourceSupport.listCameras(context) }
+    val permission = rememberPeripheralPermission(android.Manifest.permission.CAMERA)
     val failedMessage = stringResource(R.string.settings_camera_image_failed)
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
@@ -696,22 +695,68 @@ private fun CameraSourceExtras(
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             val path = withContext(Dispatchers.IO) { CameraSourceSupport.importImage(context, uri, slot) }
-            if (path != null) onImagePath(path)
-            else Toast.makeText(context, failedMessage, Toast.LENGTH_SHORT).show()
+            if (path != null) {
+                onImagePath(path)
+                onType(VitaCoreConfig.CAMERA_SOURCE_IMAGE)
+            } else {
+                Toast.makeText(context, failedMessage, Toast.LENGTH_SHORT).show()
+            }
         }
     }
-    when (type) {
-        VitaCoreConfig.CAMERA_SOURCE_IMAGE -> SettingsActionRow(
-            icon = Icons.Rounded.Image,
-            title = stringResource(R.string.settings_camera_image_title),
-            subtitle = stringResource(
-                if (imagePath.isBlank()) R.string.settings_camera_image_none else R.string.settings_camera_image_selected
-            ),
-            onClick = { picker.launch(arrayOf("image/*")) }
-        )
-        VitaCoreConfig.CAMERA_SOURCE_REAL -> {
-            val cameras = remember { CameraSourceSupport.listCameras(context) }
-            if (cameras.isNotEmpty()) {
+    val imageMissing = remember(imagePath) { CameraSourceSupport.isImageMissing(imagePath) }
+    val imageUsable = imagePath.isNotBlank() && !imageMissing
+    SectionCard(title = title, contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Chips(
+            title = stringResource(R.string.settings_camera_source),
+            description = stringResource(R.string.settings_help_camera_source),
+            onResetDefault = onResetType
+        ) {
+            FilterChip(
+                shape = neonChipShape(),
+                selected = type == VitaCoreConfig.CAMERA_SOURCE_SOLID,
+                onClick = { onType(VitaCoreConfig.CAMERA_SOURCE_SOLID) },
+                colors = appFilterChipColors(),
+                label = { Text(stringResource(R.string.settings_camera_source_solid)) }
+            )
+            FilterChip(
+                shape = neonChipShape(),
+                selected = type == VitaCoreConfig.CAMERA_SOURCE_IMAGE,
+                // Without a (still existing) picture the chip first asks for one; the source is only
+                // switched once an image was imported.
+                onClick = {
+                    if (imageUsable) onType(VitaCoreConfig.CAMERA_SOURCE_IMAGE) else picker.launch(arrayOf("image/*"))
+                },
+                colors = appFilterChipColors(),
+                label = { Text(stringResource(R.string.settings_camera_source_image)) }
+            )
+            FilterChip(
+                shape = neonChipShape(),
+                selected = type == VitaCoreConfig.CAMERA_SOURCE_REAL,
+                enabled = cameras.isNotEmpty(),
+                onClick = {
+                    onType(VitaCoreConfig.CAMERA_SOURCE_REAL)
+                    if (permission.status == com.sbro.emucorev.core.PermissionStatus.CAN_REQUEST) permission.requestOrOpenSettings()
+                },
+                colors = appFilterChipColors(),
+                label = { Text(stringResource(R.string.settings_camera_source_real)) }
+            )
+        }
+        when (type) {
+            VitaCoreConfig.CAMERA_SOURCE_IMAGE -> SettingsActionRow(
+                icon = Icons.Rounded.Image,
+                title = stringResource(R.string.settings_camera_image_title),
+                subtitle = stringResource(
+                    when {
+                        imagePath.isBlank() -> R.string.settings_camera_image_none
+                        imageMissing -> R.string.settings_camera_image_missing
+                        else -> R.string.settings_camera_image_selected
+                    }
+                ),
+                onClick = { picker.launch(arrayOf("image/*")) }
+            )
+            VitaCoreConfig.CAMERA_SOURCE_REAL -> if (cameras.isEmpty()) {
+                CameraHint(stringResource(R.string.settings_camera_none_hint))
+            } else {
                 Chips(
                     title = stringResource(R.string.settings_camera_device),
                     description = stringResource(R.string.settings_help_camera_device),
@@ -746,7 +791,152 @@ private fun CameraSourceExtras(
                         )
                     }
                 }
+                PermissionRow(
+                    icon = Icons.Rounded.CameraAlt,
+                    title = stringResource(R.string.settings_camera_permission_title),
+                    permission = permission
+                )
+                if (!permission.granted) CameraHint(stringResource(R.string.settings_camera_permission_denied_hint))
             }
+        }
+    }
+}
+
+@Composable
+private fun CameraHint(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = SettingsSectionRowPadding, vertical = 6.dp)
+    )
+}
+
+/** Status row of a runtime permission: tapping asks for it, or opens the app settings once it is blocked. */
+@Composable
+private fun PermissionRow(icon: ImageVector, title: String, permission: PeripheralPermissionState) {
+    SettingsActionRow(
+        icon = icon,
+        title = title,
+        subtitle = stringResource(
+            when (permission.status) {
+                com.sbro.emucorev.core.PermissionStatus.GRANTED -> R.string.settings_permission_granted
+                com.sbro.emucorev.core.PermissionStatus.CAN_REQUEST -> R.string.settings_permission_can_request
+                com.sbro.emucorev.core.PermissionStatus.BLOCKED -> R.string.settings_permission_blocked
+            }
+        ),
+        onClick = { if (!permission.granted) permission.requestOrOpenSettings() }
+    )
+}
+
+@Composable
+private fun MicrophoneSection(uiState: SettingsUiState, defaults: VitaCoreConfig, viewModel: SettingsViewModel) {
+    val context = LocalContext.current
+    val config = uiState.coreConfig
+    val permission = rememberPeripheralPermission(android.Manifest.permission.RECORD_AUDIO)
+    val devices = remember(permission.status, config.micInputDevice) { MicrophoneSupport.listInputDevices(context) }
+    SectionCard(title = stringResource(R.string.settings_mic_title), contentPadding = androidx.compose.foundation.layout.PaddingValues(SettingsSectionContentPadding)) {
+        Toggle(
+            stringResource(R.string.settings_mic_enable),
+            stringResource(R.string.settings_help_mic_enable),
+            config.micEnabled,
+            { enabled -> viewModel.updateCoreSettings { it.copy(micEnabled = enabled) } },
+            { viewModel.updateCoreSettings { it.copy(micEnabled = defaults.micEnabled) } }
+        )
+        PermissionRow(
+            icon = Icons.Rounded.Mic,
+            title = stringResource(R.string.settings_mic_permission_title),
+            permission = permission
+        )
+        if (devices.isNotEmpty()) {
+            Chips(stringResource(R.string.settings_mic_input_device), stringResource(R.string.settings_help_mic_input_device), { viewModel.updateCoreSettings { it.copy(micInputDevice = defaults.micInputDevice) } }) {
+                FilterChip(
+                    shape = neonChipShape(),
+                    selected = config.micInputDevice.isBlank(),
+                    onClick = { viewModel.updateCoreSettings { it.copy(micInputDevice = "") } },
+                    colors = appFilterChipColors(),
+                    label = { Text(stringResource(R.string.settings_mic_input_auto)) }
+                )
+                devices.forEach { device ->
+                    FilterChip(
+                        shape = neonChipShape(),
+                        selected = config.micInputDevice == device.key,
+                        onClick = { viewModel.updateCoreSettings { it.copy(micInputDevice = device.key) } },
+                        colors = appFilterChipColors(),
+                        label = { Text(micDeviceLabel(device)) }
+                    )
+                }
+            }
+        }
+        SliderRow(stringResource(R.string.settings_mic_gain), stringResource(R.string.settings_help_mic_gain), stringResource(R.string.settings_mic_gain_value, config.micGainPercent), { viewModel.updateCoreSettings { it.copy(micGainPercent = defaults.micGainPercent) } }) {
+            SyncedSlider(value = config.micGainPercent.toFloat(), onValueChange = { value -> viewModel.updateCoreSettings { it.copy(micGainPercent = value.roundToInt()) } }, valueRange = MIC_GAIN_MIN.toFloat()..MIC_GAIN_MAX.toFloat())
+        }
+        MicTestRow(
+            deviceId = resolveMicDeviceId(config.micInputDevice, devices),
+            gainPercent = config.micGainPercent,
+            permissionGranted = permission.granted
+        )
+    }
+}
+
+@Composable
+internal fun micDeviceLabel(device: MicInputDevice): String {
+    val kind = stringResource(
+        when (device.kind) {
+            MicDeviceKind.BUILT_IN -> R.string.settings_mic_device_builtin
+            MicDeviceKind.USB -> R.string.settings_mic_device_usb
+            MicDeviceKind.BLUETOOTH -> R.string.settings_mic_device_bluetooth
+            MicDeviceKind.WIRED -> R.string.settings_mic_device_wired
+            MicDeviceKind.OTHER -> R.string.settings_mic_device_other
+        }
+    )
+    return if (device.name.isBlank() || device.kind == MicDeviceKind.BUILT_IN) kind else "$kind (${device.name})"
+}
+
+/** Starts a short live capture so the user can see the chosen device and gain react to their voice. */
+@Composable
+private fun MicTestRow(deviceId: Int, gainPercent: Int, permissionGranted: Boolean) {
+    val context = LocalContext.current
+    var testing by remember { mutableStateOf(false) }
+    var level by remember { mutableStateOf(0f) }
+    val gain = androidx.compose.runtime.rememberUpdatedState(gainPercent)
+    LaunchedEffect(testing, deviceId, permissionGranted) {
+        level = 0f
+        if (testing && permissionGranted) {
+            MicrophoneSupport.levels(context, deviceId) { gain.value }.collect { level = it }
+        }
+    }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) testing = false
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    Column(modifier = Modifier.padding(horizontal = SettingsSectionRowPadding, vertical = 6.dp)) {
+        Button(
+            shape = neonButtonShape(),
+            enabled = permissionGranted,
+            onClick = { testing = !testing },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(if (testing) R.string.settings_mic_test_stop else R.string.settings_mic_test_start))
+        }
+        if (testing) {
+            LinearProgressIndicator(
+                progress = { level },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+            )
+        } else if (!permissionGranted) {
+            Text(
+                text = stringResource(R.string.settings_mic_test_needs_permission),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
     }
 }

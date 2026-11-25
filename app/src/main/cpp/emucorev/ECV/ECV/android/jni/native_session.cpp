@@ -61,6 +61,9 @@ extern "C" {
 
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_input_RearTouchNative_setCamerasSuspended(JNIEnv *, jobject, jboolean suspended) {
+    // Remember the state even before the emulator environment exists (cameras opened later pick it up),
+    // then flip each camera's flag; the host camera is re-opened lazily on the guest thread.
+    ecv_camera_set_host_suspended(suspended == JNI_TRUE);
     auto *emuenv = get_emuenv();
     if (!emuenv) return;
     for (auto &camera : emuenv->camera.cameras)

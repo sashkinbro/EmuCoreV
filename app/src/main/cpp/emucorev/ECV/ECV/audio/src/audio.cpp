@@ -66,9 +66,7 @@ void AudioState::deinit() {
     out_ports.clear();
 
     if (in_port.running) {
-        if (in_port.id)
-            SDL_DestroyAudioStream(static_cast<SDL_AudioStream *>(in_port.id));
-        in_port.id = nullptr;
+        audio_in_release_capture(in_port);
         in_port.running = false;
         in_port.len_bytes = 0;
         in_port.freq = 0;
@@ -76,6 +74,41 @@ void AudioState::deinit() {
     }
 
     next_port_id = 1;
+}
+
+void audio_in_release_capture(AudioInPort &in) {
+    void *stream = nullptr;
+    {
+        const std::lock_guard<std::mutex> lock(in.capture_mutex);
+        stream = in.id;
+        in.id = nullptr;
+    }
+    if (stream) {
+        SDL_DestroyAudioStream(static_cast<SDL_AudioStream *>(stream));
+        LOG_INFO("AudioIn: capture released");
+    }
+}
+
+void audio_in_set_suspended(AudioInPort &in, bool suspended) {
+    if (ecv_audio_in::settings().suspended.exchange(suspended) == suspended)
+        return;
+    if (suspended) {
+        audio_in_release_capture(in);
+        // The open port restarts capture on the guest thread (sceAudioInInput) after the resume.
+        if (in.running)
+            in.reopen_requested = true;
+        LOG_INFO("AudioIn paused");
+    } else {
+        LOG_INFO("AudioIn resumed");
+    }
+}
+
+void audio_in_settings_changed(AudioInPort &in) {
+    // Disabled: stay silent. Enabled again or another input device: restart capture. Either way the
+    // stream is released here and (re)opened by the guest thread in sceAudioInInput when wanted.
+    audio_in_release_capture(in);
+    if (in.running)
+        in.reopen_requested = true;
 }
 
 void AudioState::set_backend(const std::string &adapter_name) {

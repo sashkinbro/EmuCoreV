@@ -18,6 +18,7 @@
 #include "config/state.h"
 
 #include <array>
+#include <atomic>
 #include <string_view>
 #include <camera/camera.h>
 #include <camera/state.h>
@@ -122,10 +123,15 @@ public:
 #endif
     SDL_CameraPtr sdl_camera;
     SDL_CameraID device_id{};
-    bool suspended = false;
+    // Host suspend (menu pause / background). Flipped from the UI thread without taking frame_mutex.
+    std::atomic<bool> suspended{ false };
+    // Set when the camera must be (re)opened; the guest thread does it lazily in read()/is_active().
+    std::atomic<bool> needs_reopen{ false };
     int sensor_orientation = 0; // degrees, Android CameraCharacteristics.SENSOR_ORIENTATION
     int lens_facing = -1; // Android LENS_FACING: 0 front, 1 back, 2 external, -1 unknown
-    int reverse = SCE_CAMERA_REVERSE_OFF;
+    ecv_camera::AttributeStore attrs;
+    // Static source (image / solid colour) before the attribute adjustments; frame is derived from it.
+    SDL_SurfacePtr static_source;
     SDL_SurfacePtr frame;
     SDL_PixelFormat format;
     SDL_Colorspace colorspace;
@@ -245,8 +251,35 @@ static int camera_frame_rotation(const Camera *self) {
 }
 
 static SDL_SurfacePtr convert_camera_frame(Camera *self, SDL_Surface *source) {
+    const auto adjust = ecv_camera::adjust_from(self->pImpl->attrs);
     return SDL_SurfacePtr(ecv_camera_convert_surface(source, self->pImpl->format,
-        self->pImpl->colorspace, self->info.width, self->info.height, camera_frame_rotation(self)));
+        self->pImpl->colorspace, self->info.width, self->info.height, camera_frame_rotation(self),
+        self->pImpl->attrs.get(CameraAttributes::Zoom), &adjust));
+}
+
+// Builds the guest-format frame of a static source (image / solid colour) with the current zoom and
+// tone attributes. The source is kept so a later attribute change can re-render it.
+static bool render_static_frame(Camera *self) {
+    if (!self->pImpl->static_source)
+        return false;
+    const auto adjust = ecv_camera::adjust_from(self->pImpl->attrs);
+    SDL_SurfacePtr out(ecv_camera_convert_surface(self->pImpl->static_source.get(), self->pImpl->format,
+        self->pImpl->colorspace, self->info.width, self->info.height, 0,
+        self->pImpl->attrs.get(CameraAttributes::Zoom), &adjust));
+    if (!out) {
+        LOG_ERROR("Failed to render the static camera frame: {}", SDL_GetError());
+        return false;
+    }
+    // If frame does not own its data then duplicate it
+    if (out->flags & SDL_SURFACE_PREALLOCATED) {
+        out.reset(SDL_DuplicateSurface(out.get()));
+        if (!out) {
+            LOG_ERROR("Failed to duplicate SDL surface: {}", SDL_GetError());
+            return false;
+        }
+    }
+    self->pImpl->frame = std::move(out);
+    return true;
 }
 
 static bool init_image(Camera *self) {
@@ -269,109 +302,90 @@ static bool init_image(Camera *self) {
         LOG_ERROR("Failed to create SDL surface from image data: {}", SDL_GetError());
         return false;
     }
-
-    if (width != self->info.width || height != self->info.height) {
-        image_surface.reset(SDL_ScaleSurface(image_surface.get(), self->info.width, self->info.height, SDL_SCALEMODE_LINEAR));
-        if (!image_surface) {
-            LOG_ERROR("Failed to scale SDL surface: {}", SDL_GetError());
-            return false;
-        }
-    }
-
-    image_surface.reset(SDL_ConvertSurfaceAndColorspace(image_surface.get(), self->pImpl->format, nullptr, self->pImpl->colorspace, 0));
-    if (!image_surface) {
-        LOG_ERROR("Failed to convert SDL surface: {}", SDL_GetError());
+    // The surface borrows the stbi buffer: keep an owning copy as the static source. The centre crop to
+    // the requested aspect ratio, the scaling and the format conversion happen in render_static_frame().
+    SDL_SurfacePtr owned(SDL_DuplicateSurface(image_surface.get()));
+    if (!owned) {
+        LOG_ERROR("Failed to duplicate SDL surface: {}", SDL_GetError());
         return false;
     }
-
-    // If frame does not own its data then duplicate it
-    if (image_surface->flags & SDL_SURFACE_PREALLOCATED) {
-        image_surface.reset(SDL_DuplicateSurface(image_surface.get()));
-        if (!image_surface) {
-            LOG_ERROR("Failed to duplicate SDL surface: {}", SDL_GetError());
-            return false;
-        }
+    self->pImpl->static_source = std::move(owned);
+    if (!render_static_frame(self)) {
+        self->pImpl->static_source.reset();
+        return false;
     }
-    self->pImpl->frame = std::move(image_surface);
-
     return true;
 }
 
-static bool init_solid_color(Camera *self) {
+static bool init_solid_color(Camera *self, uint32_t color) {
     SDL_SurfacePtr image_surface(SDL_CreateSurface(self->info.width, self->info.height, SDL_PIXELFORMAT_ARGB8888));
     if (!image_surface) {
         LOG_ERROR("Failed to create SDL surface for solid color: {}", SDL_GetError());
         return false;
     }
-    if (!SDL_FillSurfaceRect(image_surface.get(), nullptr, self->color)) {
+    if (!SDL_FillSurfaceRect(image_surface.get(), nullptr, color)) {
         LOG_ERROR("Failed to fill SDL surface with solid color: {}", SDL_GetError());
         return false;
     }
-    SDL_SurfacePtr converted_surface(SDL_ConvertSurfaceAndColorspace(image_surface.get(), self->pImpl->format, nullptr, self->pImpl->colorspace, 0));
-    if (!converted_surface) {
-        LOG_ERROR("Failed to convert SDL surface for solid color: {}", SDL_GetError());
+    self->pImpl->static_source = std::move(image_surface);
+    if (!render_static_frame(self)) {
+        self->pImpl->static_source.reset();
         return false;
     }
-    self->pImpl->frame = std::move(converted_surface);
     return true;
+}
+
+// The one fallback every failed source ends in (no host camera, camera permission denied, missing or
+// unreadable image): a working camera that delivers an opaque black frame, never an error to the guest.
+static bool init_dark_frame(Camera *self) {
+    self->pImpl->sdl_camera.reset();
+    self->pImpl->frame.reset();
+    self->pImpl->static_source.reset();
+    return init_solid_color(self, ecv_camera::kDarkFrameColor);
 }
 
 static bool refresh_camera_image(Camera *self) {
     self->pImpl->sdl_camera.reset();
     self->pImpl->frame.reset();
+    self->pImpl->static_source.reset();
     switch (self->type) {
     case CameraType::WebCamera:
         if (init_web_camera(self))
             return true;
         // A real Vita always has both cameras. When the host has no usable camera for this side
-        // (e.g. handhelds without one), feed a solid frame instead of failing every open and
+        // (e.g. handhelds without one), feed a dark frame instead of failing every open and
         // retry: the game sees a working, dark camera.
-        LOG_WARN_ONCE("No host camera available for '{}'; using a solid frame", self->id);
-        self->pImpl->sdl_camera.reset();
-        return init_solid_color(self);
-    case CameraType::Image: return init_image(self);
-    case CameraType::SolidColor: return init_solid_color(self);
+        LOG_WARN_ONCE("No host camera available for '{}'; using a dark frame", self->id);
+        return init_dark_frame(self);
+    case CameraType::Image:
+        if (init_image(self))
+            return true;
+        LOG_WARN_ONCE("Camera image '{}' is missing or unreadable; using a dark frame", self->image);
+        return init_dark_frame(self);
+    case CameraType::SolidColor: return init_solid_color(self, self->color);
     }
     return false;
 }
 
 int Camera::get_attribute(CameraAttributes attribute) {
     const std::lock_guard lock(pImpl->frame_mutex);
-    switch (attribute) {
-    case CameraAttributes::Saturation: return SCE_CAMERA_SATURATION_10;
-    case CameraAttributes::Brightness: return 128; // 0-255
-    case CameraAttributes::Contrast: return 128; // random default value  0-255
-    case CameraAttributes::Sharpness: return SCE_CAMERA_SHARPNESS_100;
-    case CameraAttributes::Reverse: return pImpl->reverse;
-    case CameraAttributes::Effect: return SCE_CAMERA_EFFECT_NORMAL;
-    case CameraAttributes::EV: return 0;
-    case CameraAttributes::Zoom: return 10; // 10-40
-    case CameraAttributes::AntiFlicker: return SCE_CAMERA_ANTIFLICKER_AUTO;
-    case CameraAttributes::ISO: return SCE_CAMERA_ISO_AUTO;
-    case CameraAttributes::Gain: return SCE_CAMERA_GAIN_AUTO;
-    case CameraAttributes::WhiteBalance: return SCE_CAMERA_WB_AUTO;
-    case CameraAttributes::Backlight: return SCE_CAMERA_BACKLIGHT_OFF;
-    case CameraAttributes::Nightmode: return SCE_CAMERA_NIGHTMODE_OFF;
-    case CameraAttributes::ExposureCeiling: return 0;
-    case CameraAttributes::AutoControlHold: return 0;
-    // undescribed parameters
-    case CameraAttributes::ImageQuality: return 0;
-    case CameraAttributes::NoiseReduction: return 0;
-    case CameraAttributes::SharpnessOff: return 0;
-    }
-    return 0;
+    return pImpl->attrs.get(attribute);
 }
 
 int Camera::set_attribute(CameraAttributes attribute, int value) {
     const std::lock_guard lock(pImpl->frame_mutex);
-    if (attribute == CameraAttributes::Reverse) {
-        if (value < SCE_CAMERA_REVERSE_OFF || value > SCE_CAMERA_REVERSE_MIRROR_FLIP)
-            return SCE_CAMERA_ERROR_PARAM;
-        pImpl->reverse = value;
-        return 0;
+    switch (pImpl->attrs.set(attribute, value)) {
+    case ecv_camera::AttrStatus::BadValue: return SCE_CAMERA_ERROR_PARAM;
+    case ecv_camera::AttrStatus::Unknown: return SCE_CAMERA_ERROR_ATTRIBUTE_UNKNOWN;
+    case ecv_camera::AttrStatus::Ok: break;
     }
-    // Never claim a host camera control changed when it was not implemented.
-    return SCE_CAMERA_ERROR_ATTRIBUTE_UNKNOWN;
+    // Zoom and tone attributes change the pixels: re-render a static source now; live frames pick the
+    // new values up in convert_camera_frame(). Everything else is stored and reported back (a virtual
+    // camera has no sensor control to drive).
+    if (ecv_camera::AttributeStore::affects_pixels(attribute) && pImpl->static_source && is_started
+        && !pImpl->suspended)
+        render_static_frame(this);
+    return 0;
 }
 
 int Camera::open(SceCameraInfo *info, uint64_t base_tick, uint64_t start_tick) {
@@ -384,7 +398,9 @@ int Camera::open(SceCameraInfo *info, uint64_t base_tick, uint64_t start_tick) {
     this->frame_idx = 0;
     this->last_frame_timestamp_us = 0;
     this->next_frame_timestamp_us = 0;
-    pImpl->reverse = SCE_CAMERA_REVERSE_OFF;
+    pImpl->attrs.reset();
+    pImpl->suspended = ecv_camera_host_suspended();
+    pImpl->needs_reopen = false;
     this->info = {};
     memcpy(&(this->info), info, std::min<size_t>(sizeof(SceCameraInfo), info->size));
     switch (this->info.format) {
@@ -430,6 +446,7 @@ int Camera::start() {
     frame_interval_us = SDL_US_PER_SECOND * 100 / numerator;
     if (!refresh_camera_image(this))
         return SCE_CAMERA_ERROR_NOT_MOUNTED;
+    pImpl->needs_reopen = false;
     is_started = true; // A capture request; IsActive stays zero while permission is pending.
     frame_idx = 0;
     last_frame_timestamp_us = 0;
@@ -442,13 +459,30 @@ static bool camera_disconnected(Camera *self) {
         SDL_GetCameraProperties(self->pImpl->sdl_camera.get()), "emucorev.camera.disconnected", false);
 }
 
+// Re-opens the source after a host suspend. Runs on the guest thread (read / is_active) so the UI thread
+// that flips the suspend flag never opens a camera. Caller holds frame_mutex.
+static void resume_source_if_needed(Camera *self) {
+    if (!self->pImpl->needs_reopen.load() || self->pImpl->suspended.load() || !self->is_started)
+        return;
+    self->pImpl->needs_reopen = false;
+    if (!refresh_camera_image(self))
+        LOG_WARN("Could not resume camera '{}'", self->id);
+}
+
 int Camera::is_active() {
     const std::lock_guard lock(pImpl->frame_mutex);
     if (!is_started || pImpl->suspended) return 0;
-    // Solid/Image sources, and a real camera that fell back to a solid frame (no host camera).
+    resume_source_if_needed(this);
+    // Solid/Image sources, and a real camera that fell back to a dark frame (no host camera).
     if (type != CameraType::WebCamera || !pImpl->sdl_camera) return pImpl->frame ? 1 : 0;
-    return pImpl->sdl_camera && !camera_disconnected(this)
-        && SDL_GetCameraPermissionState(pImpl->sdl_camera.get()) > 0 ? 1 : 0;
+    if (camera_disconnected(this)) return 0;
+    const int permission = SDL_GetCameraPermissionState(pImpl->sdl_camera.get());
+    if (permission < 0) {
+        // Denied: behave exactly like a device without a camera (dark frame), not like a broken one.
+        LOG_WARN_ONCE("Camera permission denied for '{}'; using a dark frame", id);
+        return init_dark_frame(this) ? 1 : 0;
+    }
+    return permission > 0 ? 1 : 0;
 }
 
 int Camera::read(SceCameraRead *read, void *pIBase, void *pUBase, void *pVBase, SceSize sizeIBase, SceSize sizeUBase, SceSize sizeVBase) {
@@ -461,6 +495,7 @@ int Camera::read(SceCameraRead *read, void *pIBase, void *pUBase, void *pVBase, 
         read->status = SCE_CAMERA_STATUS_IS_FORCED_STOP;
         return SCE_CAMERA_ERROR_NOT_ACTIVE;
     }
+    resume_source_if_needed(this);
     if (read->mode != SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_ON && read->mode != SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_OFF)
         return SCE_CAMERA_ERROR_PARAM;
     const auto deadline = SDL_GetTicksNS() + SDL_NS_PER_SECOND;
@@ -487,7 +522,13 @@ int Camera::read(SceCameraRead *read, void *pIBase, void *pUBase, void *pVBase, 
             if (!pImpl->sdl_camera || camera_disconnected(this))
                 return SCE_CAMERA_ERROR_NOT_MOUNTED;
             const int permission = SDL_GetCameraPermissionState(pImpl->sdl_camera.get());
-            if (permission < 0) return SCE_CAMERA_ERROR_NOT_MOUNTED;
+            if (permission < 0) {
+                // Denied: same outcome as "no camera" (a dark frame), not NOT_MOUNTED.
+                LOG_WARN_ONCE("Camera permission denied for '{}'; using a dark frame", id);
+                if (!init_dark_frame(this)) return SCE_CAMERA_ERROR_NOT_MOUNTED;
+                timestamp_ns = SDL_GetTicksNS();
+                break;
+            }
             if (permission == 0) {
                 read->status = SCE_CAMERA_STATUS_IS_NOT_STABLE;
                 return SCE_CAMERA_ERROR_NOT_ACTIVE;
@@ -555,7 +596,7 @@ int Camera::read(SceCameraRead *read, void *pIBase, void *pUBase, void *pVBase, 
         ? static_cast<size_t>(frame->pitch) * frame->h + static_cast<size_t>((frame->pitch + 1) / 2) * frame->h
         : static_cast<size_t>(frame->pitch) * frame->h;
     if (!SDL_LockSurface(frame)) return SCE_CAMERA_ERROR_FATAL;
-    const bool copied = ecv_camera_copy(info.format, info.width, info.height, info.pitch, pImpl->reverse,
+    const bool copied = ecv_camera_copy(info.format, info.width, info.height, info.pitch, pImpl->attrs.get(CameraAttributes::Reverse),
         static_cast<const unsigned char *>(frame->pixels), frame->pitch, source_size,
         static_cast<unsigned char *>(pIBase), sizeIBase, static_cast<unsigned char *>(pUBase), sizeUBase,
         static_cast<unsigned char *>(pVBase), sizeVBase);
@@ -591,7 +632,9 @@ int Camera::close() {
     const std::lock_guard lock(pImpl->frame_mutex);
     is_started = false;
     is_opened = false;
+    pImpl->needs_reopen = false;
     pImpl->frame.reset();
+    pImpl->static_source.reset();
     pImpl->sdl_camera.reset();
     last_frame_timestamp_us = next_frame_timestamp_us = 0;
     return 0;
@@ -600,21 +643,33 @@ int Camera::close() {
 int Camera::stop() {
     const std::lock_guard lock(pImpl->frame_mutex);
     is_started = false;
+    pImpl->needs_reopen = false;
     pImpl->frame.reset();
+    pImpl->static_source.reset();
     pImpl->sdl_camera.reset();
     last_frame_timestamp_us = next_frame_timestamp_us = 0;
     return 0;
 }
 
+static std::atomic<bool> g_host_suspended{ false };
+
+void ecv_camera_set_host_suspended(bool suspended) { g_host_suspended = suspended; }
+bool ecv_camera_host_suspended() { return g_host_suspended.load(); }
+
+// UI-thread entry. Suspending closes the host camera (the OS camera indicator must go off while the
+// menu is open); resuming only raises a flag, the guest thread re-opens lazily in read()/is_active().
 void Camera::set_suspended(bool suspended) {
-    const std::lock_guard lock(pImpl->frame_mutex);
-    if (pImpl->suspended == suspended) return;
-    pImpl->suspended = suspended;
-    pImpl->frame.reset();
-    pImpl->sdl_camera.reset();
-    last_frame_timestamp_us = next_frame_timestamp_us = 0;
-    if (!suspended && is_started && !refresh_camera_image(this))
-        LOG_WARN("Could not resume camera '{}'", id);
+    if (pImpl->suspended.exchange(suspended) == suspended) return;
+    if (suspended) {
+        const std::lock_guard lock(pImpl->frame_mutex);
+        pImpl->needs_reopen = false;
+        pImpl->frame.reset();
+        pImpl->static_source.reset();
+        pImpl->sdl_camera.reset();
+        last_frame_timestamp_us = next_frame_timestamp_us = 0;
+    } else {
+        pImpl->needs_reopen = true;
+    }
 }
 
 void Camera::update_config(int type, const std::string &id, const std::string &image, uint32_t color) {

@@ -39,7 +39,8 @@ add_executable(core_host_tests
     rear_touch_tests.cpp
     save_data_write_tests.cpp
     fragment_output_tests.cpp
-    surface_policy_tests.cpp)
+    surface_policy_tests.cpp
+    camera_mic_tests.cpp)
 target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/kernel/include"
     "${CORE_ROOT}/ngs/include"
@@ -52,6 +53,7 @@ target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/mem/include"
     "${CORE_ROOT}/rtc/include"
     "${CORE_ROOT}/audio/include"
+    "${CORE_ROOT}/camera/include"
     "${CORE_ROOT}/touch/include"
     "${CORE_ROOT}/net/include"
     "${CORE_ROOT}/modules/SceAppUtil"

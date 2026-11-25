@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "camera_policy.h"
 #include <mem/ptr.h>
 #include <util/log.h>
 #include <util/types.h>
@@ -297,28 +298,8 @@ struct SceCameraRead {
     Ptr<void> pVBase;
 };
 
-// numbers from disasmed code
-enum class CameraAttributes {
-    Saturation = 0xa,
-    Brightness = 0xb,
-    Contrast = 0xc,
-    Sharpness = 0xd,
-    Reverse = 0xe,
-    Effect = 0xf,
-    EV = 0x10,
-    Zoom = 0x11,
-    AntiFlicker = 0x12,
-    Gain, // unused. can't be get/set in original vita
-    ISO = 0x14,
-    WhiteBalance = 0x16,
-    Backlight = 0x17,
-    Nightmode = 0x18,
-    NoiseReduction = 0x19, // another get/set functions
-    AutoControlHold = 0x1a,
-    ExposureCeiling = 0x1b,
-    ImageQuality = 0x1c,
-    SharpnessOff // also 0xd, but another get/set functions
-};
+// numbers from disasmed code; the definition (and the value ranges) live in camera_policy.h
+using CameraAttributes = ecv_camera::Attr;
 
 enum CameraType {
     SolidColor,
@@ -362,3 +343,9 @@ public:
 };
 
 void init_default_cameras(Config &cfg);
+
+// Host (Android) suspend state shared by every camera: set while the game is menu-paused or in the
+// background. Kept globally so a call made before the emulator environment exists is not lost, and so
+// the UI thread only flips a flag (the camera re-opens lazily on the guest thread).
+void ecv_camera_set_host_suspended(bool suspended);
+bool ecv_camera_host_suspended();

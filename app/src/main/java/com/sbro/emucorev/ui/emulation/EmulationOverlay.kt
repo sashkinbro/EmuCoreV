@@ -258,7 +258,7 @@ fun EmulationOverlayHost(
     }
     LaunchedEffect(effectivePaused, inputResumed, nativeImeActive, showRearTouchSettings, waitingForStateFrame) {
         activity.rearTouchInput.setActive(inputResumed && !effectivePaused && !nativeImeActive && !showRearTouchSettings && !waitingForStateFrame)
-        com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(!inputResumed || effectivePaused || showRearTouchSettings)
+        activity.setPeripheralsSuspended(!inputResumed || effectivePaused || showRearTouchSettings)
     }
     DisposableEffect(activity) {
         onDispose { activity.rearTouchInput.setActive(false); activity.rearTouchInput.capture = null }

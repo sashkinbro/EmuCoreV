@@ -295,6 +295,15 @@ static bool BuildAAudioStream(SDL_AudioDevice *device)
     const int aaudio_device_id = (int) ((size_t) device->handle);
     LOGI("Opening device id %d", aaudio_device_id);
     ctx.AAudioStreamBuilder_setDeviceId(builder, aaudio_device_id);
+#else
+    if (recording) {
+        // EmuCoreV: optional preferred input device (AudioDeviceInfo id), chosen in the microphone settings.
+        const char *preferred_hint = SDL_GetHint("ECV_AAUDIO_INPUT_DEVICE_ID");
+        const int preferred_device = preferred_hint ? SDL_atoi(preferred_hint) : 0;
+        if (preferred_device > 0) {
+            ctx.AAudioStreamBuilder_setDeviceId(builder, preferred_device);
+        }
+    }
 #endif
 
     aaudio_format_t format;

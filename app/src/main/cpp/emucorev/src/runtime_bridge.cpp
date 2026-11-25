@@ -46,6 +46,41 @@ Java_com_sbro_emucorev_core_vita_Emulator_notifyRecordAudioGranted(
         emuenv->audio.in_port.reopen_requested.store(true);
 }
 
+/**
+ * Microphone (sceAudioIn) user settings for the running or next session: enabled flag, host gain in
+ * percent and the Android input device id (0 = system default). The values live in process-wide
+ * settings so a call made before the emulator environment exists is not lost.
+ */
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_setMicrophoneSettings(
+    JNIEnv * /*env*/,
+    jobject /*thiz*/,
+    jboolean enabled,
+    jint gainPercent,
+    jint deviceId) {
+    auto &settings = ecv_audio_in::settings();
+    const bool was_enabled = settings.enabled.exchange(enabled == JNI_TRUE);
+    const int previous_device = settings.device_id.exchange(deviceId > 0 ? deviceId : 0);
+    settings.gain_percent = ecv_audio_in::clamp_gain(gainPercent);
+    if (auto *emuenv = get_emuenv()) {
+        if (was_enabled != (enabled == JNI_TRUE) || previous_device != settings.device_id.load())
+            audio_in_settings_changed(emuenv->audio.in_port);
+    }
+}
+
+/** Menu pause / background: releases the capture stream (OS mic indicator off), re-opened on resume. */
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_vita_Emulator_setMicrophoneSuspended(
+    JNIEnv * /*env*/,
+    jobject /*thiz*/,
+    jboolean suspended) {
+    if (auto *emuenv = get_emuenv()) {
+        audio_in_set_suspended(emuenv->audio.in_port, suspended == JNI_TRUE);
+    } else {
+        ecv_audio_in::settings().suspended = suspended == JNI_TRUE;
+    }
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_sbro_emucorev_core_vita_Emulator_applyRuntimeCoreSettings(
     JNIEnv * /*env*/,

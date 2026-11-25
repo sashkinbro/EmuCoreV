@@ -257,7 +257,50 @@ TEST(GuestCameraLifecycle, raw8_is_rejected_without_opening_and_unsupported_cont
     SceCameraInfo info{}; info.size=sizeof(info); info.format=SCE_CAMERA_FORMAT_RAW8;
     EXPECT_EQ(static_cast<uint32_t>(camera.open(&info,0,0)),SCE_CAMERA_ERROR_FORMAT_UNKNOWN);
     EXPECT_FALSE(camera.is_opened);
-    EXPECT_EQ(static_cast<uint32_t>(camera.set_attribute(CameraAttributes::ISO,100)),SCE_CAMERA_ERROR_ATTRIBUTE_UNKNOWN);
+    EXPECT_EQ(static_cast<uint32_t>(camera.set_attribute(CameraAttributes::Gain,1)),SCE_CAMERA_ERROR_ATTRIBUTE_UNKNOWN);
+}
+
+TEST(GuestCameraAttributes, virtual_camera_stores_values_and_rejects_out_of_range) {
+    Camera camera;
+    EXPECT_EQ(camera.set_attribute(CameraAttributes::Zoom,20),0);
+    EXPECT_EQ(camera.get_attribute(CameraAttributes::Zoom),20);
+    EXPECT_EQ(camera.set_attribute(CameraAttributes::ISO,100),0);
+    EXPECT_EQ(camera.get_attribute(CameraAttributes::ISO),100);
+    EXPECT_EQ(static_cast<uint32_t>(camera.set_attribute(CameraAttributes::Zoom,5)),SCE_CAMERA_ERROR_PARAM);
+    EXPECT_EQ(camera.get_attribute(CameraAttributes::Zoom),20);
+}
+
+TEST(GuestCameraFallback, image_source_with_a_missing_file_delivers_a_dark_frame) {
+    Camera camera;
+    camera.update_config(CameraType::Image,"","/nonexistent/ecv-camera-missing.png",0xFFFFFFFFu);
+    SceCameraInfo info{}; info.size=sizeof(info); info.format=SCE_CAMERA_FORMAT_ARGB;
+    info.resolution=SCE_CAMERA_RESOLUTION_320_240; info.framerate=SCE_CAMERA_FRAMERATE_30_FPS;
+    info.width=320; info.height=240; info.buffer=SCE_CAMERA_BUFFER_SETBYREAD;
+    ASSERT_EQ(camera.open(&info,0,0),0);
+    ASSERT_EQ(camera.start(),0);
+    EXPECT_EQ(camera.is_active(),1);
+    std::vector<unsigned char> output(320*240*4,0xCD);
+    SceCameraRead read{}; read.size=sizeof(read); read.mode=SCE_CAMERA_READ_MODE_WAIT_NEXTFRAME_OFF;
+    ASSERT_EQ(camera.read(&read,output.data(),nullptr,nullptr,output.size(),0,0),0);
+    for (size_t i=0;i<output.size();i+=4) {
+        ASSERT_EQ(output[i],0); ASSERT_EQ(output[i+1],0); ASSERT_EQ(output[i+2],0); ASSERT_EQ(output[i+3],255);
+    }
+    camera.stop(); camera.close();
+}
+
+TEST(GuestCameraFallback, suspend_resume_only_raises_a_flag_and_reopens_lazily_on_the_guest_thread) {
+    Camera camera;
+    camera.update_config(CameraType::SolidColor,"","",0xFF336699u);
+    SceCameraInfo info{}; info.size=sizeof(info); info.format=SCE_CAMERA_FORMAT_ARGB;
+    info.resolution=SCE_CAMERA_RESOLUTION_320_240; info.framerate=SCE_CAMERA_FRAMERATE_30_FPS;
+    info.width=320; info.height=240; info.buffer=SCE_CAMERA_BUFFER_SETBYREAD;
+    ASSERT_EQ(camera.open(&info,0,0),0);
+    ASSERT_EQ(camera.start(),0);
+    camera.set_suspended(true);
+    EXPECT_EQ(camera.is_active(),0);
+    camera.set_suspended(false);
+    EXPECT_EQ(camera.is_active(),1); // re-opened by the guest-side call, not by set_suspended()
+    camera.stop(); camera.close();
 }
 
 TEST(GuestCameraLifecycle, read_before_start_does_not_fabricate_a_frame) {
@@ -378,6 +421,23 @@ TEST_F(GuestCameraConversion, full_range_nv12_decodes_black_white_and_opaque_alp
         auto output=convert(format,SDL_COLORSPACE_RGB_DEFAULT);
         ASSERT_NE(output,nullptr) << SDL_GetError();expect_rgb_scene(output.get());
     }
+}
+
+TEST(GuestCameraCrop, wide_source_is_centre_cropped_not_stretched) {
+    // Four 2-pixel bands R,G,B,W in an 8x4 image; a 4x4 target keeps only the centre bands G,B.
+    std::array<unsigned char,8*4*3> rgb{};
+    const unsigned char bands[4][3] = {{255,0,0},{0,255,0},{0,0,255},{255,255,255}};
+    for (int y=0;y<4;++y) for (int x=0;x<8;++x) for (int c=0;c<3;++c) rgb[(y*8+x)*3+c]=bands[x/2][c];
+    SDL_Surface *source = SDL_CreateSurfaceFrom(8,4,SDL_PIXELFORMAT_RGB24,rgb.data(),8*3);
+    ASSERT_NE(source,nullptr);
+    SDL_Surface *out = ecv_camera_convert_surface(source,SDL_PIXELFORMAT_ARGB8888,SDL_COLORSPACE_RGB_DEFAULT,4,4);
+    ASSERT_NE(out,nullptr);
+    Uint8 r=0,g=0,b=0,a=0;
+    ASSERT_TRUE(SDL_ReadSurfacePixel(out,0,0,&r,&g,&b,&a));
+    EXPECT_GT(g,200); EXPECT_LT(r,60); EXPECT_LT(b,60);
+    ASSERT_TRUE(SDL_ReadSurfacePixel(out,3,0,&r,&g,&b,&a));
+    EXPECT_GT(b,200); EXPECT_LT(r,60); EXPECT_LT(g,60);
+    SDL_DestroySurface(out); SDL_DestroySurface(source);
 }
 
 TEST_F(GuestCameraConversion, invalid_input_returns_no_surface_without_touching_source) {

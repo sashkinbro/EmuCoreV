@@ -636,7 +636,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             }
         }
         requestRetroArchShaderReapply(currentGameIdOrIntent())
-        com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(false)
+        setPeripheralsSuspended(false)
         KeyboardMouseManager.refreshConnectionState()
         KeyboardMouseManager.refreshPointerCapture()
         DiscordIntegration.setPaused(false)
@@ -655,7 +655,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         inputGateWatchdog.setPaused(true)
         shellCatalogCheckJob?.cancel()
         rearTouchInput.setActive(false)
-        com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(true)
+        setPeripheralsSuspended(true)
         KeyboardMouseManager.releaseAll()
         updatePointerCapture(false)
         cancelActiveTouches()
@@ -1213,7 +1213,49 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     fun updateGamepadRuntimeInputSettings(config: VitaCoreConfig) {
         SDLControllerManager.updateRuntimeInputSettings(config)
+        applyMicrophoneSettings(config)
     }
+
+    /**
+     * Menu pause / background: releases the host camera and microphone (the OS privacy indicators go off)
+     * and lets the guest threads re-open them lazily after the resume. Safe before the session exists.
+     */
+    fun setPeripheralsSuspended(suspended: Boolean) {
+        com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(suspended)
+        runCatching { setMicrophoneSuspended(suspended) }
+        if (suspended) com.sbro.emucorev.core.MicrophoneSupport.clearRouting(this)
+    }
+
+    @Volatile
+    private var micRouteDeviceId = 0
+
+    /** Pushes the effective (global or per-game) microphone settings into the core. */
+    private fun applyMicrophoneSettings(config: VitaCoreConfig) {
+        val devices = com.sbro.emucorev.core.MicrophoneSupport.listInputDevices(this)
+        val deviceId = com.sbro.emucorev.core.resolveMicDeviceId(config.micInputDevice, devices)
+        micRouteDeviceId = deviceId
+        runCatching { setMicrophoneSettings(config.micEnabled, config.micGainPercent, deviceId) }
+            .onFailure { Log.w(TAG, "Microphone settings not applied yet", it) }
+    }
+
+    /** JNI (guest thread, just before the capture stream opens): route a Bluetooth headset microphone. */
+    @Suppress("unused")
+    fun prepareMicrophoneRouting() {
+        val id = micRouteDeviceId
+        com.sbro.emucorev.core.MicrophoneSupport.applyRouting(
+            this, if (id > 0) com.sbro.emucorev.core.MicrophoneSupport.deviceInfo(this, id) else null
+        )
+    }
+
+    /** JNI (guest thread): the capture port was released. */
+    @Suppress("unused")
+    fun releaseMicrophoneRouting() {
+        com.sbro.emucorev.core.MicrophoneSupport.clearRouting(this)
+    }
+
+    private external fun setMicrophoneSettings(enabled: Boolean, gainPercent: Int, deviceId: Int)
+
+    private external fun setMicrophoneSuspended(suspended: Boolean)
 
     @Deprecated("Deprecated in Java")
     @SuppressLint("GestureBackNavigation")
