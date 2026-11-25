@@ -28,6 +28,7 @@
 #include <renderer/functions.h>
 #include <renderer/state.h>
 #include <renderer/transfer_fill.h>
+#include <renderer/transfer_model.h>
 #include <renderer/types.h>
 #include <util/log.h>
 #include <util/tracy.h>
@@ -40,10 +41,6 @@
 
 // keywords.h must be after tracy.h for msvc compiler
 #include <util/keywords.h>
-
-extern "C" {
-#include <libswscale/swscale.h>
-}
 
 namespace renderer {
 
@@ -209,6 +206,52 @@ static void perform_transfer_copy_mode(MemState &mem, const SceGxmTransferImage 
     }
 }
 
+// Byte offset of a pixel of a transfer image (any layout), the runtime twin of compute_offset above
+static int64_t transfer_pixel_offset(const SceGxmTransferImage &img, SceGxmTransferType type, uint32_t x, uint32_t y, uint32_t pixel_bytes) {
+    if (type == SCE_GXM_TRANSFER_LINEAR)
+        return y * static_cast<int64_t>(img.stride) + static_cast<int64_t>(x) * pixel_bytes;
+    if (type == SCE_GXM_TRANSFER_TILED) {
+        const int64_t stride_pixel = img.stride / pixel_bytes;
+        const uint32_t texel_offset_in_tile = ((y % 32) * 32) + (x % 32);
+        const int64_t tile_address = (stride_pixel / 32) * (y / 32) + (x / 32);
+        return (tile_address * 1024 + texel_offset_in_tile) * pixel_bytes;
+    }
+    return static_cast<int64_t>(texture::encode_morton(x, y, img.width, img.height)) * pixel_bytes;
+}
+
+// Copy between two different colour formats: every pixel is converted exactly (transfer::convert_pixel). The source is read
+// completely before anything is written, so overlapping images are fine.
+static void perform_transfer_convert(MemState &mem, const SceGxmTransferImage &src, const SceGxmTransferImage &dst, SceGxmTransferType src_type, SceGxmTransferType dst_type,
+    uint32_t key_value, uint32_t key_mask, SceGxmTransferColorKeyMode mode) {
+    if (src.width == 0 || src.height == 0)
+        return;
+    const transfer::FormatDesc src_desc = transfer::describe(src.format);
+    const transfer::FormatDesc dst_desc = transfer::describe(dst.format);
+    const uint8_t *src_ptr = src.address.cast<uint8_t>().get(mem);
+    uint8_t *dst_ptr = dst.address.cast<uint8_t>().get(mem);
+
+    std::vector<uint8_t> converted(static_cast<size_t>(src.width) * src.height * dst_desc.bytes);
+    std::vector<uint8_t> keep(static_cast<size_t>(src.width) * src.height, 1);
+    for (uint32_t y = 0; y < src.height; y++) {
+        for (uint32_t x = 0; x < src.width; x++) {
+            const uint8_t *in = src_ptr + transfer_pixel_offset(src, src_type, src.x + x, src.y + y, src_desc.bytes);
+            const size_t index = static_cast<size_t>(y) * src.width + x;
+            if (mode != SCE_GXM_TRANSFER_COLORKEY_NONE) {
+                const bool match = (transfer::load_pixel(src_desc, in) & key_mask) == key_value;
+                keep[index] = (mode == SCE_GXM_TRANSFER_COLORKEY_PASS) == match ? 1 : 0;
+            }
+            transfer::convert_pixel(src_desc, dst_desc, in, &converted[index * dst_desc.bytes]);
+        }
+    }
+    for (uint32_t y = 0; y < src.height; y++) {
+        for (uint32_t x = 0; x < src.width; x++) {
+            const size_t index = static_cast<size_t>(y) * src.width + x;
+            if (keep[index])
+                memcpy(dst_ptr + transfer_pixel_offset(dst, dst_type, dst.x + x, dst.y + y, dst_desc.bytes), &converted[index * dst_desc.bytes], dst_desc.bytes);
+        }
+    }
+}
+
 COMMAND(handle_transfer_copy) {
     TRACY_FUNC_COMMANDS(handle_transfer_copy);
     const uint32_t colorKeyValue = helper.pop<uint32_t>();
@@ -234,13 +277,19 @@ COMMAND(handle_transfer_copy) {
         }
     }
 
-    if (src_fmt != dst_fmt) {
+    if (colorKeyMode == SCE_GXM_TRANSFER_COLORKEY_NONE && renderer.current_backend == Backend::Vulkan
+        && dynamic_cast<vulkan::VKState &>(renderer).surface_cache.try_transfer_color_gpu(mem, vulkan::VKSurfaceCache::ColorTransferKind::Copy, images[0], images[1], src_type, dst_type, 0)) {
+        delete[] images;
+        return;
+    }
+
+    if (src_fmt != dst_fmt && !transfer::convertible(src_fmt, dst_fmt)) {
         LOG_ERROR_ONCE("Unhandled format conversion from 0x{:0X} to 0x{:0X}", fmt::underlying(src_fmt), fmt::underlying(dst_fmt));
         delete[] images;
         return;
     }
 
-    if (colorKeyMode != SCE_GXM_TRANSFER_COLORKEY_NONE && src_fmt != SCE_GXM_TRANSFER_FORMAT_U8U8U8U8_ABGR) {
+    if (colorKeyMode != SCE_GXM_TRANSFER_COLORKEY_NONE && (src_fmt != dst_fmt || transfer::pixel_bytes(src_fmt) > 8 || transfer::pixel_bytes(src_fmt) == 3)) {
         LOG_ERROR_ONCE("Transfer copy with non-zero key mask not handled for format 0x{:0X}", fmt::underlying(src_fmt));
     }
 
@@ -248,16 +297,22 @@ COMMAND(handle_transfer_copy) {
         const SceGxmTransferImage &src = images[0];
         const SceGxmTransferImage &dst = images[1];
 
+        if (src.format != dst.format) {
+            perform_transfer_convert(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask, colorKeyMode);
+            delete[] images;
+            return;
+        }
+
         // Get bits per pixel of the image
         const uint32_t bpp = gxm::get_bits_per_pixel(src.format);
 
         // use a specialized function for each type (more optimized)
         switch (bpp) {
         case 8:
-            perform_transfer_copy_src_type<uint8_t, SCE_GXM_TRANSFER_COLORKEY_NONE>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask);
+            perform_transfer_copy_mode<uint8_t>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask, colorKeyMode);
             break;
         case 16:
-            perform_transfer_copy_src_type<uint16_t, SCE_GXM_TRANSFER_COLORKEY_NONE>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask);
+            perform_transfer_copy_mode<uint16_t>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask, colorKeyMode);
             break;
         case 24:
             perform_transfer_copy_src_type<std::array<uint8_t, 3>, SCE_GXM_TRANSFER_COLORKEY_NONE>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask);
@@ -266,7 +321,7 @@ COMMAND(handle_transfer_copy) {
             perform_transfer_copy_mode<uint32_t>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask, colorKeyMode);
             break;
         case 64:
-            perform_transfer_copy_src_type<uint64_t, SCE_GXM_TRANSFER_COLORKEY_NONE>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask);
+            perform_transfer_copy_mode<uint64_t>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask, colorKeyMode);
             break;
         case 128:
             perform_transfer_copy_src_type<std::array<uint64_t, 2>, SCE_GXM_TRANSFER_COLORKEY_NONE>(mem, src, dst, src_type, dst_type, colorKeyValue, colorKeyMask);
@@ -301,6 +356,48 @@ static uint64_t transfer_region_bytes(const SceGxmTransferImage &img, uint32_t p
     return static_cast<uint64_t>(img.stride) * (img.height - 1) + static_cast<uint64_t>(img.width) * pixel_bytes;
 }
 
+// The exact 2x2 box downscale of linear images (no libswscale: no scaler context per call, no padding copies, a rounding
+// that is the same on every host). Formats the box filter has no meaning for (YUV, RAW) take the top left texel of each 2x2.
+static void perform_transfer_downscale(MemState &mem, const SceGxmTransferImage &src, const SceGxmTransferImage &dst) {
+    const uint32_t src_bytes_px = transfer::pixel_bytes(src.format);
+    const uint32_t dst_bytes_px = transfer::pixel_bytes(dst.format);
+    if (src_bytes_px == 0 || dst_bytes_px == 0 || src.width == 0 || src.height == 0 || dst.width == 0 || dst.height == 0 || src.stride <= 0 || dst.stride <= 0)
+        return;
+    const uint64_t src_bytes = transfer_region_bytes(src, src_bytes_px);
+    const uint64_t dst_bytes = transfer_region_bytes(dst, dst_bytes_px);
+    const Address src_addr = src.address.address();
+    const Address dst_addr = dst.address.address();
+    if (src_bytes == 0 || dst_bytes == 0 || !is_valid_addr_range(mem, src_addr, static_cast<Address>(src_addr + src_bytes))
+        || !is_valid_addr_range(mem, dst_addr, static_cast<Address>(dst_addr + dst_bytes))) {
+        LOG_WARN_ONCE("Downscale skipped: src 0x{:08X}+{} or dst 0x{:08X}+{} is not fully allocated guest memory", src_addr, src_bytes, dst_addr, dst_bytes);
+        return;
+    }
+    const uint8_t *src_ptr = src.address.cast<uint8_t>().get(mem);
+    uint8_t *dst_ptr = dst.address.cast<uint8_t>().get(mem);
+    const transfer::FormatDesc src_desc = transfer::describe(src.format);
+    const transfer::FormatDesc dst_desc = transfer::describe(dst.format);
+    const bool box = src_desc.bytes != 0 && (src.format == dst.format || dst_desc.bytes != 0);
+    uint8_t averaged[4];
+
+    for (uint32_t y = 0; y < dst.height; y++) {
+        // the last row/column of a source that is not exactly twice as big repeats
+        const uint32_t sy0 = std::min(2 * y, src.height - 1), sy1 = std::min(2 * y + 1, src.height - 1);
+        for (uint32_t x = 0; x < dst.width; x++) {
+            const uint32_t sx0 = std::min(2 * x, src.width - 1), sx1 = std::min(2 * x + 1, src.width - 1);
+            const auto at = [&](uint32_t px, uint32_t py) { return src_ptr + static_cast<size_t>(py) * src.stride + static_cast<size_t>(px) * src_bytes_px; };
+            uint8_t *out = dst_ptr + static_cast<size_t>(y) * dst.stride + static_cast<size_t>(x) * dst_bytes_px;
+            if (!box) {
+                memcpy(out, at(sx0, sy0), std::min(src_bytes_px, dst_bytes_px));
+            } else if (src.format == dst.format) {
+                transfer::average_2x2(src_desc, at(sx0, sy0), at(sx1, sy0), at(sx0, sy1), at(sx1, sy1), out);
+            } else {
+                transfer::average_2x2(src_desc, at(sx0, sy0), at(sx1, sy0), at(sx0, sy1), at(sx1, sy1), averaged);
+                transfer::convert_pixel(src_desc, dst_desc, averaged, out);
+            }
+        }
+    }
+}
+
 COMMAND(handle_transfer_downscale) {
     TRACY_FUNC_COMMANDS(handle_transfer_downscale);
     SceGxmTransferImage *src = helper.pop<SceGxmTransferImage *>();
@@ -311,131 +408,40 @@ COMMAND(handle_transfer_downscale) {
             dst->address.address(), static_cast<uint32_t>(dst->format), dst->x, dst->y, dst->width, dst->height, dst->stride, 0);
 #endif
 
-    if (src->format != dst->format) {
+    if (renderer.current_backend == Backend::Vulkan
+        && dynamic_cast<vulkan::VKState &>(renderer).surface_cache.try_transfer_color_gpu(mem, vulkan::VKSurfaceCache::ColorTransferKind::Downscale, *src, *dst,
+            SCE_GXM_TRANSFER_LINEAR, SCE_GXM_TRANSFER_LINEAR, 0)) {
+        delete src;
+        delete dst;
+        return;
+    }
+
+    if (src->format != dst->format && !transfer::convertible(src->format, dst->format)) {
         LOG_ERROR_ONCE("Unhandled format conversion from 0x{:0X} to 0x{:0X}", fmt::underlying(src->format), fmt::underlying(dst->format));
+        delete src;
+        delete dst;
         return;
     }
 
     // adjust the x/y value
-    const uint32_t pixel_bytes = gxm::get_bits_per_pixel(src->format) / 8;
-    const Address src_surface_base = src->address.address();
+    const uint32_t pixel_bytes = transfer::pixel_bytes(src->format);
     src->address = (src->address.cast<uint8_t>() + src->y * src->stride + src->x * pixel_bytes).cast<void>();
-    dst->address = (dst->address.cast<uint8_t>() + dst->y * dst->stride + dst->x * pixel_bytes).cast<void>();
+    dst->address = (dst->address.cast<uint8_t>() + dst->y * dst->stride + dst->x * transfer::pixel_bytes(dst->format)).cast<void>();
 
-    // only rgb formats are supported by the PS Vita for downscaling
-    vulkan::CallbackRequestFunction downscale_operation = [&mem, src, dst, pixel_bytes]() {
-        AVPixelFormat pixel_fmt = AV_PIX_FMT_NONE;
-        switch (src->format) {
-        case SCE_GXM_TRANSFER_FORMAT_U5U6U5_BGR:
-            pixel_fmt = AV_PIX_FMT_RGB565LE;
-            break;
-        case SCE_GXM_TRANSFER_FORMAT_U8U8U8_BGR:
-            pixel_fmt = AV_PIX_FMT_RGB24;
-            break;
-        case SCE_GXM_TRANSFER_FORMAT_U8U8U8U8_ABGR:
-            pixel_fmt = AV_PIX_FMT_RGBA;
-            break;
-        default:
-            break;
-        }
-
-        // In Page Table mode a range can span and libswscale can read past the last row of its input
-        const uint64_t src_bytes = transfer_region_bytes(*src, pixel_bytes);
-        const uint64_t dst_bytes = transfer_region_bytes(*dst, pixel_bytes);
-        const bool can_stage = src_bytes > 0 && dst_bytes > 0;
-        const Address src_addr = src->address.address();
-        const Address dst_addr = dst->address.address();
-
-        if (can_stage
-            && (!is_valid_addr_range(mem, src_addr, static_cast<Address>(src_addr + src_bytes))
-                || !is_valid_addr_range(mem, dst_addr, static_cast<Address>(dst_addr + dst_bytes)))) {
-            LOG_WARN_ONCE("Downscale skipped: src 0x{:08X}+{} or dst 0x{:08X}+{} is not fully allocated guest memory",
-                src_addr, src_bytes, dst_addr, dst_bytes);
-            delete src;
-            delete dst;
-            return;
-        }
-
-        constexpr uint32_t sws_input_padding = 64;
-        std::vector<uint8_t> src_staging, dst_staging;
-        uint8_t *src_ptr = nullptr;
-        uint8_t *dst_ptr = nullptr;
-        if (can_stage) {
-            src_staging.assign(static_cast<size_t>(src_bytes) + sws_input_padding, 0);
-            memcpy_from_guest(mem, src_staging.data(), src_addr, static_cast<uint32_t>(src_bytes));
-            // read-modify-write: whatever the scaler does not touch (inter-row padding) must survive
-            dst_staging.resize(static_cast<size_t>(dst_bytes));
-            memcpy_from_guest(mem, dst_staging.data(), dst_addr, static_cast<uint32_t>(dst_bytes));
-            src_ptr = src_staging.data();
-            dst_ptr = dst_staging.data();
-        } else {
-            src_ptr = src->address.cast<uint8_t>().get(mem);
-            dst_ptr = dst->address.cast<uint8_t>().get(mem);
-        }
-
-        if (pixel_fmt != AV_PIX_FMT_NONE && src->stride > 0 && dst->stride > 0) {
-            // use ffmpeg with the avg filter
-            SwsContext *ctx = sws_getContext(src->width, src->height, pixel_fmt, dst->width, dst->height, pixel_fmt, SWS_AREA, nullptr, nullptr, nullptr);
-            if (ctx == nullptr) {
-                LOG_ERROR("Failed to get ffmpeg context for format 0x{:0X}", fmt::underlying(src->format));
-            } else {
-                const uint8_t *const src_planes[4] = { src_ptr, nullptr, nullptr, nullptr };
-                uint8_t *const dst_planes[4] = { dst_ptr, nullptr, nullptr, nullptr };
-                const int src_strides[4] = { src->stride, 0, 0, 0 };
-                const int dst_strides[4] = { dst->stride, 0, 0, 0 };
-                sws_scale(ctx, src_planes, src_strides, 0, src->height, dst_planes, dst_strides);
-                sws_freeContext(ctx);
-            }
-
-        } else {
-            // fallback, not (entirely) supported by ffmpeg
-            // slow and not entirely accurate (nearest instead of average) fallback
-
-            auto perform_downscale = [&]<typename T>(T type) {
-                for (size_t y = 0; y < dst->height; y++) {
-                    // stride is in bytes
-                    T *src_line = reinterpret_cast<T *>(src_ptr + (size_t)src->stride * y * 2);
-                    T *dst_line = reinterpret_cast<T *>(dst_ptr + (size_t)dst->stride * y);
-                    for (size_t x = 0; x < dst->width; x++) {
-                        dst_line[x] = src_line[2 * x];
-                    }
-                }
-            };
-            switch (gxm::get_bits_per_pixel(src->format)) {
-            case 8:
-                perform_downscale(uint8_t());
-                break;
-            case 16:
-                perform_downscale(uint16_t());
-                break;
-            case 24:
-                perform_downscale(std::array<uint8_t, 3>());
-                break;
-            case 32:
-                perform_downscale(uint32_t());
-                break;
-            default:
-                // should not happen
-                LOG_ERROR("Unhandled format 0x{:0X}", fmt::underlying(src->format));
-                break;
-            }
-        }
-
-        if (can_stage)
-            memcpy_to_guest(mem, dst_addr, dst_staging.data(), static_cast<uint32_t>(dst_bytes));
-
+    vulkan::CallbackRequestFunction downscale_operation = [&mem, src, dst]() {
+        perform_transfer_downscale(mem, *src, *dst);
         delete src;
         delete dst;
     };
 
-    bool gpu_path = false;
+    bool surface_synced = false;
     if (renderer.current_backend == Backend::Vulkan && renderer.features.enable_memory_mapping && !renderer.disable_surface_sync) {
         // src->address has already been adjusted to the first read byte above
-        gpu_path = dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, src->address.address(), downscale_operation, dst->address.address(), static_cast<uint32_t>(std::min<uint64_t>(transfer_region_bytes(*src, pixel_bytes), UINT32_MAX)));
+        surface_synced = dynamic_cast<vulkan::VKState &>(renderer).surface_cache.check_for_surface(mem, src->address.address(), downscale_operation, dst->address.address(), static_cast<uint32_t>(std::min<uint64_t>(transfer_region_bytes(*src, pixel_bytes), UINT32_MAX)));
     }
 
-    if (gpu_path)
-        // let the vulkan surface cache handle it
+    if (surface_synced)
+        // the surface cache runs it once the GPU surface has been written back to guest memory
         return;
 
     downscale_operation();
@@ -451,6 +457,12 @@ COMMAND(handle_transfer_fill) {
         ecv::oracle::gpu::xfer("fill", 0, 0, 0, 0, 0, 0, 0, dest->address.address(), static_cast<uint32_t>(dest->format), dest->x, dest->y, dest->width, dest->height,
             dest->stride, fill_color);
 #endif
+    if (renderer.current_backend == Backend::Vulkan
+        && dynamic_cast<vulkan::VKState &>(renderer).surface_cache.try_transfer_color_gpu(mem, vulkan::VKSurfaceCache::ColorTransferKind::Fill, *dest, *dest,
+            SCE_GXM_TRANSFER_LINEAR, SCE_GXM_TRANSFER_LINEAR, fill_color)) {
+        delete dest;
+        return;
+    }
     const auto bpp = gxm::get_bits_per_pixel(dest->format);
 
     const uint32_t bytes_per_pixel = transfer_fill_pixel_bytes(bpp);

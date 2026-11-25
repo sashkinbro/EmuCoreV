@@ -407,6 +407,11 @@ public:
     std::unordered_map<uint64_t, vkutil::sync::State> mirror_buffer_sync;
     bool try_transfer_depth_gpu(Address src_address, Address dst_address, uint32_t width, uint32_t height);
 
+    // sceGxmTransferCopy / Downscale / Fill between cached colour surfaces as image blits and clears (P12). Returns false when
+    // the transfer is not exactly expressible (the caller then runs the exact CPU transfer).
+    enum class ColorTransferKind { Copy, Downscale, Fill };
+    bool try_transfer_color_gpu(MemState &mem, ColorTransferKind kind, const SceGxmTransferImage &src, const SceGxmTransferImage &dst, SceGxmTransferType src_type, SceGxmTransferType dst_type, uint32_t fill_color);
+
     void perform_pending_casts(VKContext &context, uint16_t vert_texture_count, uint16_t frag_texture_count);
     void flush_all_pending_casts();
 
@@ -435,6 +440,7 @@ public:
     // fill): flag every cached color surface overlapping it dirty so its next use re-uploads the
     // guest content. Works even where memory protection cannot trap the write.
     void mark_guest_range_written(Address first, Address end);
+    ColorSurfaceCacheInfo *find_transfer_surface(MemState &mem, Address address);
     // Called when a guest address is about to be read by the GPU through raw buffer
     // accesses (e.g. a uniform buffer aliasing a rendered surface, like Killzone Mercenary's
     // bloom chain reading its HDR render target). If the address lies inside a

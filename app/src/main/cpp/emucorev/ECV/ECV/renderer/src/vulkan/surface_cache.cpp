@@ -20,6 +20,8 @@
 #include <gxm/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
 #include <renderer/vulkan/gpu_resource_cleanup.h>
+#include <renderer/transfer_model.h>
+#include <renderer/vulkan/colour_format_model.h>
 #include <renderer/vulkan/surface_pack.h>
 #include <renderer/vulkan/surface_sync.h>
 #include <renderer/vulkan/state.h>
@@ -269,6 +271,161 @@ void VKSurfaceCache::record_pending_cast(PendingCast &cast, VKContext &context) 
     }
 
     cast.record(context.render_cmd);
+}
+
+ColorSurfaceCacheInfo *VKSurfaceCache::find_transfer_surface(MemState &mem, Address address) {
+    auto it = color_address_lookup.upper_bound(address);
+    if (it == color_address_lookup.begin())
+        return nullptr;
+    --it;
+    ColorSurfaceCacheInfo *info = it->second;
+    if (info == nullptr || !info->texture.image || address >= it->first + info->total_bytes)
+        return nullptr;
+    // a surface the guest wrote to since its last upload has stale image content: the CPU transfer handles it
+    refresh_guest_trap(mem, *info);
+    if (*info->dirty)
+        return nullptr;
+    // the image must hold the 8888 bytes of the guest in order: identity swizzle, plain RGBA8, no raw alias
+    if (info->tiling != SurfaceTiling::Linear || info->format != SCE_GXM_COLOR_BASE_FORMAT_U8U8U8U8
+        || info->swizzle.r != vk::ComponentSwizzle::eR || info->texture.format != vk::Format::eR8G8B8A8Unorm || info->raw_image)
+        return nullptr;
+    return info;
+}
+
+bool VKSurfaceCache::try_transfer_color_gpu(MemState &mem, const ColorTransferKind kind, const SceGxmTransferImage &src, const SceGxmTransferImage &dst,
+    const SceGxmTransferType src_type, const SceGxmTransferType dst_type, const uint32_t fill_color) {
+    // guest memory is the buffer the surface sync writes (no mirror to forward) and the surface cache keeps it in step
+    if (!state.features.enable_memory_mapping || state.disable_surface_sync || state.mapping_method == MappingMethod::DoubleBuffer)
+        return false;
+    constexpr SceGxmTransferFormat rgba8 = SCE_GXM_TRANSFER_FORMAT_U8U8U8U8_ABGR;
+    if (dst.format != rgba8 || dst_type != SCE_GXM_TRANSFER_LINEAR || (kind != ColorTransferKind::Fill && (src.format != rgba8 || src_type != SCE_GXM_TRANSFER_LINEAR)))
+        return false;
+    VKContext &context = *static_cast<VKContext *>(state.context);
+    // work already recorded for the running scene is not submitted yet: a transfer submitted now would run before it
+    if (context.is_recording && context.scene_has_drawn)
+        return false;
+
+    const uint32_t src_w = src.width, src_h = src.height;
+    const uint32_t dst_w = kind == ColorTransferKind::Copy ? src.width : dst.width;
+    const uint32_t dst_h = kind == ColorTransferKind::Copy ? src.height : dst.height;
+    if (kind == ColorTransferKind::Downscale && !transfer::is_exact_half(src_w, src_h, dst_w, dst_h))
+        return false;
+    if (dst.stride <= 0 || (kind != ColorTransferKind::Fill && src.stride <= 0))
+        return false;
+
+    ColorSurfaceCacheInfo *dst_info = find_transfer_surface(mem, dst.address.address());
+    if (dst_info == nullptr)
+        return false;
+    const auto geometry = [](const ColorSurfaceCacheInfo &i) {
+        return transfer::SurfaceGeometry{ i.data.address(), i.stride_bytes, i.original_width, i.original_height, 4 };
+    };
+    const auto dst_rect = transfer::locate(geometry(*dst_info), dst.address.address(), static_cast<uint32_t>(dst.stride), dst.x, dst.y, dst_w, dst_h);
+    if (!dst_rect)
+        return false;
+
+    ColorSurfaceCacheInfo *src_info = nullptr;
+    std::optional<transfer::PixelRect> src_rect;
+    if (kind != ColorTransferKind::Fill) {
+        src_info = find_transfer_surface(mem, src.address.address());
+        if (src_info == nullptr)
+            return false;
+        src_rect = transfer::locate(geometry(*src_info), src.address.address(), static_cast<uint32_t>(src.stride), src.x, src.y, src_w, src_h);
+        if (!src_rect || (src_info == dst_info && transfer::rects_overlap(*src_rect, *dst_rect)))
+            return false;
+    }
+
+    const float m = state.res_multiplier;
+    const auto scaled = [&](const ColorSurfaceCacheInfo &i, const transfer::PixelRect &r) {
+        const auto clampi = [](float v, uint32_t limit) { return static_cast<int32_t>(std::min<float>(std::max(v, 0.0f), static_cast<float>(limit))); };
+        return std::array<vk::Offset3D, 2>{ vk::Offset3D{ clampi(std::floor(r.x * m), i.texture.width), clampi(std::floor(r.y * m), i.texture.height), 0 },
+            vk::Offset3D{ clampi(std::floor((r.x + r.w) * m), i.texture.width), clampi(std::floor((r.y + r.h) * m), i.texture.height), 1 } };
+    };
+
+    auto temp = std::make_shared<vkutil::Image>();
+    if (kind == ColorTransferKind::Fill) {
+        temp->width = 1;
+        temp->height = 1;
+        temp->format = vk::Format::eR8G8B8A8Unorm;
+        temp->init_image(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst);
+    }
+
+    vk::CommandBuffer transfer_cmd = nullptr;
+    vk::Fence fence = state.device.createFence({});
+    {
+        std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
+        transfer_cmd = vkutil::create_single_time_command(state.device, state.multithread_command_pool);
+
+        vkutil::Image *source_image = nullptr;
+        if (kind == ColorTransferKind::Fill) {
+            temp->transition_to(transfer_cmd, vkutil::ImageLayout::TransferDst);
+            // unorm8 of the four bytes of the fill value (little endian: R G B A), exact
+            const vk::ClearColorValue color{ std::array<float, 4>{ static_cast<float>(fill_color & 0xFF) / 255.0f, static_cast<float>((fill_color >> 8) & 0xFF) / 255.0f,
+                static_cast<float>((fill_color >> 16) & 0xFF) / 255.0f, static_cast<float>((fill_color >> 24) & 0xFF) / 255.0f } };
+            transfer_cmd.clearColorImage(temp->image, vk::ImageLayout::eTransferDstOptimal, color, vkutil::color_subresource_range);
+            temp->transition_to(transfer_cmd, vkutil::ImageLayout::TransferSrc);
+            source_image = temp.get();
+        } else {
+            src_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::TransferSrc);
+            source_image = &src_info->texture;
+        }
+        dst_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::TransferDst);
+
+        const std::array<vk::Offset3D, 2> src_offsets = kind == ColorTransferKind::Fill
+            ? std::array<vk::Offset3D, 2>{ vk::Offset3D{ 0, 0, 0 }, vk::Offset3D{ 1, 1, 1 } }
+            : scaled(*src_info, *src_rect);
+        const vk::ImageBlit blit{
+            .srcSubresource = vkutil::color_subresource_layer,
+            .srcOffsets = src_offsets,
+            .dstSubresource = vkutil::color_subresource_layer,
+            .dstOffsets = scaled(*dst_info, *dst_rect)
+        };
+        // a copy and a fill replicate texels; the exact 2:1 downscale is the average of the four texels under each output texel
+        const vk::Filter filter = kind == ColorTransferKind::Downscale ? vk::Filter::eLinear : vk::Filter::eNearest;
+        transfer_cmd.blitImage(source_image->image, vk::ImageLayout::eTransferSrcOptimal, dst_info->texture.image, vk::ImageLayout::eTransferDstOptimal, blit, filter);
+
+        if (src_info != nullptr)
+            src_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::ColorAttachmentReadWrite);
+        dst_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::ColorAttachmentReadWrite);
+        transfer_cmd.end();
+    }
+
+    vk::SubmitInfo submit_info{};
+    submit_info.setCommandBuffers(transfer_cmd);
+    state.general_queue.submit(submit_info, fence);
+
+    CallbackRequestFunction vk_callback = [&state = this->state, fence, transfer_cmd, temp]() {
+        const auto result = state.device.waitForFences(fence, vk::True, std::numeric_limits<uint64_t>::max());
+        if (result != vk::Result::eSuccess)
+            LOG_ERROR("Could not wait for the colour transfer fence.");
+        state.device.destroyFence(fence);
+        if (temp->image)
+            temp->destroy();
+        std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
+        state.device.freeCommandBuffers(state.multithread_command_pool, transfer_cmd);
+    };
+    dispatch_gpu_resource_cleanup(state.gpu_request_reader_count.load(std::memory_order_acquire) != 0,
+        [&](CallbackRequestFunction *callback) { return state.request_queue.try_push(CallbackRequest{ callback }); },
+        std::move(vk_callback), []() { LOG_ERROR("Could not release discarded GPU colour transfer resources."); });
+
+    // the destination now holds newer content than guest memory: mark what was written (write-back bounds) and write it
+    // back like the end of a scene would, so that guest reads of the destination see the transfer
+    dst_info->last_frame_rendered = context.frame_timestamp;
+    const int32_t t0x = static_cast<int32_t>(dst_rect->x), t0y = static_cast<int32_t>(dst_rect->y);
+    const int32_t t1x = static_cast<int32_t>(dst_rect->x + dst_rect->w), t1y = static_cast<int32_t>(dst_rect->y + dst_rect->h);
+    dst_info->scene_x0 = t0x;
+    dst_info->scene_y0 = t0y;
+    dst_info->scene_x1 = t1x;
+    dst_info->scene_y1 = t1y;
+    const auto align_down32 = [](int32_t v) { return (v / 32) * 32; };
+    const auto align_up32 = [&](int32_t v, int32_t limit) { return std::min(((v + 31) / 32) * 32, limit); };
+    dst_info->written_x0 = std::min(dst_info->written_x0, align_down32(t0x));
+    dst_info->written_y0 = std::min(dst_info->written_y0, align_down32(t0y));
+    dst_info->written_x1 = std::max(dst_info->written_x1, align_up32(t1x, dst_info->original_width));
+    dst_info->written_y1 = std::max(dst_info->written_y1, align_up32(t1y, dst_info->original_height));
+    submit_immediate_surface_sync(*dst_info, nullptr);
+
+    LOG_INFO_ONCE("Colour transfer ({}) done on the GPU: {}x{} RGBA8", kind == ColorTransferKind::Copy ? "copy" : kind == ColorTransferKind::Downscale ? "downscale" : "fill", dst_rect->w, dst_rect->h);
+    return true;
 }
 
 void VKSurfaceCache::perform_pending_casts(VKContext &context, uint16_t vert_texture_count, uint16_t frag_texture_count) {
