@@ -93,4 +93,13 @@ inline void note_pass_end(vkutil::sync::State &st, PassAttachment kind) {
         to_stage2(d[2].dstStageMask), to_access2(d[2].dstAccessMask));
 }
 
+// Where a GPU-side copy that is requested between scenes (depth transfer) must be recorded so it executes between the right scenes.
+// A separate submission is only correct when nothing is open and nothing is queued behind an unsubmitted batch.
+enum class GpuCopyRoute { RecordIntoOpenScene, QueueBehindPending, SeparateSubmit };
+inline GpuCopyRoute gpu_copy_route(bool scene_recording, bool unsubmitted_scenes_queued) {
+    if (scene_recording)
+        return GpuCopyRoute::RecordIntoOpenScene;
+    return unsubmitted_scenes_queued ? GpuCopyRoute::QueueBehindPending : GpuCopyRoute::SeparateSubmit;
+}
+
 } // namespace renderer::vulkan

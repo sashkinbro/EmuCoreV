@@ -24,6 +24,7 @@
 #include <renderer/vulkan/surface_sync.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/types.h>
+#include <renderer/vulkan/render_pass_sync.h>
 #include <vkutil/vkutil.h>
 #if ECV_ORACLE
 #include <ecv_gpu_trace.h>
@@ -1717,14 +1718,9 @@ bool VKSurfaceCache::try_transfer_depth_gpu(Address src_address, Address dst_add
     if (copy_width == 0 || copy_height == 0)
         return false;
 
-    vk::CommandBuffer transfer_cmd = nullptr;
-    vk::Fence fence = state.device.createFence({});
-    {
-        std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
-        transfer_cmd = vkutil::create_single_time_command(state.device, state.multithread_command_pool);
-
-        src_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::TransferSrc, vkutil::ds_subresource_range);
-        dst_info->texture.transition_to_discard(transfer_cmd, vkutil::ImageLayout::TransferDst, vkutil::ds_subresource_range);
+    const auto record_copy = [&](vk::CommandBuffer cmd) {
+        src_info->texture.transition_to(cmd, vkutil::ImageLayout::TransferSrc, vkutil::ds_subresource_range);
+        dst_info->texture.transition_to_discard(cmd, vkutil::ImageLayout::TransferDst, vkutil::ds_subresource_range);
 
         vk::ImageSubresourceLayers layers = vkutil::color_subresource_layer;
         layers.aspectMask = dsmodel::host_aspects(src_info->texture.format);
@@ -1735,11 +1731,51 @@ bool VKSurfaceCache::try_transfer_depth_gpu(Address src_address, Address dst_add
             .dstOffset = { 0, 0, 0 },
             .extent = { copy_width, copy_height, 1U }
         };
-        transfer_cmd.copyImage(src_info->texture.image, vk::ImageLayout::eTransferSrcOptimal, dst_info->texture.image, vk::ImageLayout::eTransferDstOptimal, image_copy);
+        cmd.copyImage(src_info->texture.image, vk::ImageLayout::eTransferSrcOptimal, dst_info->texture.image, vk::ImageLayout::eTransferDstOptimal, image_copy);
 
-        src_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
-        dst_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
+        src_info->texture.transition_to(cmd, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
+        dst_info->texture.transition_to(cmd, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
+    };
 
+    // Ordering (docs/gpu-sync-tracker.md, hazard 2): this runs as a render-thread command, so the tracker state it touches is the
+    // render thread's. If a scene is being recorded its commands are NOT submitted yet: a separate submission would run BEFORE
+    // the draws that wrote the depth being copied (stale depth) and before the scene that later loads the destination. Record the
+    // copy into the open stream instead, after stopping the pass; draws restart the pass lazily.
+    VKContext *recording_context = reinterpret_cast<VKContext *>(state.context);
+    const GpuCopyRoute route = gpu_copy_route(recording_context && recording_context->is_recording && recording_context->render_cmd,
+        recording_context && !recording_context->cmdbuffers_to_submit.empty());
+    if (route == GpuCopyRoute::RecordIntoOpenScene) {
+        if (recording_context->in_renderpass)
+            recording_context->stop_render_pass();
+        record_copy(recording_context->render_cmd);
+        dst_info->depth_content_stored = true;
+        LOG_INFO_ONCE("Depth transfer recorded into the open scene: 0x{:08X} -> 0x{:08X}", src_address, dst_address);
+        return true;
+    }
+
+    if (route == GpuCopyRoute::QueueBehindPending) {
+        // closed scenes that are queued but not submitted yet (batched submission): join the queue behind them so the copy still
+        // executes after them and before any later scene
+        vk::CommandBuffer queued_cmd = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
+            queued_cmd = vkutil::create_single_time_command(state.device, state.multithread_command_pool);
+            record_copy(queued_cmd);
+            queued_cmd.end();
+        }
+        recording_context->cmdbuffers_to_submit.push_back(queued_cmd);
+        state.frame().destroy_queue.add_cmd_buffer(queued_cmd, state.multithread_command_pool);
+        dst_info->depth_content_stored = true;
+        return true;
+    }
+
+    // nothing is open or queued: every earlier scene is already submitted on this queue, so a separate submission is correctly ordered
+    vk::CommandBuffer transfer_cmd = nullptr;
+    vk::Fence fence = state.device.createFence({});
+    {
+        std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
+        transfer_cmd = vkutil::create_single_time_command(state.device, state.multithread_command_pool);
+        record_copy(transfer_cmd);
         transfer_cmd.end();
     }
 
