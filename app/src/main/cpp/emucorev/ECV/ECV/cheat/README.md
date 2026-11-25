@@ -77,12 +77,12 @@ game's section, the other sections are left untouched.
 | Type | Layout | What it does |
 | --- | --- | --- |
 | `$0X00` | `<address> <value>` | Write `value` at `address`. |
-| `$3X<level>` | `<address> <offset>`, then one line per further offset, then one line with the value | Follow `level` pointers from `address`, adding one offset at each step, then write the value. Up to 5 levels. |
+| `$3X<level>` | `<address> <offset>`, then one line per further offset, then one line with the value | Follow `level` pointers from `address`, adding one offset at each step, then write the value. Up to 5 levels are documented; packs with 6 and 7 are accepted (the engine bound is 8). |
 | `$4X01` | `<address> <value>` + `$<count> <address gap> <value gap>` | Repeat the write `count` times, stepping the address and the value by their gap. |
 | `$5X00` | `<destination> <source>` | Copy the value at `source` to `destination`. |
 | `$7X<level>` | a `$3` block whose closing line is `$77XX`, then `$<count> <address gap> <value gap>` | Follow the pointers as `$3` does, then repeat the write as `$4` does. |
 | `$8X<level>` + `$8<4\|5\|6><level>` | each block is a `$3`-style chain closed by a `$88` / `$89` line | Same as `$5`, with a pointer chain on both sides. The first block is the destination. |
-| `$AX00` | `<address> <instruction>` | Patch guest code (X is `1` for a 16-bit and `2` for a 32-bit instruction). The original instruction is restored when the cheat is turned off. |
+| `$AX00` | `<address> <instruction>` | Patch guest code (X is `0` for an 8-bit value, `1` for a 16-bit and `2` for a 32-bit instruction). The original instruction is restored when the cheat is turned off. |
 | `$B2<module>` | `0000000<segment> 00000000` | Make the addresses of the following codes relative to a segment of a loaded module, so that one cheat works across game versions. Module `0` is the main executable. |
 | `$C2<lines>` | `<pad type> <button mask>` | Run the next `lines` code lines only while the buttons of `mask` are held. The mask uses the `SCE_CTRL_*` values, e.g. `0x300` for L+R. |
 | `$DX<lines>` | `<address> <value>` | Run the next `lines` code lines only when the comparison holds. X selects both the comparison and the width: `0`-`2` `==`, `3`-`5` `!=`, `6`-`8` `>`, `9`-`B` `<`. |

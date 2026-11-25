@@ -29,8 +29,18 @@ namespace {
 
 // Safety net so that a malformed database cannot make the vblank thread walk codes forever.
 constexpr size_t max_executed_lines = 4096;
-// The format allows at most five levels of indirection.
-constexpr uint8_t max_pointer_level = 5;
+// The format documents at most five levels of indirection, but real packs use six and seven with the
+// very same layout (head, one line per further offset, closing line). Eight is a sanity bound only.
+// PROVISIONAL: the limit above five is not backed by the plugin documentation.
+constexpr uint8_t max_pointer_level = 8;
+
+// Outcome of one code line.
+enum class Step {
+    done, //!< executed
+    skipped, //!< the target is not available right now (null pointer, unmapped page): drop the line, retry next vblank
+    stop_frame, //!< a precondition is missing (module not loaded yet): end this vblank's run, retry next vblank
+    malformed, //!< the code can never run: the cheat is broken for good
+};
 
 uint32_t width_size(CodeWidth width) {
     switch (width) {
@@ -133,11 +143,14 @@ public:
         size_t executed = 0;
         while ((m_index < m_cheat.lines.size()) && (executed < max_executed_lines)) {
             ++executed;
-            if (!execute(m_cheat.lines[m_index])) {
+            const Step step = execute(m_cheat.lines[m_index]);
+            if (step == Step::malformed) {
                 m_cheat.broken = true;
                 m_cheat.enabled = false;
                 break;
             }
+            if (step == Step::stop_frame)
+                break;
         }
     }
 
@@ -155,6 +168,12 @@ private:
     bool write(uint32_t address, CodeWidth width, uint32_t value) {
         return !m_address_overflow && write_value(m_mem, address, width, value);
     }
+    // An access that failed because the target is not mapped or readable yet is not a defect of the code.
+    static Step unless_unavailable(bool ok) {
+        if (!ok)
+            LOG_DEBUG_ONCE("A cheat target is not available yet, skipping it until it is");
+        return ok ? Step::done : Step::skipped;
+    }
     size_t code_line_count(size_t index) const {
         if (index >= m_cheat.lines.size())
             return 0;
@@ -170,11 +189,11 @@ private:
             return 1 + pointer_block_lines(line) + 1;
         case CodeType::pointer_mov: {
             // A pointer MOV is a destination block followed by a source block.
-            const size_t destination = 1 + pointer_block_lines(line);
+            const size_t destination = 1 + pointer_block_levels(index, mov_destination_closer);
             const size_t source_index = index + destination;
             if ((source_index >= m_cheat.lines.size()) || (m_cheat.lines[source_index].type() != CodeType::pointer_mov))
                 return destination;
-            return destination + 1 + pointer_block_lines(m_cheat.lines[source_index]);
+            return destination + 1 + pointer_block_levels(source_index, mov_source_closer);
         }
         default:
             return 1;
@@ -184,6 +203,31 @@ private:
     static size_t pointer_block_lines(const CodeLine &head) {
         return std::min<size_t>(head.param(), max_pointer_level);
     }
+
+    // Number of lines after the head of the pointer block at `index`. The head level is trusted unless the
+    // block is closed by a known line (`$88` / `$89` of a pointer MOV): packs write a head level that does not
+    // match their lines (e.g. `$8601` over three lines), the closing line then gives the real depth.
+    size_t pointer_block_levels(size_t index, uint16_t closer) const {
+        const size_t level = pointer_block_lines(m_cheat.lines[index]);
+        if (closer == 0)
+            return level;
+
+        const auto closes = [&](size_t count) {
+            const size_t at = index + count;
+            return (at < m_cheat.lines.size()) && ((m_cheat.lines[at].control >> 8) == closer);
+        };
+        if ((level >= 1) && closes(level))
+            return level;
+        for (size_t count = 1; count <= max_pointer_level; ++count) {
+            if (closes(count))
+                return count;
+        }
+
+        return level;
+    }
+    static constexpr uint16_t mov_destination_closer = 0x88;
+    static constexpr uint16_t mov_source_closer = 0x89;
+
     // A related count is a number of code lines below the identifier, the
     // original plugin skips line by line so a pointer block is skipped whole.
     void skip_related_lines(uint8_t related) {
@@ -191,14 +235,13 @@ private:
         m_index = std::min(m_index + remaining, m_cheat.lines.size());
     }
 
-    bool execute(const CodeLine &line) {
+    Step execute(const CodeLine &line) {
         const auto type = line.type();
         if ((type == CodeType::write || type == CodeType::pointer_write ||
              type == CodeType::compression || type == CodeType::mov ||
-             type == CodeType::pointer_compression || type == CodeType::pointer_mov) && line.op() > 2)
-            return false;
-        if (type == CodeType::arm_write && line.op() != 1 && line.op() != 2)
-            return false;
+             type == CodeType::pointer_compression || type == CodeType::pointer_mov ||
+             type == CodeType::arm_write) && line.op() > 2)
+            return Step::malformed;
         switch (line.type()) {
         case CodeType::write:
             return execute_write(line);
@@ -222,31 +265,31 @@ private:
             return execute_condition(line);
         default:
             LOG_WARN_ONCE("Cheat '{}' uses the unsupported code type ${:04X}", m_cheat.name, line.control);
-            return false;
+            return Step::malformed;
         }
     }
 
     // `$0X00 <address> <value>`
-    bool execute_write(const CodeLine &line) {
+    Step execute_write(const CodeLine &line) {
         ++m_index;
-        return write(resolve(line.first), static_cast<CodeWidth>(line.op()), line.second);
+        return unless_unavailable(write(resolve(line.first), static_cast<CodeWidth>(line.op()), line.second));
     }
 
     // `$5X00 <destination> <source>`
-    bool execute_mov(const CodeLine &line) {
+    Step execute_mov(const CodeLine &line) {
         ++m_index;
 
         const auto width = static_cast<CodeWidth>(line.op());
         uint32_t value = 0;
-        return read_value(m_mem, resolve(line.second), width, value) &&
-            write(resolve(line.first), width, value);
+        return unless_unavailable(read_value(m_mem, resolve(line.second), width, value) &&
+            write(resolve(line.first), width, value));
     }
 
     // `$4X01 <address> <value>` followed by `$<count> <address gap> <value gap>`
-    bool execute_compression(const CodeLine &line) {
+    Step execute_compression(const CodeLine &line) {
         if (m_index + 1 >= m_cheat.lines.size()) {
             LOG_WARN_ONCE("Cheat '{}' ends with an incomplete compression code", m_cheat.name);
-            return false;
+            return Step::malformed;
         }
 
         const CodeLine gaps = m_cheat.lines[m_index + 1];
@@ -259,64 +302,64 @@ private:
         for (uint32_t i = 0; i < count; ++i) {
             const uint64_t address = static_cast<uint64_t>(base) + static_cast<uint64_t>(i) * gaps.first;
             if (address > UINT32_MAX || !write(static_cast<uint32_t>(address), width, line.second + (i * gaps.second)))
-                return false;
+                return unless_unavailable(false);
         }
 
-        return true;
+        return Step::done;
     }
 
     // `$3X<level> <address> <offset>`, one line per further offset, then the value.
-    bool execute_pointer_write(const CodeLine &line) {
+    Step execute_pointer_write(const CodeLine &line) {
         PointerBlock block;
         if (!parse_pointer_block(line, block))
-            return false;
+            return Step::malformed;
 
         uint32_t address = 0;
-        return follow_pointers(block, address) &&
-            write(address, static_cast<CodeWidth>(line.op()), block.closing.second);
+        return unless_unavailable(follow_pointers(block, address) &&
+            write(address, static_cast<CodeWidth>(line.op()), block.closing.second));
     }
 
     // `$8X<level> ...` writes to `$8<4|5|6><level> ...`, both blocks closed by a `$88` / `$89` line.
-    bool execute_pointer_mov(const CodeLine &line) {
+    Step execute_pointer_mov(const CodeLine &line) {
         PointerBlock destination;
-        if (!parse_pointer_block(line, destination))
-            return false;
+        if (!parse_pointer_block(line, destination, mov_destination_closer))
+            return Step::malformed;
 
         if (m_index >= m_cheat.lines.size()) {
             LOG_WARN_ONCE("Cheat '{}' ends with an incomplete pointer MOV code", m_cheat.name);
-            return false;
+            return Step::malformed;
         }
 
         const CodeLine source_line = m_cheat.lines[m_index];
         if ((source_line.type() != CodeType::pointer_mov) || (source_line.op() < 4) || (source_line.op() > 6)) {
             LOG_WARN_ONCE("Cheat '{}' has a pointer MOV code without a source block", m_cheat.name);
-            return false;
+            return Step::malformed;
         }
 
         PointerBlock source;
-        if (!parse_pointer_block(source_line, source))
-            return false;
+        if (!parse_pointer_block(source_line, source, mov_source_closer))
+            return Step::malformed;
 
         const auto width = static_cast<CodeWidth>(line.op());
         uint32_t destination_address = 0;
         uint32_t source_address = 0;
         if (!follow_pointers(destination, destination_address) || !follow_pointers(source, source_address))
-            return false;
+            return unless_unavailable(false);
 
         uint32_t value = 0;
-        return read_value(m_mem, source_address, width, value) &&
-            write(destination_address, width, value);
+        return unless_unavailable(read_value(m_mem, source_address, width, value) &&
+            write(destination_address, width, value));
     }
 
     // A `$3` block followed by the `$<count> <address gap> <value gap>` line of a `$4` code.
-    bool execute_pointer_compression(const CodeLine &line) {
+    Step execute_pointer_compression(const CodeLine &line) {
         PointerBlock block;
         if (!parse_pointer_block(line, block))
-            return false;
+            return Step::malformed;
 
         if (m_index >= m_cheat.lines.size()) {
             LOG_WARN_ONCE("Cheat '{}' ends with an incomplete pointer compression code", m_cheat.name);
-            return false;
+            return Step::malformed;
         }
 
         const CodeLine gaps = m_cheat.lines[m_index];
@@ -324,35 +367,37 @@ private:
 
         uint32_t address = 0;
         if (!follow_pointers(block, address))
-            return false;
+            return unless_unavailable(false);
 
         const auto width = static_cast<CodeWidth>(line.op());
         const uint32_t count = gaps.control;
         for (uint32_t i = 0; i < count; ++i) {
             const uint64_t target = static_cast<uint64_t>(address) + static_cast<uint64_t>(i) * gaps.first;
             if (target > UINT32_MAX || !write(static_cast<uint32_t>(target), width, block.closing.second + (i * gaps.second)))
-                return false;
+                return unless_unavailable(false);
         }
 
-        return true;
+        return Step::done;
     }
 
-    // `$AX00 <address> <instruction>`, X is 1 for a 16-bit and 2 for a 32-bit instruction.
-    bool execute_arm_write(const CodeLine &line) {
+    // `$AX00 <address> <value>`, X is 0 for an 8-bit, 1 for a 16-bit and 2 for a 32-bit value.
+    // `$A0` is documented by the VitaCheat wiki only through its example `$A000 810A12A6 00000001`
+    // (writes 0x01, the original byte comes back when the code is turned off).
+    Step execute_arm_write(const CodeLine &line) {
         ++m_index;
 
-        const auto width = (line.op() == 1) ? CodeWidth::bits16 : CodeWidth::bits32;
+        const auto width = static_cast<CodeWidth>(line.op());
         const uint32_t size = width_size(width);
         const uint32_t address = resolve(line.first);
         const uint32_t value = line.second & width_mask(width);
 
         uint32_t current = 0;
         if (!read_value(m_mem, address, width, current))
-            return false;
+            return unless_unavailable(false);
 
         // Patching guest code once is enough, only pay for the recompiler flush when it changed.
         if (current == value)
-            return true;
+            return Step::done;
 
         const bool already_saved = std::any_of(m_cheat.saved_memory.begin(), m_cheat.saved_memory.end(),
             [address](const SavedMemory &saved) { return saved.address == address; });
@@ -361,47 +406,54 @@ private:
             saved.address = address;
             saved.bytes.resize(size);
             if (!read_bytes(m_mem, address, saved.bytes.data(), size))
-                return false;
+                return unless_unavailable(false);
             m_cheat.saved_memory.push_back(std::move(saved));
         }
 
         if (!write(address, width, value))
-            return false;
+            return unless_unavailable(false);
         if (m_invalidate_jit)
             m_invalidate_jit(address, size);
 
-        return true;
+        return Step::done;
     }
 
     // `$B2<module> 0000000<segment> 00000000`
-    bool execute_relative_base(const CodeLine &line) {
+    Step execute_relative_base(const CodeLine &line) {
         ++m_index;
 
         if (line.op() != 2) {
             LOG_WARN_ONCE("Cheat '{}' uses the unsupported code type ${:04X}", m_cheat.name, line.control);
-            return false;
+            return Step::malformed;
         }
 
         const uint8_t module_index = line.param();
         const uint32_t segment_index = line.first & 0xF;
-        if ((module_index >= m_state.modules.size()) || (segment_index >= 2)) {
-            LOG_WARN_ONCE("Cheat '{}' refers to module {} segment {}, which is not loaded", m_cheat.name, module_index, segment_index);
-            return false;
+        if (segment_index >= 2) {
+            LOG_WARN_ONCE("Cheat '{}' refers to segment {}, a module only has two", m_cheat.name, segment_index);
+            return Step::malformed;
+        }
+
+        // A module that is not registered (yet) is not a defect of the code: the codes below it must not run
+        // against an unrelocated base, so end this vblank and look again at the next one.
+        if (module_index >= m_state.modules.size()) {
+            LOG_DEBUG_ONCE("Cheat '{}' refers to module {}, which is not registered", m_cheat.name, module_index);
+            return Step::stop_frame;
         }
 
         const auto &segment = m_state.modules[module_index].segments[segment_index];
         if (segment.size == 0) {
-            LOG_WARN_ONCE("Cheat '{}' refers to module {} segment {}, which is empty", m_cheat.name, module_index, segment_index);
-            return false;
+            LOG_DEBUG_ONCE("Cheat '{}' refers to module {} segment {}, which is empty", m_cheat.name, module_index, segment_index);
+            return Step::stop_frame;
         }
 
         m_relative_base = segment.address;
 
-        return true;
+        return Step::done;
     }
 
     // `$C2<lines> <pad type> <button mask>`
-    bool execute_button_pad(const CodeLine &line) {
+    Step execute_button_pad(const CodeLine &line) {
         ++m_index;
 
         // The pad type selects between the Vita pad and a DualShock, Vita3K only exposes one pad.
@@ -409,17 +461,17 @@ private:
         if ((m_buttons & mask) != mask)
             skip_related_lines(line.param());
 
-        return true;
+        return Step::done;
     }
 
     // `$DX<lines> <address> <value>`
-    bool execute_condition(const CodeLine &line) {
+    Step execute_condition(const CodeLine &line) {
         ++m_index;
 
         const uint8_t op = line.op();
         if (op > 0xB) {
             LOG_WARN_ONCE("Cheat '{}' uses the unsupported condition ${:04X}", m_cheat.name, line.control);
-            return false;
+            return Step::malformed;
         }
 
         const auto width = static_cast<CodeWidth>(op % 3);
@@ -440,13 +492,13 @@ private:
         if (!satisfied)
             skip_related_lines(line.param());
 
-        return true;
+        return Step::done;
     }
 
     // Databases word the control field of the follow-up lines freely, so only `second` is read.
-    bool parse_pointer_block(const CodeLine &head, PointerBlock &block) {
-        const uint8_t level = head.param();
-        if ((level == 0) || (level > max_pointer_level)) {
+    bool parse_pointer_block(const CodeLine &head, PointerBlock &block, uint16_t closer = 0) {
+        const uint8_t level = static_cast<uint8_t>(pointer_block_levels(m_index, closer));
+        if ((level == 0) || (head.param() > max_pointer_level && closer == 0)) {
             LOG_WARN_ONCE("Cheat '{}' uses the invalid pointer level {} of code ${:04X}", m_cheat.name, level, head.control);
             return false;
         }

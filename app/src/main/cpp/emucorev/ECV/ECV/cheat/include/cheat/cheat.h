@@ -82,6 +82,8 @@ struct Cheat {
     bool broken = false;
     std::vector<SavedMemory> saved_memory;
     size_t line_number = 0;
+    // Code lines of this cheat that could not be parsed and were left out, one message per line.
+    std::vector<std::string> warnings;
 };
 
 struct CheatFile {
@@ -97,7 +99,7 @@ fs::path find_cheat_file(const fs::path &cheats_dir, const std::string &title_id
 // Retail and homebrew IDs may differ; imports only require a safe filename.
 bool is_safe_title_id(std::string_view title_id);
 
-// Parse a cheat file. Malformed lines are logged and skipped, they never abort the parsing.
+// Parse a cheat file. Malformed lines never abort the parsing: they are skipped and reported in `Cheat::warnings`.
 CheatFile parse_cheat_file(const fs::path &path, const std::string &title_id);
 
 // Validate a staged copy, then atomically replace the selected destination.

@@ -251,6 +251,7 @@ CheatFile parse_cheat_file(const fs::path &path, const std::string &title_id) {
         CodeLine code;
         if (!parse_code_line(line, code)) {
             LOG_ERROR("Failed to parse code line {} of cheat file {}: {}", line_number, path, line);
+            file.cheats[*current].warnings.push_back(fmt::format("line {}: unparsable code line left out: {}", line_number, line));
             continue;
         }
 
