@@ -179,23 +179,27 @@ bool ScreenRenderer::setup() {
         return false;
     }
 
-    // check for linear filtering on depth support
-    // usefull because some device crashed if it's not supported
-    const vk::FormatProperties d24u8_support = state.physical_device.getFormatProperties(vk::Format::eD24UnormS8Uint);
-    const vk::FormatProperties d32u8_support = state.physical_device.getFormatProperties(vk::Format::eD32SfloatS8Uint);
+    // Probe every depth/stencil format a GXM surface can map to (attachment + sampled: the guest reads its depth as a texture)
+    // and pick the host format of each GXM class from the features, see dsmodel::select_host_format.
+    dsmodel::HostDsSupport ds_support;
+    for (const vk::Format candidate : dsmodel::host_candidates)
+        ds_support.set(candidate, dsmodel::format_usable(state.physical_device.getFormatProperties(candidate).optimalTilingFeatures));
 
-    bool support_d24u8 = static_cast<bool>(d24u8_support.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment);
-    bool support_d32u8 = static_cast<bool>(d32u8_support.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment);
-
-    if (support_d32u8) {
-        LOG_INFO_ONCE("Your device support high deep stencil quality");
-        state.deep_stencil_use = vk::Format::eD32SfloatS8Uint;
-    } else if (support_d24u8) {
-        state.deep_stencil_use = vk::Format::eD24UnormS8Uint;
-    } else {
-        LOG_WARN_ONCE("Your device doesn't support standard deep stencil ");
-        // vk::Format::eD16UnormS8Uint didn't support in Android
+    state.deep_stencil_use = dsmodel::select_combined_format(ds_support);
+    if (state.deep_stencil_use == vk::Format::eUndefined) {
+        // the spec guarantees D16 attachment + sampling; reaching this means a broken driver
+        LOG_WARN_ONCE("Your device reports no usable depth/stencil format, using D16 anyway");
         state.deep_stencil_use = vk::Format::eD16Unorm;
+    } else if (!dsmodel::host_has_stencil(state.deep_stencil_use)) {
+        LOG_WARN_ONCE("Your device has no depth/stencil format with a stencil aspect: the stencil test of the guest is lost");
+    } else {
+        LOG_INFO_ONCE("Depth/stencil host format (combined): {}", vk::to_string(state.deep_stencil_use));
+    }
+    for (size_t i = 0; i < state.ds_class_format.size(); i++) {
+        const vk::Format f = dsmodel::select_host_format(static_cast<dsmodel::DsClass>(i), ds_support);
+        // nothing usable for this class (stencil class on a device without stencil): use the combined format
+        state.ds_class_format[i] = f == vk::Format::eUndefined ? state.deep_stencil_use : f;
+        LOG_INFO("Depth/stencil class {} -> {}", i, vk::to_string(state.ds_class_format[i]));
     }
 
     // preferred order : mailbox > fifo_relaxed > fifo > whatever

@@ -20,6 +20,7 @@
 #include <renderer/state.h>
 #include <renderer/types.h>
 
+#include <renderer/vulkan/depth_stencil_model.h>
 #include <renderer/vulkan/overlay_renderer.h>
 #include <renderer/vulkan/pipeline_cache.h>
 #include <renderer/vulkan/screen_renderer.h>
@@ -75,7 +76,15 @@ struct VKState : public renderer::State {
     vk::PhysicalDeviceFeatures physical_device_features;
     vk::PhysicalDeviceMemoryProperties physical_device_memory;
     std::vector<vk::QueueFamilyProperties> physical_device_queue_families;
+    // combined depth+stencil format for attachments with no guest surface behind them (and the fallback of everything else)
     vk::Format deep_stencil_use;
+    // host format of each GXM depth/stencil class, chosen from the probed format features (screen_renderer.cpp setup)
+    std::array<vk::Format, static_cast<size_t>(dsmodel::DsClass::Count)> ds_class_format{};
+
+    vk::Format ds_format_for(dsmodel::DsClass c) const {
+        const vk::Format f = ds_class_format[static_cast<size_t>(c)];
+        return f == vk::Format::eUndefined ? deep_stencil_use : f;
+    }
 
     vma::Allocator allocator;
 

@@ -19,6 +19,7 @@
 
 #include <blockingconcurrentqueue.h>
 #include <renderer/compile_gate.h>
+#include <renderer/vulkan/depth_stencil_model.h>
 #include <util/containers.h>
 #include <vkutil/vkutil.h>
 
@@ -53,6 +54,13 @@ namespace vulkan {
 struct VKState;
 struct VKContext;
 struct CompileRequest;
+
+// What the pipeline needs to know about the depth/stencil attachment of the scene (the render pass handle alone does not tell)
+struct PipelineDsInfo {
+    vk::Format format = vk::Format::eUndefined;
+    bool depth_test = true;
+    bool stencil_test = true;
+};
 
 using PipelineCompileQueue = moodycamel::BlockingConcurrentQueue<CompileRequest *>;
 
@@ -97,11 +105,12 @@ private:
     // second index: 1 if the depth aspect is loaded at scene start, 0 if cleared
     // third index: 1 if the stencil aspect is loaded at scene start, 0 if cleared
     // fourth index: 1 if depth-stencil is force stored, 0 otherwise
-    std::map<vk::Format, vk::RenderPass> render_passes[2][2][2][2];
+    // keyed by (colour format << 32 | depth/stencil format): a pass is only compatible with its own attachment formats
+    std::map<uint64_t, vk::RenderPass> render_passes[2][2][2][2];
     // variants carrying the raw u16 attachment
-    std::map<vk::Format, vk::RenderPass> render_passes_with_raw[2][2][2];
+    std::map<uint64_t, vk::RenderPass> render_passes_with_raw[2][2][2];
     // render passes used along shader interlock
-    std::map<vk::Format, vk::RenderPass> shader_interlock_pass;
+    std::map<uint64_t, vk::RenderPass> shader_interlock_pass;
 
     // only used when accessing the shaders map
     std::mutex shaders_mutex;
@@ -123,7 +132,7 @@ private:
     // each pipeline compiler thread uses this function as its entrypoint
     void compiler_thread(MemState &mem);
 
-    vk::Pipeline compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem);
+    vk::Pipeline compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem, const PipelineDsInfo &ds, dsmodel::PassVariant variant);
 
 public:
     bool uses_coherent_framebuffer_fetch() const { return support_coherent_framebuffer_fetch; }
@@ -151,8 +160,8 @@ public:
     void read_pipeline_cache();
     void save_pipeline_cache();
 
-    vk::RenderPass retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color = false, bool has_raw_attachment = false);
-    vk::Pipeline retrieve_pipeline(VKContext &context, SceGxmPrimitiveType &type, bool consider_for_async, MemState &mem);
+    vk::RenderPass retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color = false, bool has_raw_attachment = false, vk::Format ds_format = vk::Format::eUndefined);
+    vk::Pipeline retrieve_pipeline(VKContext &context, SceGxmPrimitiveType &type, bool consider_for_async, MemState &mem, dsmodel::PassVariant variant = dsmodel::PassVariant::Front);
 
     vk::ShaderModule precompile_shader(const Sha256Hash &hash, bool search_first = true);
 

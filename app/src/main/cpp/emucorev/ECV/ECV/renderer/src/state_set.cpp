@@ -285,8 +285,12 @@ COMMAND_SET_STATE(depth_bias) {
     const int factor = helper.pop<int>();
     const int unit = helper.pop<int>();
 
-    render_context->record.depth_bias_unit = unit;
-    render_context->record.depth_bias_slope = factor;
+    // the record keeps the front values (they are part of a save state), the back values are kept by the Vulkan context:
+    // a call for one face must never overwrite the other face
+    if (is_front) {
+        render_context->record.depth_bias_unit = unit;
+        render_context->record.depth_bias_slope = factor;
+    }
 
     switch (renderer.current_backend) {
     case Backend::OpenGL:
@@ -294,10 +298,16 @@ COMMAND_SET_STATE(depth_bias) {
             gl::sync_depth_bias(factor, unit, is_front);
         break;
 
-    case Backend::Vulkan:
-        if (is_front)
-            vulkan::sync_depth_bias(*reinterpret_cast<vulkan::VKContext *>(render_context));
+    case Backend::Vulkan: {
+        vulkan::VKContext &vk_context = *reinterpret_cast<vulkan::VKContext *>(render_context);
+        vk_context.depth_bias.set(is_front, factor, unit);
+        // the bias of the face a draw uses is set at the draw (split draws change it per face)
+        vulkan::sync_depth_bias(vk_context);
+        // with two-sided on, differing face biases change how draws are split
+        if (render_context->record.two_sided == SCE_GXM_TWO_SIDED_ENABLED)
+            vulkan::refresh_pipeline(vk_context);
         break;
+    }
 
     default:
         REPORT_MISSING(renderer.current_backend);

@@ -99,12 +99,26 @@ void sync_stencil_func(VKContext &context, const bool is_back) {
     context.render_cmd.setStencilWriteMask(face, state->write_mask);
 }
 
-void sync_depth_bias(VKContext &context) {
+void apply_depth_bias(VKContext &context, const bool back) {
     if (!context.is_recording)
         return;
 
+    const dsmodel::DepthBias &bias = context.depth_bias.face(back);
+    if (context.applied_bias_valid && context.applied_bias == bias && context.applied_bias_scale == context.ds_bias_units_scale)
+        return;
+    context.applied_bias = bias;
+    context.applied_bias_scale = context.ds_bias_units_scale;
+    context.applied_bias_valid = true;
+
+    // units are multiples of the smallest step of the guest depth format: follow the precision of the host format.
     // The slope factor applies per raster pixel
-    context.render_cmd.setDepthBias(static_cast<float>(context.record.depth_bias_unit), 0.0, static_cast<float>(context.record.depth_bias_slope) * context.state.res_multiplier);
+    context.render_cmd.setDepthBias(static_cast<float>(bias.units) * context.ds_bias_units_scale, 0.0, static_cast<float>(bias.factor) * context.state.res_multiplier);
+}
+
+void sync_depth_bias(VKContext &context) {
+    // the front values of the record are the reference (a restored save state fills them, not the context)
+    context.depth_bias.front = dsmodel::DepthBias{ context.record.depth_bias_slope, context.record.depth_bias_unit };
+    apply_depth_bias(context, context.face_plan == dsmodel::FacePlan::Back);
 }
 
 void sync_depth_data(VKContext &context) {

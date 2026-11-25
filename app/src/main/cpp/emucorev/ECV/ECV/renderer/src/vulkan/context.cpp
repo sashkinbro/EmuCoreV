@@ -326,6 +326,21 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
         ds_surface_fin = nullptr;
     }
 
+    // P5 depth/stencil model: host format and aspects of this scene's depth/stencil attachment (also read by the bias, which is
+    // set when recording starts, so this must come before start_recording)
+    {
+        namespace dsm = dsmodel;
+        const dsm::DsClass ds_cls = ds_surface_fin ? dsm::ds_class(ds_surface_fin->get_format()) : dsm::DsClass::S8D24;
+        context.ds_host_format = ds_surface_fin ? context.state.ds_format_for(ds_cls) : context.state.deep_stencil_use;
+        // the tile hardware always depth/stencil-tests on chip, the surface format only says what is stored: both tests stay on
+        // whenever the host format has the aspect (only a device with no stencil format loses the stencil test)
+        context.ds_depth_test = dsm::host_has_depth(context.ds_host_format);
+        context.ds_stencil_test = dsm::host_has_stencil(context.ds_host_format);
+        context.ds_bias_units_scale = dsm::depth_bias_units_scale(ds_cls, context.ds_host_format);
+        context.face_plan = dsm::FacePlan::Front;
+        context.split_pipeline = nullptr;
+    }
+
     VKState &state = context.state;
     state.surface_cache.set_render_target(rt);
 
@@ -357,7 +372,7 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
             depth_load = false;
     }
     const bool color_has_raw = context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16;
-    context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, depth_load, stencil_load, force_store, color_surface_fin == nullptr, false, color_has_raw);
+    context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, depth_load, stencil_load, force_store, color_surface_fin == nullptr, false, color_has_raw, context.ds_host_format);
 #if ECV_ORACLE
     if (ecv::oracle::gpu::enabled())
         ecv::oracle::gpu::scene_cfg(restoring, context.record.depth_stencil_surface.force_load, context.record.depth_stencil_surface.force_store,
@@ -366,7 +381,7 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
 #endif
     if (context.state.features.support_shader_interlock)
         // also retrieve / create the shader interlock pass
-        context.current_shader_interlock_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, true, true, true, color_surface_fin == nullptr, true);
+        context.current_shader_interlock_pass = context.state.pipeline_cache.retrieve_render_pass(vk_format, true, true, true, color_surface_fin == nullptr, true, false, context.ds_host_format);
 
     Framebuffer &framebuffer = state.surface_cache.retrieve_framebuffer_handle(mem, color_surface_fin, ds_surface_fin, context.current_render_pass, context.current_shader_interlock_pass, context.current_color_view, context.current_ds_view);
     context.current_framebuffer = framebuffer.standard;
@@ -397,6 +412,7 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
         context.last_draw_was_framebuffer_fetch = false;
         context.refresh_pipeline = true;
         context.current_pipeline = nullptr;
+        context.split_pipeline = nullptr;
         context.curr_vert_ublock.changed = true;
         context.curr_frag_ublock.changed = true;
 
@@ -483,6 +499,8 @@ void VKContext::start_recording(bool first_in_scene) {
     // set all the dynamic state here
     render_cmd.setViewport(0, viewport);
     render_cmd.setScissor(0, scissor);
+    // a new command buffer has no bias set
+    applied_bias_valid = false;
     sync_depth_bias(*this);
     sync_point_line_width(*this, true);
     sync_stencil_func(*this, false);
@@ -629,6 +647,7 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
 
     refresh_pipeline = true;
     current_pipeline = nullptr;
+    split_pipeline = nullptr;
     in_renderpass = true;
 
     if (!create_descriptor_set)
@@ -899,7 +918,7 @@ void VKContext::check_for_macroblock_change(bool is_draw) {
         // TODO: with the feedback loop extension we can do better
         ignore_macroblock = true;
         // in this case we must load and store the depth stencil each time
-        current_render_pass = state.pipeline_cache.retrieve_render_pass(current_color_format, true, true, true, !record.color_surface.data, false, record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16);
+        current_render_pass = state.pipeline_cache.retrieve_render_pass(current_color_format, true, true, true, !record.color_surface.data, false, record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16, ds_host_format);
     }
 
     // use the scissor to know in which macroblock we are

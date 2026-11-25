@@ -77,6 +77,8 @@ struct CompileRequest {
     ProgramSource vertex_source;
     ProgramSource fragment_source;
     shader::Hints hints;
+    PipelineDsInfo ds;
+    dsmodel::PassVariant variant;
 
     // Compilation also reads color_surface beyond the hashed fixed-state prefix.
     // Own the full value while the rendering thread advances its live record.
@@ -599,7 +601,11 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
     return make_stage(module);
 }
 
-vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color, bool has_raw_attachment) {
+vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color, bool has_raw_attachment, vk::Format ds_format) {
+    // eUndefined = the combined format used for attachments without a guest surface
+    if (ds_format == vk::Format::eUndefined)
+        ds_format = state.deep_stencil_use;
+    const uint64_t pass_key = (static_cast<uint64_t>(format) << 32) | static_cast<uint64_t>(ds_format);
     const bool with_raw_attachment = has_raw_attachment && !no_color && !is_color_transient && state.features.preserve_f16_nan_as_u16 && format == vk::Format::eR16G16B16A16Sfloat;
     bool shell_snapshot = false;
     shell_snapshot = state.current_title_id == "SceShell" && !no_color && !is_color_transient
@@ -611,7 +617,7 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
                   ? render_passes_with_raw[depth_load][stencil_load][force_store]
                   : render_passes[is_color_transient][depth_load][stencil_load][force_store]);
 
-    auto it = render_passes_map.find(format);
+    auto it = render_passes_map.find(pass_key);
 
     if (it != render_passes_map.end())
         return it->second;
@@ -664,7 +670,7 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
 
     vk::AttachmentStoreOp store_op = force_store ? vk::AttachmentStoreOp::eStore : vk::AttachmentStoreOp::eDontCare;
     vk::AttachmentDescription ds_attachment{
-        .format = state.deep_stencil_use,
+        .format = ds_format,
         .samples = vk::SampleCountFlagBits::e1,
         .loadOp = depth_load ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear,
         .storeOp = store_op,
@@ -725,9 +731,9 @@ vk::RenderPass PipelineCache::retrieve_render_pass(vk::Format format, bool depth
         pass_info.setDependencyCount(3);
     }
 
-    render_passes_map[format] = state.device.createRenderPass(pass_info);
+    render_passes_map[pass_key] = state.device.createRenderPass(pass_info);
 
-    return render_passes_map[format];
+    return render_passes_map[pass_key];
 }
 
 vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(const SceGxmVertexProgram &vertex_program, MemState &mem) {
@@ -859,7 +865,7 @@ void PipelineCache::compiler_thread(MemState &mem) {
             // use this as an instruction to stop the thread
             break;
 
-        vk::Pipeline pipeline = compile_pipeline(request->type, request->render_pass, *request->vertex_program_gxm, *request->fragment_program_gxm, request->vertex_source, request->fragment_source, *request->get_record(), request->hints, mem);
+        vk::Pipeline pipeline = compile_pipeline(request->type, request->render_pass, *request->vertex_program_gxm, *request->fragment_program_gxm, request->vertex_source, request->fragment_source, *request->get_record(), request->hints, mem, request->ds, request->variant);
         // mark a refused pipeline as failed rather than leaving it null, which would make every
         // later draw queue the same doomed compilation again
         *request->pipeline = pipeline ? pipeline : kPipelineFailed;
@@ -886,7 +892,7 @@ static vk::StencilOpState convert_op_state(const GxmStencilStateOp &state) {
     };
 }
 
-vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem) {
+vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem, const PipelineDsInfo &ds, dsmodel::PassVariant variant) {
     const VertexProgram &vertex_program = *vertex_program_gxm.renderer_data;
     const SceGxmProgram *gxm_fragment_shader = fragment_source.get();
     const VKFragmentProgram &fragment_program = *reinterpret_cast<VKFragmentProgram *>(
@@ -908,7 +914,10 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
     const vk::PipelineShaderStageCreateInfo fragment_shader = retrieve_shader(gxm_fragment_shader, fragment_program.hash, false, fragment_program_gxm.is_maskupdate, mem, fragment_hints, record.is_gamma_corrected);
     const vk::PipelineShaderStageCreateInfo shader_stages[] = { vertex_shader, fragment_shader };
     // disable the fragment shader if gxm asks us to
-    const bool is_fragment_disabled = record.front_side_fragment_program_mode == SCE_GXM_FRAGMENT_PROGRAM_DISABLED || gxm_fragment_shader->has_no_effect();
+    // a split draw builds one pipeline per facing: this variant carries the front or the back state of the guest
+    const bool back_state = dsmodel::variant_uses_back_state(variant);
+    const SceGxmFragmentProgramMode face_fragment_mode = back_state ? record.back_side_fragment_program_mode : record.front_side_fragment_program_mode;
+    const bool is_fragment_disabled = face_fragment_mode == SCE_GXM_FRAGMENT_PROGRAM_DISABLED || gxm_fragment_shader->has_no_effect();
     const uint32_t shader_stage_count = is_fragment_disabled ? 1U : 2U;
     if (!vertex_shader.module || (!is_fragment_disabled && !fragment_shader.module)) {
         // a shader could not be generated: fail this pipeline instead of passing a null module to the driver
@@ -922,11 +931,23 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
 
     const bool two_sided = (record.two_sided == SCE_GXM_TWO_SIDED_ENABLED);
 
+    SceGxmPolygonMode face_polygon_mode = back_state ? record.back_polygon_mode : record.front_polygon_mode;
+    vk::PolygonMode polygon_mode = translate_polygon_mode(face_polygon_mode);
+    if (polygon_mode != vk::PolygonMode::eFill && !state.physical_device_features.fillModeNonSolid) {
+        // line/point rasterisation needs fillModeNonSolid (enabled whenever the device has it)
+        LOG_WARN_ONCE("Polygon mode line/point requested but the device has no fillModeNonSolid: drawing filled");
+        polygon_mode = vk::PolygonMode::eFill;
+    }
+    vk::CullModeFlags cull_mode = translate_cull_mode(record.cull_mode);
+    if (variant == dsmodel::PassVariant::SplitFront)
+        cull_mode |= vk::CullModeFlagBits::eBack;
+    else if (variant == dsmodel::PassVariant::SplitBack)
+        cull_mode |= vk::CullModeFlagBits::eFront;
 
     const vk::PipelineRasterizationStateCreateInfo rasterizer{
         .depthClampEnable = (enable_depth_clamp && state.depth_clamp_enabled && state.physical_device_features.depthClamp) ? VK_TRUE : VK_FALSE,
-        .polygonMode = translate_polygon_mode(record.front_polygon_mode),
-        .cullMode = translate_cull_mode(record.cull_mode),
+        .polygonMode = polygon_mode,
+        .cullMode = cull_mode,
         // front face is always counter clockwise
         .frontFace = vk::FrontFace::eCounterClockwise,
         .depthBiasEnable = VK_TRUE,
@@ -936,13 +957,15 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         .rasterizationSamples = vk::SampleCountFlagBits::e1
     };
     // depth and stencil tests are always enabled on the ps vita as there is almost no cost in doing so
-    // on a tiled renderer
+    // on a tiled renderer. The tests are only off when the host format has no such aspect (device without a stencil format).
+    const SceGxmDepthFunc face_depth_func = back_state ? record.back_depth_func : record.front_depth_func;
+    const SceGxmDepthWriteMode face_depth_write = back_state ? record.back_depth_write_mode : record.front_depth_write_mode;
     const vk::PipelineDepthStencilStateCreateInfo ds_info{
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = (record.front_depth_write_mode == SCE_GXM_DEPTH_WRITE_ENABLED),
-        .depthCompareOp = translate_depth_func(record.front_depth_func),
+        .depthTestEnable = ds.depth_test ? VK_TRUE : VK_FALSE,
+        .depthWriteEnable = (ds.depth_test && face_depth_write == SCE_GXM_DEPTH_WRITE_ENABLED) ? VK_TRUE : VK_FALSE,
+        .depthCompareOp = ds.depth_test ? translate_depth_func(face_depth_func) : vk::CompareOp::eAlways,
         .depthBoundsTestEnable = VK_FALSE,
-        .stencilTestEnable = VK_TRUE,
+        .stencilTestEnable = ds.stencil_test ? VK_TRUE : VK_FALSE,
         .front = convert_op_state(record.front_stencil_state_op),
         .back = convert_op_state(two_sided ? record.back_stencil_state_op : record.front_stencil_state_op)
     };
@@ -1030,7 +1053,7 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
     }
 }
 
-vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiveType &type, bool consider_for_async, MemState &mem) {
+vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiveType &type, bool consider_for_async, MemState &mem, dsmodel::PassVariant variant) {
     const GxmRecordState &record = context.record;
     // get the hash of the current context
     uint64_t key = XXH3_64bits(&record, record_pipeline_len);
@@ -1048,6 +1071,12 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
 
     // and also add the primitive type
     key ^= static_cast<uint64_t>(type);
+
+    // the render pass is chosen per scene from the depth/stencil surface: its format and which tests exist change the pipeline,
+    // and so does the facing variant of a draw split by facing
+    const PipelineDsInfo ds_info{ context.ds_host_format, context.ds_depth_test, context.ds_stencil_test };
+    key ^= (static_cast<uint64_t>(ds_info.format) * 0x9E3779B97F4A7C15ull) ^ (static_cast<uint64_t>(ds_info.depth_test) << 1) ^ (static_cast<uint64_t>(ds_info.stencil_test) << 2)
+        ^ (static_cast<uint64_t>(variant) * 0xC2B2AE3D27D4EB4Full);
 
     // if the pipeline is in the pipeline cache, we can expect its creation time to be almost instantaneous
     bool already_in_cache = false;
@@ -1101,6 +1130,8 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
             .vertex_source = vertex_source,
             .fragment_source = fragment_source,
             .hints = context.shader_hints,
+            .ds = ds_info,
+            .variant = variant,
             .record = record
         };
         it->second = kPipelineCompiling;
@@ -1114,7 +1145,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
         return nullptr;
     } else {
         // can't wait, compile it right now
-        vk::Pipeline result = compile_pipeline(type, render_pass, vertex_program_gxm, fragment_program_gxm, vertex_source, fragment_source, record, context.shader_hints, mem);
+        vk::Pipeline result = compile_pipeline(type, render_pass, vertex_program_gxm, fragment_program_gxm, vertex_source, fragment_source, record, context.shader_hints, mem, ds_info, variant);
 
         const auto time_s = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         next_pipeline_cache_save = time_s + pipeline_cache_save_delay;

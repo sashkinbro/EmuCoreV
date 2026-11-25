@@ -384,9 +384,14 @@ bool VKTextureCache::init(const bool hashless_texture_cache, const fs::path &tex
     samplers.resize(max_sampler_used);
 
     // check for linear filtering on depth support
-    const vk::FormatProperties depth_linear = state.physical_device.getFormatProperties(state.deep_stencil_use);
+    // (depth surfaces use the host format of their GXM class: linear filtering must work on every depth format in use)
+    bool depth_linear_ok = true;
+    for (const vk::Format ds_format : state.ds_class_format) {
+        if (dsmodel::host_has_depth(ds_format))
+            depth_linear_ok = depth_linear_ok && static_cast<bool>(state.physical_device.getFormatProperties(ds_format).optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear);
+    }
     const vk::FormatProperties x8d24_support = state.physical_device.getFormatProperties(vk::Format::eX8D24UnormPack32);
-    support_depth_linear_filtering = static_cast<bool>(depth_linear.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear);
+    support_depth_linear_filtering = depth_linear_ok;
     support_x8d24 = static_cast<bool>(x8d24_support.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment);
 
     // other format

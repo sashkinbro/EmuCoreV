@@ -80,6 +80,13 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 	target_compile_options(renderer PRIVATE "-Wno-nullability-completeness")
 endif()
 
+# Host test of the depth/stencil model (header only, no Vulkan calls)
+if(NOT ANDROID)
+	add_executable(renderer-ds-model-tests tests/depth_stencil_model_tests.cpp)
+	target_link_libraries(renderer-ds-model-tests PRIVATE renderer googletest)
+	add_test(NAME renderer_ds_model COMMAND renderer-ds-model-tests)
+endif()
+
 # Marshmallow Tracy linking
 if(TRACY_ENABLE_ON_CORE_COMPONENTS)
 	target_link_libraries(renderer PRIVATE tracy)

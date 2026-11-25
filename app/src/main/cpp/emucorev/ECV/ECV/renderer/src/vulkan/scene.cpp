@@ -499,7 +499,8 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
 
     void *indices_ptr = indices.get(mem);
 
-    if (context.record.front_depth_write_mode == SCE_GXM_DEPTH_WRITE_ENABLED)
+    if (context.record.front_depth_write_mode == SCE_GXM_DEPTH_WRITE_ENABLED
+        || (context.record.two_sided == SCE_GXM_TWO_SIDED_ENABLED && context.record.back_depth_write_mode == SCE_GXM_DEPTH_WRITE_ENABLED))
         context.scene_wrote_depth = true;
 
     // record queued casted-texture copies BEFORE marking the draw, so the placement decision
@@ -539,7 +540,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     if (context.is_first_scene_draw && (context.state.features.support_shader_interlock || context.ignore_macroblock || !context.render_target->has_macroblock_sync)) {
         // update the render pass to load and store the depth and stencil
         context.current_render_pass = context.state.pipeline_cache.retrieve_render_pass(context.current_color_format, true, true, true, !context.record.color_surface.data, false,
-            context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16);
+            context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16, context.ds_host_format);
 #if ECV_ORACLE
         if (ecv::oracle::gpu::enabled())
             ecv::oracle::gpu::rp_loads(reinterpret_cast<uint64_t>(static_cast<VkRenderPass>(context.current_render_pass)), "first_draw_upgrade");
@@ -676,7 +677,29 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         // We don't want to defer cases where we draw a whole quad over the screen as these draws could be necessary
         // to be able to see anything
         bool can_be_whole_quad = instance_count == 1 && count <= 6;
-        vk::Pipeline new_pipeline = context.state.pipeline_cache.retrieve_pipeline(context, type, !can_be_whole_quad, mem);
+
+        // The Vita uses the front or the back depth state of the face a primitive hits. Vulkan can not do that per face (stencil
+        // aside): if the guest gives the faces different state, draw once per facing with the other facing culled.
+        const GxmRecordState &rec = context.record;
+        const dsmodel::FaceState front_face{ rec.front_depth_func, rec.front_depth_write_mode, rec.front_polygon_mode,
+            rec.front_side_fragment_program_mode, dsmodel::DepthBias{ rec.depth_bias_slope, rec.depth_bias_unit } };
+        const dsmodel::FaceState back_face{ rec.back_depth_func, rec.back_depth_write_mode, rec.back_polygon_mode,
+            rec.back_side_fragment_program_mode, context.depth_bias.back };
+        const dsmodel::FacePlan plan = dsmodel::plan_faces(rec.two_sided == SCE_GXM_TWO_SIDED_ENABLED, rec.cull_mode, front_face, back_face);
+        const dsmodel::PassList passes = dsmodel::passes_for(plan);
+        if (plan == dsmodel::FacePlan::Split)
+            LOG_INFO_ONCE("Two-sided draw with different front/back depth state: drawn once per facing");
+
+        vk::Pipeline new_pipeline = context.state.pipeline_cache.retrieve_pipeline(context, type, !can_be_whole_quad, mem, passes.variant[0]);
+        vk::Pipeline new_split = nullptr;
+        if (passes.count == 2 && new_pipeline != nullptr) {
+            new_split = context.state.pipeline_cache.retrieve_pipeline(context, type, !can_be_whole_quad, mem, passes.variant[1]);
+            // both facings must be ready, a half drawn object would be worse than waiting like any other pending pipeline
+            if (new_split == nullptr)
+                new_pipeline = nullptr;
+        }
+        context.face_plan = plan;
+        context.split_pipeline = new_split;
 
         if (new_pipeline != context.current_pipeline) {
             context.current_pipeline = new_pipeline;
@@ -846,7 +869,16 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         return;
     }
 
+    apply_depth_bias(context, context.face_plan == dsmodel::FacePlan::Back);
     context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
+
+    if (context.split_pipeline != nullptr) {
+        // second facing: its own pipeline and bias, then bind the first pipeline back (the draw loop assumes it is bound)
+        apply_depth_bias(context, true);
+        context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.split_pipeline);
+        context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
+        context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.current_pipeline);
+    }
 
     context.vertex_uniform_storage_allocated = false;
     context.fragment_uniform_storage_allocated = false;

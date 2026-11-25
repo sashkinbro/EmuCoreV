@@ -1728,6 +1728,9 @@ bool VKSurfaceCache::try_transfer_depth_gpu(Address src_address, Address dst_add
         return false;
     if (!src_info->texture.image || !dst_info->texture.image)
         return false;
+    // an image copy needs identical formats (surfaces of different GXM formats get different host formats)
+    if (src_info->texture.format != dst_info->texture.format)
+        return false;
 
     const uint32_t scaled_width = static_cast<uint32_t>(width * state.res_multiplier);
     const uint32_t scaled_height = static_cast<uint32_t>(height * state.res_multiplier);
@@ -1746,7 +1749,7 @@ bool VKSurfaceCache::try_transfer_depth_gpu(Address src_address, Address dst_add
         dst_info->texture.transition_to_discard(transfer_cmd, vkutil::ImageLayout::TransferDst, vkutil::ds_subresource_range);
 
         vk::ImageSubresourceLayers layers = vkutil::color_subresource_layer;
-        layers.aspectMask = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+        layers.aspectMask = dsmodel::host_aspects(src_info->texture.format);
         vk::ImageCopy image_copy{
             .srcSubresource = layers,
             .srcOffset = { 0, 0, 0 },
@@ -1826,10 +1829,12 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
         cached_info->last_used_frame = reinterpret_cast<VKContext *>(state.context)->frame_timestamp;
         cached_info->last_used_scene = reinterpret_cast<VKContext *>(state.context)->scene_timestamp;
 
+        // the host format follows the GXM format of the surface (depth only, stencil only, D16, ... have different host images)
         const bool need_remake = cached_info->texture.width < width
             || cached_info->texture.height < height
             || cached_info->stride_samples != depth_stencil->get_stride()
-            || cached_info->tiling != tiling;
+            || cached_info->tiling != tiling
+            || cached_info->texture.format != state.ds_format_for(dsmodel::ds_class(depth_stencil->get_format()));
 
         if (!need_remake) {
             // MSAA passes rasterise at the sample rate, so a pass whose colour surface downscales
@@ -1875,10 +1880,12 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
                         .dstOffsets = dst_bounds
                     };
                 };
-                const std::array<vk::ImageBlit, 2> blit_regions{
-                    region_for(vk::ImageAspectFlagBits::eDepth),
-                    region_for(vk::ImageAspectFlagBits::eStencil)
-                };
+                // only the aspects the host format has (a depth-only or stencil-only surface has one)
+                std::vector<vk::ImageBlit> blit_regions;
+                if (dsmodel::host_has_depth(full.format))
+                    blit_regions.push_back(region_for(vk::ImageAspectFlagBits::eDepth));
+                if (dsmodel::host_has_stencil(full.format))
+                    blit_regions.push_back(region_for(vk::ImageAspectFlagBits::eStencil));
                 cmd_buffer.blitImage(full.image, vk::ImageLayout::eTransferSrcOptimal, resampled.image, vk::ImageLayout::eTransferDstOptimal, blit_regions, vk::Filter::eNearest);
                 full.transition_to(cmd_buffer, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
                 resampled.transition_to(cmd_buffer, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
@@ -1944,7 +1951,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
 
     image.width = width;
     image.height = height;
-    image.format = state.deep_stencil_use;
+    image.format = state.ds_format_for(dsmodel::ds_class(depth_stencil->get_format()));
     image.layout = vkutil::ImageLayout::Undefined;
     image.init_image(vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled);
 
@@ -1953,7 +1960,9 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
         .depth = 1.0,
         .stencil = 0
     };
-    cmd_buffer.clearDepthStencilImage(image.image, vk::ImageLayout::eTransferDstOptimal, clear_value, vkutil::ds_subresource_range);
+    vk::ImageSubresourceRange clear_range = vkutil::ds_subresource_range;
+    clear_range.aspectMask = dsmodel::host_aspects(image.format);
+    cmd_buffer.clearDepthStencilImage(image.image, vk::ImageLayout::eTransferDstOptimal, clear_value, clear_range);
     image.transition_to(cmd_buffer, vkutil::ImageLayout::DepthStencilReadOnly, vkutil::ds_subresource_range);
 
     return {
@@ -2111,7 +2120,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
             vk::ImageViewCreateInfo view_info{
                 .image = cached_info.texture.image,
                 .viewType = vk::ImageViewType::e2D,
-                .format = state.deep_stencil_use,
+                .format = cached_info.texture.format,
                 .components = {},
                 .subresourceRange = range
             };
@@ -2134,7 +2143,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
         return TextureLookupResult{
             img_view,
             vkutil::ImageLayout::DepthStencilReadOnly,
-            state.deep_stencil_use
+            cached_info.texture.format
         };
     }
 
@@ -2145,6 +2154,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
         auto &read_surface = cached_info.read_surfaces[i];
         if (read_surface.depth_view.width == width
             && read_surface.depth_view.height == height
+            && read_surface.depth_view.format == cached_info.texture.format
             && read_surface.delta_row == delta_row_samples
             && read_surface.delta_col == delta_col_samples) {
             read_surface_idx = i;
@@ -2156,7 +2166,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
         // no compatible read surface found
 
         DepthSurfaceView read_only{
-            .depth_view = vkutil::Image(width, height, state.deep_stencil_use),
+            .depth_view = vkutil::Image(width, height, cached_info.texture.format),
             .scene_timestamp = 0,
             .delta_col = delta_col_samples,
             .delta_row = delta_row_samples,
@@ -2180,7 +2190,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
         vk::ImageViewCreateInfo view_info{
             .image = read_only.depth_view.image,
             .viewType = vk::ImageViewType::e2D,
-            .format = state.deep_stencil_use,
+            .format = read_only.depth_view.format,
             .components = {},
             .subresourceRange = range
         };
@@ -2209,7 +2219,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
 
     cached_info.texture.transition_to(cmd_buffer, vkutil::ImageLayout::TransferSrc, vkutil::ds_subresource_range);
     vk::ImageSubresourceLayers layers = vkutil::color_subresource_layer;
-    layers.aspectMask = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+    layers.aspectMask = dsmodel::host_aspects(cached_info.texture.format);
     vk::ImageCopy image_copy{
         .srcSubresource = layers,
         .srcOffset = { static_cast<int>(delta_col_samples), static_cast<int>(delta_row_samples), 0 },

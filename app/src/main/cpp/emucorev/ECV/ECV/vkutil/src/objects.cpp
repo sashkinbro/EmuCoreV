@@ -110,8 +110,12 @@ void Image::init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping, 
     vk::ImageSubresourceRange range;
     if (format == vk::Format::eD16UnormS8Uint || format == vk::Format::eD24UnormS8Uint || format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eX8D24UnormPack32) {
         range = vkutil::ds_subresource_range;
-    } else if (format == vk::Format::eS8Uint || format == vk::Format::eD16Unorm || format == vk::Format::eD32Sfloat) {
+    } else if (format == vk::Format::eD16Unorm || format == vk::Format::eD32Sfloat) {
         range = vkutil::d_subresource_range;
+    } else if (format == vk::Format::eS8Uint) {
+        // stencil only: the view names the stencil aspect (it used to claim depth, which this format does not have)
+        range = vkutil::d_subresource_range;
+        range.aspectMask = vk::ImageAspectFlagBits::eStencil;
     } else {
         range = vkutil::color_subresource_range;
     }
@@ -126,13 +130,34 @@ void Image::init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping, 
     view = allocator.getAllocatorInfo().device.createImageView(view_info);
 }
 
+// A barrier may only name aspects the image has: callers pass the combined depth+stencil range, a depth-only or
+// stencil-only format keeps just its own aspect.
+static vk::ImageSubresourceRange range_for_format(const vk::Format format, vk::ImageSubresourceRange range) {
+    constexpr vk::ImageAspectFlags ds = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+    if (!(range.aspectMask & ds))
+        return range;
+    switch (format) {
+    case vk::Format::eD16Unorm:
+    case vk::Format::eD32Sfloat:
+    case vk::Format::eX8D24UnormPack32:
+        range.aspectMask &= vk::ImageAspectFlagBits::eDepth;
+        break;
+    case vk::Format::eS8Uint:
+        range.aspectMask &= vk::ImageAspectFlagBits::eStencil;
+        break;
+    default:
+        break;
+    }
+    return range;
+}
+
 void Image::transition_to(vk::CommandBuffer buffer, ImageLayout new_layout, const vk::ImageSubresourceRange &range) {
-    transition_image_layout(buffer, image, layout, new_layout, range);
+    transition_image_layout(buffer, image, layout, new_layout, range_for_format(format, range));
     layout = new_layout;
 }
 
 void Image::transition_to_discard(vk::CommandBuffer buffer, ImageLayout new_layout, const vk::ImageSubresourceRange &range) {
-    transition_image_layout_discard(buffer, image, layout, new_layout, range);
+    transition_image_layout_discard(buffer, image, layout, new_layout, range_for_format(format, range));
     layout = new_layout;
 }
 
