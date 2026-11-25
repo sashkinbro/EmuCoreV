@@ -9,7 +9,9 @@
 // a subpass-input fragment shader of the same shape as the translator's (float input or raw u16 input, writes both outputs) and
 // N overlapping quads drawn one after the other, each blending the value it fetched with a constant. The result is read back and compared
 // with a CPU model, for: (1) in-pass, raw input (the failing GR mode), (2) in-pass, float input, (3) one pass instance per draw (the
-// reference path, must match the model or the test itself is not trusted).
+// reference path, must match the model or the test itself is not trusted), (4) ALL quads in ONE instanced draw call, raw input: overlapping
+// primitives inside a single draw are ordered only by the destination-read (rasterization order) path, the case Mali ROAA breaks in other
+// projects (EmuCoreX lessons item 1) and the one particle batches of Rayman/GR rely on.
 //
 // Self-contained on purpose (header only, no renderer state): the caller passes handles and gets a report back, so the shared capability
 // layer (gpu_caps.h / choose_strategy) can call it as the "verified" probe of the FbFetchPath rungs.
@@ -66,6 +68,7 @@ struct FbFetchReport {
     double mismatch_inplace_raw = -1.0;
     double mismatch_inplace_float = -1.0;
     double mismatch_split = -1.0;
+    double mismatch_batch = -1.0; // ONE draw call with all quads (overlapping primitives inside a draw: the destination-read order of ROAA)
     double ms = 0.0;
     std::string note;
 };
@@ -159,8 +162,8 @@ struct Resources {
     vk::Device device;
     vk::Image color, raw, depth;
     vk::ImageView color_view, raw_view, depth_view;
-    vk::DeviceMemory color_mem, raw_mem, depth_mem, buf_mem;
-    vk::Buffer buf;
+    vk::DeviceMemory color_mem, raw_mem, depth_mem, buf_mem, ubo_mem;
+    vk::Buffer buf, ubo;
     vk::Framebuffer fb;
     vk::DescriptorSetLayout set_layout;
     vk::DescriptorPool pool;
@@ -188,10 +191,12 @@ struct Resources {
         if (raw) device.destroyImage(raw);
         if (depth) device.destroyImage(depth);
         if (buf) device.destroyBuffer(buf);
+        if (ubo) device.destroyBuffer(ubo);
         if (color_mem) device.freeMemory(color_mem);
         if (raw_mem) device.freeMemory(raw_mem);
         if (depth_mem) device.freeMemory(depth_mem);
         if (buf_mem) device.freeMemory(buf_mem);
+        if (ubo_mem) device.freeMemory(ubo_mem);
     }
 };
 
@@ -276,21 +281,52 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
         }
 
         // descriptors: two input attachments (float, raw)
-        const vk::DescriptorSetLayoutBinding bindings[2] = {
+        const vk::DescriptorSetLayoutBinding bindings[3] = {
             { .binding = 0, .descriptorType = vk::DescriptorType::eInputAttachment, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment },
-            { .binding = 1, .descriptorType = vk::DescriptorType::eInputAttachment, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment }
+            { .binding = 1, .descriptorType = vk::DescriptorType::eInputAttachment, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment },
+            { .binding = 2, .descriptorType = vk::DescriptorType::eUniformBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eVertex }
         };
-        r.set_layout = dev.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo{ .bindingCount = 2, .pBindings = bindings });
-        const vk::DescriptorPoolSize pool_size{ vk::DescriptorType::eInputAttachment, 2 };
-        r.pool = dev.createDescriptorPool(vk::DescriptorPoolCreateInfo{ .maxSets = 1, .poolSizeCount = 1, .pPoolSizes = &pool_size });
+        r.set_layout = dev.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo{ .bindingCount = 3, .pBindings = bindings });
+        const vk::DescriptorPoolSize pool_sizes[2] = { { vk::DescriptorType::eInputAttachment, 2 }, { vk::DescriptorType::eUniformBuffer, 1 } };
+        r.pool = dev.createDescriptorPool(vk::DescriptorPoolCreateInfo{ .maxSets = 1, .poolSizeCount = 2, .pPoolSizes = pool_sizes });
         const vk::DescriptorSet set = dev.allocateDescriptorSets(vk::DescriptorSetAllocateInfo{ .descriptorPool = r.pool, .descriptorSetCount = 1, .pSetLayouts = &r.set_layout })[0];
         const vk::DescriptorImageInfo di_color{ nullptr, r.color_view, vk::ImageLayout::eGeneral };
         const vk::DescriptorImageInfo di_raw{ nullptr, r.raw_view, vk::ImageLayout::eGeneral };
-        const vk::WriteDescriptorSet writes[2] = {
+        // all quads for the single-draw (instanced) run: rect + colour per instance, std140 arrays of 128 vec4
+        constexpr uint32_t max_batch = 128;
+        const std::vector<Quad> quads = make_quads(W, H, std::min(in.draws, max_batch));
+        const vk::DeviceSize ubo_size = 2ull * max_batch * 16;
+        r.ubo = dev.createBuffer(vk::BufferCreateInfo{ .size = ubo_size, .usage = vk::BufferUsageFlagBits::eUniformBuffer, .sharingMode = vk::SharingMode::eExclusive });
+        {
+            const vk::MemoryRequirements req = dev.getBufferMemoryRequirements(r.ubo);
+            const uint32_t type = find_memory(mp, req.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+            if (type == ~0u) {
+                rep.note = "no host visible memory (ubo)";
+                return rep;
+            }
+            r.ubo_mem = dev.allocateMemory(vk::MemoryAllocateInfo{ .allocationSize = req.size, .memoryTypeIndex = type });
+            dev.bindBufferMemory(r.ubo, r.ubo_mem, 0);
+            float *u = static_cast<float *>(dev.mapMemory(r.ubo_mem, 0, ubo_size));
+            std::memset(u, 0, static_cast<size_t>(ubo_size));
+            for (size_t i = 0; i < quads.size(); i++) {
+                const Quad &q = quads[i];
+                float *rc = u + i * 4;
+                float *cc = u + (max_batch + i) * 4;
+                rc[0] = static_cast<float>(q.x) / static_cast<float>(W) * 2.0f - 1.0f;
+                rc[1] = static_cast<float>(q.y) / static_cast<float>(H) * 2.0f - 1.0f;
+                rc[2] = static_cast<float>(q.w) / static_cast<float>(W) * 2.0f;
+                rc[3] = static_cast<float>(q.h) / static_cast<float>(H) * 2.0f;
+                std::memcpy(cc, q.color, 16);
+            }
+            dev.unmapMemory(r.ubo_mem);
+        }
+        const vk::DescriptorBufferInfo di_ubo{ r.ubo, 0, ubo_size };
+        const vk::WriteDescriptorSet writes[3] = {
             { .dstSet = set, .dstBinding = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eInputAttachment, .pImageInfo = &di_color },
-            { .dstSet = set, .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eInputAttachment, .pImageInfo = &di_raw }
+            { .dstSet = set, .dstBinding = 1, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eInputAttachment, .pImageInfo = &di_raw },
+            { .dstSet = set, .dstBinding = 2, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &di_ubo }
         };
-        dev.updateDescriptorSets(2, writes, 0, nullptr);
+        dev.updateDescriptorSets(3, writes, 0, nullptr);
 
         const vk::PushConstantRange pcr{ vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, 48 };
         r.pipe_layout = dev.createPipelineLayout(vk::PipelineLayoutCreateInfo{ .setLayoutCount = 1, .pSetLayouts = &r.set_layout, .pushConstantRangeCount = 1, .pPushConstantRanges = &pcr });
@@ -351,8 +387,6 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
             c.pipelineBarrier(ss, ds_, vk::DependencyFlags(), {}, {}, b);
         };
 
-        const std::vector<Quad> quads = make_quads(W, H, in.draws);
-
         // fill the staging buffer with the initial pattern
         auto fill_initial = [&]() {
             uint16_t *p = static_cast<uint16_t *>(dev.mapMemory(r.buf_mem, 0, buf_size));
@@ -389,10 +423,11 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
             float rect[4];
             float color[4];
             float use_raw;
-            float pad[3];
+            float batch;
+            float pad[2];
         };
 
-        auto draw_all = [&](bool split, bool use_raw) {
+        auto draw_all = [&](bool split, bool use_raw, bool batch) {
             return submit_wait([&](vk::CommandBuffer c) {
                 auto begin = [&]() {
                     const vk::RenderPassBeginInfo bi{ .renderPass = in.render_pass, .framebuffer = r.fb, .renderArea = { { 0, 0 }, { W, H } } };
@@ -401,7 +436,7 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
                     c.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, r.pipe_layout, 0, set, {});
                 };
                 begin();
-                for (size_t i = 0; i < quads.size(); i++) {
+                for (size_t i = 0; i < (batch ? 1 : quads.size()); i++) {
                     if (split && i > 0) {
                         c.endRenderPass();
                         begin();
@@ -414,8 +449,9 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
                     b[1] = b[0];
                     b[1].image = r.raw;
                     c.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eFragmentShader, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ArrayProxy<const vk::ImageMemoryBarrier>(2, b));
-                    const Quad &q = quads[i];
+                    const Quad &q = quads[batch ? 0 : i];
                     PC pc{};
+                    pc.batch = batch ? 1.0f : 0.0f;
                     pc.rect[0] = static_cast<float>(q.x) / static_cast<float>(W) * 2.0f - 1.0f;
                     pc.rect[1] = static_cast<float>(q.y) / static_cast<float>(H) * 2.0f - 1.0f;
                     pc.rect[2] = static_cast<float>(q.w) / static_cast<float>(W) * 2.0f;
@@ -423,7 +459,7 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
                     std::memcpy(pc.color, q.color, sizeof(pc.color));
                     pc.use_raw = use_raw ? 1.0f : 0.0f;
                     c.pushConstants(r.pipe_layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(PC), &pc);
-                    c.draw(4, 1, 0, 0);
+                    c.draw(4, batch ? static_cast<uint32_t>(quads.size()) : 1u, 0, 0);
                 }
                 c.endRenderPass();
                 // make the colour image readable by the transfer
@@ -466,8 +502,9 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
         };
 
         constexpr double fail_fraction = 0.0005; // the defect covered several percent of the target
-        struct Run { bool split; bool raw; double *out; };
-        Run runs[3] = { { false, true, &rep.mismatch_inplace_raw }, { false, false, &rep.mismatch_inplace_float }, { true, true, &rep.mismatch_split } };
+        struct Run { bool split; bool raw; bool batch; double *out; };
+        Run runs[4] = { { false, true, false, &rep.mismatch_inplace_raw }, { false, false, false, &rep.mismatch_inplace_float }, { true, true, false, &rep.mismatch_split },
+            { false, true, true, &rep.mismatch_batch } };
         for (Run &run : runs) {
             if (!upload_initial()) {
                 rep.note = "upload timed out";
@@ -475,7 +512,7 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
             }
             first_upload = false;
             depth_ready = true;
-            if (!draw_all(run.split, run.raw)) {
+            if (!draw_all(run.split, run.raw, run.batch)) {
                 rep.note = "draw timed out";
                 return rep;
             }
@@ -488,7 +525,7 @@ inline FbFetchReport run_fbfetch_selftest(const FbFetchInput &in) {
             rep.note = "reference (split) path disagrees with the CPU model";
             return rep;
         }
-        rep.result = (rep.mismatch_inplace_raw > fail_fraction || rep.mismatch_inplace_float > fail_fraction) ? Result::Fail : Result::Pass;
+        rep.result = (rep.mismatch_inplace_raw > fail_fraction || rep.mismatch_inplace_float > fail_fraction || rep.mismatch_batch > fail_fraction) ? Result::Fail : Result::Pass;
         return rep;
     } catch (const std::exception &e) {
         rep.note = std::string("exception: ") + e.what();

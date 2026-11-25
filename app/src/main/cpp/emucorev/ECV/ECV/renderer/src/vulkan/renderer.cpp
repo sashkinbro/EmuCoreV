@@ -1093,7 +1093,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
 // <files dir>/fbfetch-selftest.cache so the test runs once per driver update. Never a vendor/device-name decision.
 static void select_fbfetch_split(VKState &s) {
     namespace st = renderer::vulkan::selftest;
-    constexpr int test_version = 1; // bump when the test or its shaders change
+    constexpr int test_version = 2; // bump when the test or its shaders change
     fs::path flag_dir = s.vita_fs_path;
     if (!flag_dir.has_filename())
         flag_dir = flag_dir.parent_path();
@@ -1164,11 +1164,11 @@ static void select_fbfetch_split(VKState &s) {
         }
     }
     s.features.split_fbfetch_between_draws = result != st::Result::Pass;
-    LOG_INFO("Framebuffer-fetch self-test: {} (source {}), split between consecutive fetching draws = {}; mismatch in-pass raw {:.5f} float {:.5f} split {:.5f}, {:.0f} ms {}",
-        st::to_string(result), source, s.features.split_fbfetch_between_draws, report.mismatch_inplace_raw, report.mismatch_inplace_float, report.mismatch_split, report.ms, report.note);
+    LOG_INFO("Framebuffer-fetch self-test: {} (source {}), split between consecutive fetching draws = {}; mismatch in-pass raw {:.5f} float {:.5f} one-draw batch {:.5f} split {:.5f}, {:.0f} ms {}",
+        st::to_string(result), source, s.features.split_fbfetch_between_draws, report.mismatch_inplace_raw, report.mismatch_inplace_float, report.mismatch_batch, report.mismatch_split, report.ms, report.note);
 #if ECV_ORACLE && defined(__ANDROID__)
-    __android_log_print(ANDROID_LOG_INFO, "ECVLAB", "paths fbfetch=%s fbfetch_split=%d selftest=%s source=%s mismatch_raw=%.5f mismatch_float=%.5f mismatch_split=%.5f ms=%.0f", s.pipeline_cache.uses_coherent_framebuffer_fetch() ? "roaa" : "input-attachment",
-        s.features.split_fbfetch_between_draws ? 1 : 0, st::to_string(result), source, report.mismatch_inplace_raw, report.mismatch_inplace_float, report.mismatch_split, report.ms);
+    __android_log_print(ANDROID_LOG_INFO, "ECVLAB", "paths fbfetch=%s fbfetch_split=%d selftest=%s source=%s mismatch_raw=%.5f mismatch_float=%.5f mismatch_batch=%.5f mismatch_split=%.5f ms=%.0f", s.pipeline_cache.uses_coherent_framebuffer_fetch() ? "roaa" : "input-attachment",
+        s.features.split_fbfetch_between_draws ? 1 : 0, st::to_string(result), source, report.mismatch_inplace_raw, report.mismatch_inplace_float, report.mismatch_batch, report.mismatch_split, report.ms);
 #endif
 }
 
