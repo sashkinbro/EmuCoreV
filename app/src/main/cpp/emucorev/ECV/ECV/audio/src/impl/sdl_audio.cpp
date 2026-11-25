@@ -20,6 +20,9 @@
 #include "util/log.h"
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_hints.h>
+#ifdef ECV_ORACLE
+#include <ecv_lab.h> // oracle: lab audio metrics (debug builds only)
+#endif
 
 #define SDL_CHECK_EXT(condition, ret)                         \
     do {                                                      \
@@ -41,6 +44,10 @@ void SDLCALL SDLAudioAdapter::thread_wakeup_callback(void *userdata, SDL_AudioSt
     assert(userdata != nullptr);
     assert(stream != nullptr);
     SDLAudioOutPort *port = static_cast<SDLAudioOutPort *>(userdata);
+#ifdef ECV_ORACLE
+    if (additional_amount > 0)
+        ecv::oracle::lab::audio_underrun(); // the device asked for more than the stream holds
+#endif
     const int samples_available = port->adapter.get_rest_sample(*port);
     if (samples_available < get_threshold_samples(port->adapter.device_buffer_samples) || additional_amount > 0) {
         port->cond_var.notify_one();
@@ -118,10 +125,17 @@ AudioSubmitResult SDLAudioAdapter::try_audio_output(AudioOutPort &out_port, cons
     // backlog instead: one short skip, then audio is in sync again.
     if (samples_available > 4 * threshold) {
         LOG_WARN_ONCE("Audio output backlog of {} samples (limit {}): dropping it to keep audio in sync", samples_available, 4 * threshold);
+#ifdef ECV_ORACLE
+        ecv::oracle::lab::audio_dropped(samples_available);
+#endif
         SDL_ClearAudioStream(port.stream.get());
     }
-    return SDL_PutAudioStreamData(port.stream.get(), buffer, port.len_bytes)
-        ? AudioSubmitResult::submitted : AudioSubmitResult::error;
+    const bool put = SDL_PutAudioStreamData(port.stream.get(), buffer, port.len_bytes);
+#ifdef ECV_ORACLE
+    if (put && ecv::oracle::lab::audio_armed())
+        ecv::oracle::lab::audio_submitted(&port, port.len_microseconds, get_rest_sample(port), dst_spec.freq);
+#endif
+    return put ? AudioSubmitResult::submitted : AudioSubmitResult::error;
 }
 
 void SDLAudioAdapter::set_volume(AudioOutPort &out_port, float volume) {
