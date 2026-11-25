@@ -129,6 +129,23 @@ struct GpuCaps {
     bool lazily_allocated_memory = false; // a DEVICE_LOCAL | LAZILY_ALLOCATED memory type exists (tiler signal)
     bool host_visible_coherent = false;
     bool host_visible_coherent_cached = false;
+    // --- rasteriser features the P8/P15 paths choose from (a missing feature selects the documented fallback) ---
+    bool wide_lines = false; // lines wider than one pixel; without it a wide line is a brush of shifted lines (raster_model.h)
+    bool large_points = false; // point sizes above one pixel; without it the point size register is clamped to 1
+    bool fill_mode_non_solid = false; // line/point polygon modes and TRIANGLE_EDGES; without it triangles are drawn filled
+    bool occlusion_query_precise = false; // visibility entries count samples instead of a flag
+    float max_point_size = 1.0f;
+    // --- colour surface formats (P7): host format chosen per GXM colour base format from the probed attachment/blend support ---
+    // (colour_format_model.h owns the table of candidates; `repack` is its Repack enum value)
+    struct ColourFormatCap {
+        uint32_t host_format = 0; // VkFormat, 0 = not probed (legacy mapping)
+        uint8_t repack = 0;
+        bool blend_ok = true; // the host format blends; the pipeline draws without blending when it does not
+        bool lossy = false; // reduced precision fallback (F32 to F16)
+        bool forced = false; // nothing in the chain was usable, the primary candidate is used anyway
+    };
+    static constexpr size_t colour_format_count = 23;
+    std::array<ColourFormatCap, colour_format_count> colour_format{};
     // --- limits ---
     uint32_t max_bound_descriptor_sets = 4;
     uint32_t max_per_stage_sampled_images = 16;

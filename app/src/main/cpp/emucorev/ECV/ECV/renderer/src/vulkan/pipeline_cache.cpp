@@ -1041,7 +1041,7 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
 
     SceGxmPolygonMode face_polygon_mode = back_state ? record.back_polygon_mode : record.front_polygon_mode;
     vk::PolygonMode polygon_mode = translate_polygon_mode(face_polygon_mode);
-    if (polygon_mode != vk::PolygonMode::eFill && !state.physical_device_features.fillModeNonSolid) {
+    if (polygon_mode != vk::PolygonMode::eFill && !state.gpu_caps.fill_mode_non_solid) {
         // line/point rasterisation needs fillModeNonSolid (enabled whenever the device has it)
         LOG_WARN_ONCE("Polygon mode line/point requested but the device has no fillModeNonSolid: drawing filled");
         polygon_mode = vk::PolygonMode::eFill;
@@ -1051,7 +1051,7 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
     const vk::CullModeFlags cull_mode = state.use_extended_dynamic_state ? vk::CullModeFlags() : draw_cull_mode(record.cull_mode, variant);
 =======
     if (type == SCE_GXM_PRIMITIVE_TRIANGLE_EDGES) {
-        if (state.physical_device_features.fillModeNonSolid)
+        if (state.gpu_caps.fill_mode_non_solid)
             polygon_mode = vk::PolygonMode::eLine;
         else
             LOG_WARN_ONCE("SCE_GXM_PRIMITIVE_TRIANGLE_EDGES needs fillModeNonSolid, which the device lacks: drawing filled triangles");
@@ -1114,7 +1114,7 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         if (hints.color_format == SCE_GXM_COLOR_FORMAT_U8_A)
             blend_attachments[0] = translate_alpha_surface_blend(blend_attachments[0]);
         // the host format of this surface cannot blend (probed, P7): the lossless format wins over the blend, see colourmodel
-        const auto *colour_entry = state.colour_entry(record.color_base_format);
+        const auto colour_entry = state.colour_entry(record.color_base_format);
         if (colour_entry && !colour_entry->blend_ok && blend_attachments[0].blendEnable) {
             LOG_WARN_ONCE("Blending on a {} surface is not supported by the device: drawn without blending", vk::to_string(colour_entry->format));
             blend_attachments[0].blendEnable = VK_FALSE;

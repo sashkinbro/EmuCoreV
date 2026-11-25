@@ -32,6 +32,14 @@ GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::Extensio
     c.framebuffer_depth_sample_counts = static_cast<uint32_t>(static_cast<VkSampleCountFlags>(lim.framebufferDepthSampleCounts));
     c.framebuffer_stencil_sample_counts = static_cast<uint32_t>(static_cast<VkSampleCountFlags>(lim.framebufferStencilSampleCounts));
     c.max_bound_descriptor_sets = lim.maxBoundDescriptorSets;
+    {
+        const vk::PhysicalDeviceFeatures features = device.getFeatures();
+        c.wide_lines = features.wideLines;
+        c.large_points = features.largePoints;
+        c.fill_mode_non_solid = features.fillModeNonSolid;
+        c.occlusion_query_precise = features.occlusionQueryPrecise;
+        c.max_point_size = lim.pointSizeRange[1];
+    }
     c.max_per_stage_input_attachments = lim.maxPerStageDescriptorInputAttachments;
     c.max_per_stage_sampled_images = lim.maxPerStageDescriptorSampledImages;
     c.max_descriptor_set_sampled_images = lim.maxDescriptorSetSampledImages;

@@ -301,9 +301,6 @@ bool VKSurfaceCache::try_transfer_color_gpu(MemState &mem, const ColorTransferKi
     if (dst.format != rgba8 || dst_type != SCE_GXM_TRANSFER_LINEAR || (kind != ColorTransferKind::Fill && (src.format != rgba8 || src_type != SCE_GXM_TRANSFER_LINEAR)))
         return false;
     VKContext &context = *static_cast<VKContext *>(state.context);
-    // work already recorded for the running scene is not submitted yet: a transfer submitted now would run before it
-    if (context.is_recording && context.scene_has_drawn)
-        return false;
 
     const uint32_t src_w = src.width, src_h = src.height;
     const uint32_t dst_w = kind == ColorTransferKind::Copy ? src.width : dst.width;
@@ -341,20 +338,25 @@ bool VKSurfaceCache::try_transfer_color_gpu(MemState &mem, const ColorTransferKi
             vk::Offset3D{ clampi(std::floor((r.x + r.w) * m), i.texture.width), clampi(std::floor((r.y + r.h) * m), i.texture.height), 1 } };
     };
 
-    auto temp = std::make_shared<vkutil::Image>();
+    // The blit is recorded into the scene command stream, in order with the draws that wrote the surfaces and the scenes that read the
+    // destination (a separate submission cannot be ordered against a scene that is still being recorded). Between two scenes a recording
+    // is opened for it. All barriers are the vkutil sync tracker's (transition_to / the surface sync's own use_in_place).
+    if (!context.render_target)
+        return false;
+    std::unique_ptr<vkutil::Image> temp;
     if (kind == ColorTransferKind::Fill) {
+        temp = std::make_unique<vkutil::Image>();
         temp->width = 1;
         temp->height = 1;
         temp->format = vk::Format::eR8G8B8A8Unorm;
         temp->init_image(vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst);
     }
-
-    vk::CommandBuffer transfer_cmd = nullptr;
-    vk::Fence fence = state.device.createFence({});
+    if (!context.is_recording)
+        context.start_recording();
+    if (context.in_renderpass)
+        context.stop_render_pass();
     {
-        std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
-        transfer_cmd = vkutil::create_single_time_command(state.device, state.multithread_command_pool);
-
+        vk::CommandBuffer transfer_cmd = context.render_cmd;
         vkutil::Image *source_image = nullptr;
         if (kind == ColorTransferKind::Fill) {
             temp->transition_to(transfer_cmd, vkutil::ImageLayout::TransferDst);
@@ -386,26 +388,9 @@ bool VKSurfaceCache::try_transfer_color_gpu(MemState &mem, const ColorTransferKi
         if (src_info != nullptr)
             src_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::ColorAttachmentReadWrite);
         dst_info->texture.transition_to(transfer_cmd, vkutil::ImageLayout::ColorAttachmentReadWrite);
-        transfer_cmd.end();
     }
-
-    vk::SubmitInfo submit_info{};
-    submit_info.setCommandBuffers(transfer_cmd);
-    state.general_queue.submit(submit_info, fence);
-
-    CallbackRequestFunction vk_callback = [&state = this->state, fence, transfer_cmd, temp]() {
-        const auto result = state.device.waitForFences(fence, vk::True, std::numeric_limits<uint64_t>::max());
-        if (result != vk::Result::eSuccess)
-            LOG_ERROR("Could not wait for the colour transfer fence.");
-        state.device.destroyFence(fence);
-        if (temp->image)
-            temp->destroy();
-        std::lock_guard<std::mutex> lock(state.multithread_pool_mutex);
-        state.device.freeCommandBuffers(state.multithread_command_pool, transfer_cmd);
-    };
-    dispatch_gpu_resource_cleanup(state.gpu_request_reader_count.load(std::memory_order_acquire) != 0,
-        [&](CallbackRequestFunction *callback) { return state.request_queue.try_push(CallbackRequest{ callback }); },
-        std::move(vk_callback), []() { LOG_ERROR("Could not release discarded GPU colour transfer resources."); });
+    if (temp)
+        state.frame().destroy_queue.add_image(*temp);
 
     // the destination now holds newer content than guest memory: mark what was written (write-back bounds) and write it
     // back like the end of a scene would, so that guest reads of the destination see the transfer
@@ -422,7 +407,14 @@ bool VKSurfaceCache::try_transfer_color_gpu(MemState &mem, const ColorTransferKi
     dst_info->written_y0 = std::min(dst_info->written_y0, align_down32(t0y));
     dst_info->written_x1 = std::max(dst_info->written_x1, align_up32(t1x, dst_info->original_width));
     dst_info->written_y1 = std::max(dst_info->written_y1, align_up32(t1y, dst_info->original_height));
-    submit_immediate_surface_sync(*dst_info, nullptr);
+    {
+        // written back to guest memory by the scene stream itself (an identity RGBA8 surface needs no CPU post step)
+        ColorSurfaceCacheInfo *prev_last_written = last_written_surface;
+        *dst_info->need_surface_sync = true;
+        last_written_surface = dst_info;
+        perform_surface_sync();
+        last_written_surface = prev_last_written;
+    }
 
     LOG_INFO_ONCE("Colour transfer ({}) done on the GPU: {}x{} RGBA8", kind == ColorTransferKind::Copy ? "copy" : kind == ColorTransferKind::Downscale ? "downscale" : "fill", dst_rect->w, dst_rect->h);
     return true;
@@ -997,7 +989,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
     }
 
     const SceGxmColorBaseFormat base_format = gxm::get_base_format(color->colorFormat);
-    const auto *colour_entry = state.colour_entry(base_format);
+    const auto colour_entry = state.colour_entry(base_format);
     vk::Format vk_format = colour_entry ? colour_entry->format : color::translate_surface_format(base_format);
 
     SurfaceTiling tiling;
@@ -1326,7 +1318,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
     }
 
     const vk::ComponentMapping swizzle = texture::translate_swizzle(gxm::get_format(texture));
-    const auto *colour_entry = state.colour_entry(base_format);
+    const auto colour_entry = state.colour_entry(base_format);
     vk::Format vk_format = colour_entry ? colour_entry->format : color::translate_surface_format(base_format);
 
     const bool is_srgb = texture.gamma_mode != 0;

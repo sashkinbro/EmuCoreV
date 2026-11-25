@@ -220,7 +220,7 @@ bool ScreenRenderer::setup() {
         };
         for (size_t i = 0; i < colourmodel::fmt_count; i++) {
             const auto entry = colourmodel::select_host_format(static_cast<colourmodel::Fmt>(i), supports);
-            state.colour_formats.entries[i] = entry;
+            state.gpu_caps.colour_format[i] = { static_cast<uint32_t>(entry.format), static_cast<uint8_t>(entry.repack), entry.blend_ok, entry.lossy, entry.forced };
             const colourmodel::Chain &chain = colourmodel::chain_of(static_cast<colourmodel::Fmt>(i));
             if (entry.format != chain.list[0].format || !entry.blend_ok || entry.forced)
                 LOG_WARN("Colour surface format {}: host {}{}{}{}", i, vk::to_string(entry.format), entry.blend_ok ? "" : ", no blending on this format",

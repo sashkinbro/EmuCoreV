@@ -469,7 +469,7 @@ static void activate_visibility(VKContext &context, const bool is_back) {
         return;
     }
     context.visibility_max_used_idx = slot;
-    const vk::QueryControlFlags control_flags = (face.increment && context.state.physical_device_features.occlusionQueryPrecise) ? vk::QueryControlFlagBits::ePrecise : vk::QueryControlFlags();
+    const vk::QueryControlFlags control_flags = (face.increment && context.state.gpu_caps.occlusion_query_precise) ? vk::QueryControlFlagBits::ePrecise : vk::QueryControlFlags();
     context.render_cmd.beginQuery(buffer->query_pool, static_cast<uint32_t>(slot), control_flags);
     context.is_in_query = true;
     context.instance_queries++;
@@ -806,8 +806,8 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     vert_ublock.viewport_flag = (context.record.viewport_flat) ? 0.0f : 1.0f;
     vert_ublock.z_offset = context.record.z_offset;
     vert_ublock.z_scale = context.record.z_scale;
-    vert_ublock.point_size = raster::point_size(context.record.line_width, context.state.res_multiplier, context.state.physical_device_features.largePoints,
-        context.state.physical_device_properties.limits.pointSizeRange[1]);
+    vert_ublock.point_size = raster::point_size(context.record.line_width, context.state.res_multiplier, context.state.gpu_caps.large_points,
+        context.state.gpu_caps.max_point_size);
     vert_ublock.screen_width = context.render_target->width / context.state.res_multiplier;
     vert_ublock.screen_height = context.render_target->height / context.state.res_multiplier;
 
@@ -941,7 +941,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     // Lines wider than one pixel on a device without wideLines: repeat the draw shifted by sub-pixel steps (raster::line_brush)
     std::vector<raster::Offset> brush;
     const float line_pixels = static_cast<float>(context.record.line_width) * context.state.res_multiplier;
-    if (type == SCE_GXM_PRIMITIVE_LINES && !context.state.physical_device_features.wideLines && line_pixels > 1.0f) {
+    if (type == SCE_GXM_PRIMITIVE_LINES && !context.state.gpu_caps.wide_lines && line_pixels > 1.0f) {
         brush = raster::line_brush(line_pixels);
         LOG_INFO_ONCE("Wide lines without the wideLines feature: drawn as a brush of {} shifted lines", brush.size());
     }

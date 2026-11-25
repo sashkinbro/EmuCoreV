@@ -33,6 +33,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 
 struct Config;
@@ -95,11 +96,16 @@ struct VKState : public renderer::State {
     std::vector<vk::QueueFamilyProperties> physical_device_queue_families;
     // combined depth+stencil format for attachments with no guest surface behind them (and the fallback of everything else)
     vk::Format deep_stencil_use;
-    // host format of every GXM colour base format, probed at start up (P7); the default is the legacy mapping
-    colourmodel::SurfaceFormatTable colour_formats;
-    const colourmodel::SurfaceFormatTable::Entry *colour_entry(const SceGxmColorBaseFormat base) const {
+    // host format of a GXM colour base format as probed at start up (GpuCaps::colour_format, P7); nothing for a format the renderer does not render to,
+    // the legacy mapping while the probe has not run
+    std::optional<colourmodel::SurfaceFormatTable::Entry> colour_entry(const SceGxmColorBaseFormat base) const {
         const colourmodel::Fmt f = colourmodel::fmt_of(base);
-        return f == colourmodel::Fmt::Count ? nullptr : &colour_formats[f];
+        if (f == colourmodel::Fmt::Count)
+            return std::nullopt;
+        const GpuCaps::ColourFormatCap &cap = gpu_caps.colour_format[static_cast<size_t>(f)];
+        if (cap.host_format == 0)
+            return colourmodel::SurfaceFormatTable()[f];
+        return colourmodel::SurfaceFormatTable::Entry{ static_cast<vk::Format>(cap.host_format), static_cast<colourmodel::Repack>(cap.repack), cap.blend_ok, cap.lossy, cap.forced };
     }
     // host format of each GXM depth/stencil class, chosen from the probed format features (screen_renderer.cpp setup)
     std::array<vk::Format, static_cast<size_t>(dsmodel::DsClass::Count)> ds_class_format{};
