@@ -4,8 +4,13 @@ add_library(
 	include/display/state.h
 	include/display/functions.h
 	src/display.cpp
+	src/panel_vsync.cpp
 )
 
 target_include_directories(display PUBLIC include)
 target_link_libraries(display PUBLIC emuenv kernel)
 target_link_libraries(display PRIVATE cheat touch renderer dialog motion)
+
+if(ANDROID)
+	target_link_libraries(display PRIVATE android)
+endif()

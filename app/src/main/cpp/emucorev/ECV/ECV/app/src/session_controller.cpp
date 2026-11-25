@@ -140,6 +140,10 @@ bool AppSessionController::load_and_run(bool restore_state) {
     emuenv.renderer->set_app(emuenv.io.title_id.c_str(), emuenv.self_name.c_str());
     prepare_game_launch_overlay(emuenv);
 
+    // Games lock their 60 Hz vblank to the panel vsync (while v-sync is on); the native shell and
+    // trophy apps run their own refresh handling.
+    emuenv.display.follow_panel_vsync = !is_native_library(active_launch_request) && !is_native_trophies(active_launch_request);
+
     if (restore_state) {
         // Load reconstructs every guest thread and module from the snapshot.
         // Starting a fresh main thread first can leave it waiting for a module

@@ -45,6 +45,9 @@ public:
     vk::SurfaceCapabilitiesKHR surface_capabilities;
     vk::SurfaceFormatKHR surface_format;
     vk::PresentModeKHR present_mode{};
+    // v-sync setting, applied to the present mode on the next swapchain (re)build
+    bool vsync_enabled = true;
+    void select_present_mode();
     vk::Extent2D extent;
     uint32_t swapchain_size{};
     std::vector<vk::Image> swapchain_images;

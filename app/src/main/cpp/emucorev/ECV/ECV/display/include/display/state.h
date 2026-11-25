@@ -24,6 +24,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -50,6 +51,17 @@ struct PredictedDisplayFrame {
     Address sync_object;
 };
 
+// Source of the host panel's vsync (Android Choreographer). The guest vblank follows it when present.
+struct PanelVsyncSource {
+    virtual ~PanelVsyncSource() = default;
+    // Blocks until the next panel vsync or the timeout. On success sets the vsync timestamp
+    // (CLOCK_MONOTONIC, ns) and returns true; false means no vsync arrived in time (app hidden, source stopped).
+    virtual bool wait_next(std::chrono::microseconds timeout, int64_t &timestamp_ns) = 0;
+};
+
+// Starts a vsync source for this platform; nullptr where none exists.
+std::unique_ptr<PanelVsyncSource> create_panel_vsync_source();
+
 struct DisplayState {
     int viewport_drawable_w = 0;
     int viewport_drawable_h = 0;
@@ -73,6 +85,9 @@ struct DisplayState {
     bool producer_active = false;
     bool shell_suspended = false; // Protected by producer_mutex; games never enable it.
     int refresh_hz = 60;
+    // Set by the session before the vblank thread starts: lock guest vblank to the panel vsync while v-sync is on.
+    bool follow_panel_vsync = false;
+    std::unique_ptr<PanelVsyncSource> panel_vsync;
     void set_shell_suspended(bool suspended);
     bool begin_vblank_update();
     void end_vblank_update();

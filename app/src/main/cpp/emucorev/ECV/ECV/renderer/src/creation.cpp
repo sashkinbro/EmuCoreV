@@ -371,6 +371,7 @@ bool init(FrameHost &frame, std::unique_ptr<State> &state, Backend backend, cons
         case Backend::Vulkan:
             state = std::make_unique<vulkan::VKState>(config.current_config.gpu_idx);
             state->frame = &frame;
+            state->set_vsync_state(config.current_config.v_sync); // picks the swapchain present mode
             state->init_paths(root_paths);
             if (!vulkan::create(state, config))
                 return false;

@@ -33,6 +33,7 @@
 #include <functional>
 #include <overlay/display_manager.h>
 #include <overlay/shader_precompile_progress.h>
+#include <util/frame_pacing.h>
 #include <util/log.h>
 
 #if ECV_ORACLE
@@ -300,6 +301,12 @@ static void render_loop_body(renderer::State &state, DisplayState &display, GxmS
     }
     auto next_presentation = std::chrono::steady_clock::now();
     int previous_frame_limit = 0;
+#ifndef NDEBUG
+    // debug builds only: present-to-present interval histogram, logged every 5 s (ECVPACE)
+    frame_pacing::IntervalHistogram present_histogram;
+    auto last_present = std::chrono::steady_clock::time_point{};
+    auto present_histogram_start = std::chrono::steady_clock::now();
+#endif
     while (!state.render_abort.load(std::memory_order_relaxed)) {
         {
             std::unique_lock lock(state.shell_suspend_mutex);
@@ -355,6 +362,19 @@ static void render_loop_body(renderer::State &state, DisplayState &display, GxmS
         if (should_present) {
             state.render_frame(display, gxm, mem);
             state.swap_window();
+#ifndef NDEBUG
+            {
+                const auto presented = std::chrono::steady_clock::now();
+                if (last_present != std::chrono::steady_clock::time_point{})
+                    present_histogram.add(std::chrono::duration<double, std::milli>(presented - last_present).count());
+                last_present = presented;
+                if (presented - present_histogram_start >= std::chrono::seconds(5)) {
+                    LOG_INFO("ECVPACE present {}", present_histogram.format());
+                    present_histogram.clear();
+                    present_histogram_start = presented;
+                }
+            }
+#endif
 #if ECV_ORACLE
             ecv::oracle::lab::frame_presented();
 #endif

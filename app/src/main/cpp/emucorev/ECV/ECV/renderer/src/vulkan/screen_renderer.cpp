@@ -15,6 +15,7 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+#include <util/frame_pacing.h>
 #include "renderer/vulkan/screen_renderer.h"
 #include "renderer/vulkan/surface_capability_selection.h"
 
@@ -238,28 +239,9 @@ bool ScreenRenderer::setup() {
         }
     }
 
-    // preferred order : mailbox > fifo_relaxed > fifo > whatever
-    // the only drawback for mailbox is that it draws more power, so maybe on a portable device use something else
-    // this one should always be available
-    present_mode = vk::PresentModeKHR::eImmediate;
-    const auto present_modes = state.physical_device.getSurfacePresentModesKHR(surface);
-    for (const auto &mode : present_modes) {
-        if (mode == vk::PresentModeKHR::eMailbox) {
-            present_mode = mode;
-            break;
-        }
-
-        if (mode == vk::PresentModeKHR::eFifoRelaxed) {
-            present_mode = mode;
-        }
-        if (present_mode == vk::PresentModeKHR::eFifoRelaxed)
-            continue;
-
-        if (mode == vk::PresentModeKHR::eFifo) {
-            present_mode = mode;
-        }
-    }
-    LOG_INFO("Present mode: {}", vk::to_string(present_mode));
+    // the swapchain below picks its present mode from the configured v-sync
+    if (const int initial_vsync = state.pending_vsync.exchange(-1, std::memory_order_relaxed); initial_vsync >= 0)
+        vsync_enabled = initial_vsync != 0;
 
     create_render_pass();
 
@@ -276,7 +258,28 @@ bool ScreenRenderer::setup() {
     return true;
 }
 
+void ScreenRenderer::select_present_mode() {
+    // v-sync on (the default): FIFO, one image per panel refresh, never drops or tears, which is what
+    // an even frame cadence needs. v-sync off: the best mode that does not tear (mailbox), then the rest.
+    frame_pacing::PresentModeSupport support;
+    for (const auto &mode : state.physical_device.getSurfacePresentModesKHR(surface)) {
+        support.mailbox |= mode == vk::PresentModeKHR::eMailbox;
+        support.immediate |= mode == vk::PresentModeKHR::eImmediate;
+        support.fifo_relaxed |= mode == vk::PresentModeKHR::eFifoRelaxed;
+    }
+    const vk::PresentModeKHR previous = present_mode;
+    switch (frame_pacing::choose_present_mode(vsync_enabled, support)) {
+    case frame_pacing::PresentMode::Mailbox: present_mode = vk::PresentModeKHR::eMailbox; break;
+    case frame_pacing::PresentMode::Immediate: present_mode = vk::PresentModeKHR::eImmediate; break;
+    case frame_pacing::PresentMode::FifoRelaxed: present_mode = vk::PresentModeKHR::eFifoRelaxed; break;
+    case frame_pacing::PresentMode::Fifo: present_mode = vk::PresentModeKHR::eFifo; break;
+    }
+    if (present_mode != previous)
+        LOG_INFO("Present mode: {} (v-sync {})", vk::to_string(present_mode), vsync_enabled ? "on" : "off");
+}
+
 bool ScreenRenderer::create_swapchain() {
+    select_present_mode();
     surface_capabilities = state.physical_device.getSurfaceCapabilitiesKHR(surface);
     SwapchainCapabilitiesSelection capabilities_selection;
     if (!select_swapchain_capabilities(surface_capabilities, !state.is_adreno_turnip, capabilities_selection)) {
@@ -904,6 +907,14 @@ void ScreenRenderer::create_surface_image() {
 bool ScreenRenderer::ensure_swapchain() {
     if (!window_has_drawable_size(state))
         return false;
+
+    // The v-sync setting can change while the game runs; the present mode is a swapchain property.
+    const int pending_vsync = state.pending_vsync.exchange(-1, std::memory_order_relaxed);
+    if (pending_vsync >= 0 && (pending_vsync != 0) != vsync_enabled) {
+        vsync_enabled = pending_vsync != 0;
+        need_rebuild = true;
+        rebuild_reason = "v-sync setting changed";
+    }
 
     if (!need_rebuild && !need_surface_recreate && swapchain) {
         // A one-frame disagreement between what Vulkan reports as the surface extent and what the window reports as its client size is not a resize

@@ -115,6 +115,8 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     private var isNativeShellSession = false
     private var isNativeTrophySession = false
     private val isFirmwareSession get() = isNativeShellSession || isNativeTrophySession
+    /** True for emulated games (not the native shell / trophies): the panel is paced to the 60 Hz guest. */
+    internal val isGameSession get() = !isFirmwareSession
     val returnsToNativeLibrary: Boolean get() = NativeLibraryMode.available(this) &&
         (isNativeShellSession || intent.getBooleanExtra(NativeLibraryMode.RETURN_TO_NATIVE_LIBRARY, false))
     private val shellLaunchPending = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -616,6 +618,18 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 else -> 60
             }
             if (mode != null) window.attributes = window.attributes.apply { preferredDisplayModeId = mode.modeId }
+        } else if (!isFirmwareSession) {
+            // Games: a panel that is not a multiple of 60 Hz cannot show 60 fps evenly (B141); move it to one
+            // when it has such a mode. Otherwise keep the rate; the native side paces presentation.
+            @Suppress("DEPRECATION")
+            val display = windowManager.defaultDisplay
+            val current = display.mode
+            fun toPolicyMode(m: android.view.Display.Mode) =
+                GameDisplayModePolicy.Mode(m.modeId, m.physicalWidth, m.physicalHeight, m.refreshRate)
+            GameDisplayModePolicy.pick(toPolicyMode(current), display.supportedModes.map(::toPolicyMode))?.let { target ->
+                Log.i(TAG, "Display mode ${current.refreshRate} Hz -> ${target.refreshRate} Hz for the game session")
+                window.attributes = window.attributes.apply { preferredDisplayModeId = target.id }
+            }
         }
         if (isFirmwareSession) inputOverlay.setTouchControlsActive(false)
         else GameSessionMarker.forContext(this).markLive(android.os.Process.myPid(), android.app.Application.getProcessName())
