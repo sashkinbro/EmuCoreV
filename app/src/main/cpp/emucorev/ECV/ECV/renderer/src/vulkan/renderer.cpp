@@ -719,6 +719,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             // formats are still gated per-format by vkGetPhysicalDeviceFormatProperties
             .depthBiasClamp = physical_device_features.depthBiasClamp,
             .fillModeNonSolid = physical_device_features.fillModeNonSolid,
+            .largePoints = physical_device_features.largePoints,
             .wideLines = physical_device_features.wideLines,
             .samplerAnisotropy = physical_device_features.samplerAnisotropy,
             .textureCompressionETC2 = physical_device_features.textureCompressionETC2,

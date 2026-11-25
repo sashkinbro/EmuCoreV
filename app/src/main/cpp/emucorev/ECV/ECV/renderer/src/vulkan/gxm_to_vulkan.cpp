@@ -163,8 +163,8 @@ vk::PrimitiveTopology translate_primitive(SceGxmPrimitiveType primitive) {
         return vk::PrimitiveTopology::eLineList;
     case SCE_GXM_PRIMITIVE_POINTS:
         return vk::PrimitiveTopology::ePointList;
-    case SCE_GXM_PRIMITIVE_TRIANGLE_EDGES: // Todo: Implement this
-        LOG_WARN("Unsupported primitive: SCE_GXM_PRIMITIVE_TRIANGLE_EDGES, using SCE_GXM_PRIMITIVE_TRIANGLES instead");
+    case SCE_GXM_PRIMITIVE_TRIANGLE_EDGES:
+        // the edges of the triangles: a triangle list rasterised as lines (the pipeline sets the polygon mode)
         return vk::PrimitiveTopology::eTriangleList;
     default:
         LOG_ERROR("Unknown primitive: {}", fmt::underlying(primitive));

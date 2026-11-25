@@ -53,11 +53,16 @@ void sync_clipping(VKContext &context) {
         };
         break;
     case SCE_GXM_REGION_CLIP_INSIDE:
-        // TODO: Implement SCE_GXM_REGION_CLIP_INSIDE
-        LOG_WARN("STUB SCE_GXM_REGION_CLIP_INSIDE");
+        // the pixels inside the region are clipped: the whole target is the scissor of the state, the draws are repeated
+        // once per rectangle of the target outside the region (see draw)
         context.scissor = vk::Rect2D{ { 0, 0 }, { context.render_target->width, context.render_target->height } };
+        context.inside_clip = raster::outside_of_hole(context.render_target->width, context.render_target->height,
+            static_cast<int64_t>(scissor_x * res_multiplier), static_cast<int64_t>(scissor_y * res_multiplier),
+            static_cast<int64_t>((scissor_x + static_cast<int>(scissor_w)) * res_multiplier), static_cast<int64_t>((scissor_y + static_cast<int>(scissor_h)) * res_multiplier));
         break;
     }
+    if (context.record.region_clip_mode != SCE_GXM_REGION_CLIP_INSIDE)
+        context.inside_clip.count = 0;
 
     // Vulkan does not allow the offset to be negative
     if (context.scissor.offset.x < 0) {

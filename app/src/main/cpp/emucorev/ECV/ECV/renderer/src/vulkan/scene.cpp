@@ -806,6 +806,8 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
                                     && context.record.color_base_format == SCE_GXM_COLOR_BASE_FORMAT_F16F16F16F16
                                     && context.state.surface_cache.current_surface_raw_is_valid())
         ? 1.0f
+    vert_ublock.point_size = raster::point_size(context.record.line_width, context.state.res_multiplier, context.state.physical_device_features.largePoints,
+        context.state.physical_device_properties.limits.pointSizeRange[1]);
         : 0.0f;
 #if ECV_ORACLE
     if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_NO_RAW))
@@ -821,10 +823,6 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         frag_ublock.res_multiplier *= 2;
     else if (!has_msaa && has_downscale)
         frag_ublock.res_multiplier /= 2;
-    frag_ublock.dither_enabled = context.record.color_surface.dither ? 1.0f : 0.0f;
-    const raster::PointUvFlip point_flip = raster::point_uv_flip(context.record.front_polygon_mode);
-    frag_ublock.point_flip_u = point_flip.flip_u ? 1.0f : 0.0f;
-    frag_ublock.point_flip_v = point_flip.flip_v ? 1.0f : 0.0f;
 
     // Cast-sampler UV re-anchor inputs
     frag_ublock.cast_sampler_mask = static_cast<float>(context.curr_frag_ublock.cast_sampler_bits);
@@ -890,8 +888,6 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         return;
     }
 
-    apply_depth_bias(context, context.face_plan == dsmodel::FacePlan::Back);
-    context.instance_draws++;
     const auto set_cull = [&](dsmodel::PassVariant variant) {
         if (!context.state.use_extended_dynamic_state)
             return;
@@ -902,17 +898,56 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
             context.applied_cull_valid = true;
         }
     };
-    set_cull(context.draw_variant[0]);
-    context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
-
-    if (context.split_pipeline != nullptr) {
-        // second facing: its own pipeline and bias, then bind the first pipeline back (the draw loop assumes it is bound)
-        apply_depth_bias(context, true);
-        context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.split_pipeline);
-        set_cull(context.draw_variant[1]);
+    const auto draw_faces = [&]() {
+        apply_depth_bias(context, context.face_plan == dsmodel::FacePlan::Back);
+        activate_visibility(context, context.face_plan == dsmodel::FacePlan::Back);
+        context.instance_draws++;
+        set_cull(context.draw_variant[0]);
         context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
-        context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.current_pipeline);
+
+        if (context.split_pipeline != nullptr) {
+            // second facing: its own pipeline and bias, then bind the first pipeline back (the draw loop assumes it is bound)
+            apply_depth_bias(context, true);
+            activate_visibility(context, true);
+            context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.split_pipeline);
+            set_cull(context.draw_variant[1]);
+            context.instance_draws++;
+            context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
+            context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.current_pipeline);
+        }
+    };
+
+    // Lines wider than one pixel on a device without wideLines: repeat the draw shifted by sub-pixel steps (raster::line_brush)
+    std::vector<raster::Offset> brush;
+    const float line_pixels = static_cast<float>(context.record.line_width) * context.state.res_multiplier;
+    if (type == SCE_GXM_PRIMITIVE_LINES && !context.state.physical_device_features.wideLines && line_pixels > 1.0f) {
+        brush = raster::line_brush(line_pixels);
+        LOG_INFO_ONCE("Wide lines without the wideLines feature: drawn as a brush of {} shifted lines", brush.size());
     }
+    // Region clip INSIDE: one draw per rectangle of the target outside the region
+    const bool clip_inside = context.record.region_clip_mode == SCE_GXM_REGION_CLIP_INSIDE;
+    const uint32_t strip_count = clip_inside ? context.inside_clip.count : 1;
+
+    for (uint32_t strip = 0; strip < strip_count; strip++) {
+        if (clip_inside) {
+            const raster::Rect &r = context.inside_clip.rect[strip];
+            context.render_cmd.setScissor(0, vk::Rect2D{ { r.x, r.y }, { r.w, r.h } });
+        }
+        if (brush.empty()) {
+            draw_faces();
+        } else {
+            for (const raster::Offset &offset : brush) {
+                vk::Viewport shifted = context.viewport;
+                shifted.x += offset.x;
+                shifted.y += offset.y;
+                context.render_cmd.setViewport(0, shifted);
+                draw_faces();
+            }
+            context.render_cmd.setViewport(0, context.viewport);
+        }
+    }
+    if (clip_inside)
+        context.render_cmd.setScissor(0, context.scissor);
 
     context.vertex_uniform_storage_allocated = false;
     context.fragment_uniform_storage_allocated = false;

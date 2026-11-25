@@ -17,6 +17,7 @@ struct RenderVertUniformBlock {
     float z_offset;
     float z_scale;
     // size of the points of a program that writes no PSIZE (the point width register)
+    float point_size;
 };
 
 // used internally to identify the field by the shader recompiler
@@ -27,7 +28,8 @@ enum VertUniformFieldId : uint32_t {
     VERT_UNIFORM_screen_width,
     VERT_UNIFORM_screen_height,
     VERT_UNIFORM_z_offset,
-    VERT_UNIFORM_z_scale
+    VERT_UNIFORM_z_scale,
+    VERT_UNIFORM_point_size
 };
 
 struct RenderFragUniformBlock {

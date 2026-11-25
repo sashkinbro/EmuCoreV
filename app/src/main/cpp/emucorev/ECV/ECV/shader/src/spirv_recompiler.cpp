@@ -116,6 +116,8 @@ struct TranslationState {
     spv::Id mask_id = spv::NoResult;
     spv::Id frag_coord_id = spv::NoResult;
     spv::Id front_facing_id = spv::NoResult;
+    spv::Id point_coord_private_id = spv::NoResult;
+    spv::Id point_coord_input_id = spv::NoResult; // gl_PointCoord, copied (with the polygon mode flips) to the private variable the textures read
     spv::Id render_info_id = spv::NoResult;
     std::vector<VarToReg> var_to_regs;
     std::vector<spv::Id> interfaces;
@@ -878,10 +880,15 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
             }
 
             if (query_info.coord_index == 10) {
-                coords[query_info.coord_index].first = b.createVariable(spv::NoPrecision, spv::StorageClassInput,
+                const spv::Id point_coord_in = b.createVariable(spv::NoPrecision, spv::StorageClassInput,
                     b.makeVectorType(b.makeFloatType(32), 2), coord_name.c_str());
-                b.addDecoration(coords[query_info.coord_index].first, spv::DecorationBuiltIn, spv::BuiltInPointCoord);
-                translation_state.interfaces.push_back(coords[query_info.coord_index].first);
+                b.addDecoration(point_coord_in, spv::DecorationBuiltIn, spv::BuiltInPointCoord);
+                translation_state.interfaces.push_back(point_coord_in);
+                translation_state.point_coord_input_id = point_coord_in;
+                // the textures read the flipped copy, written by frag_init
+                coords[query_info.coord_index].first = b.createVariable(spv::NoPrecision, spv::StorageClassPrivate,
+                    b.makeVectorType(b.makeFloatType(32), 2), "v_PointCoord");
+                translation_state.point_coord_private_id = coords[query_info.coord_index].first;
             } else {
                 coords[query_info.coord_index].first = create_fragment_iterator(b, translation_state, spv::NoPrecision,
                     b.makeVectorType(b.makeFloatType(32), 4), coord_name.c_str(), TEXCOORD_BASE_LOCATION + query_info.coord_index);
@@ -1322,6 +1329,7 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
         ADD_VERT_UNIFORM_MEMBER(screen_height);
         ADD_VERT_UNIFORM_MEMBER(z_offset);
         ADD_VERT_UNIFORM_MEMBER(z_scale);
+        ADD_VERT_UNIFORM_MEMBER(point_size);
 
 #undef ADD_VERT_UNIFORM_MEMBER
 #define ADD_EXT_UNIFORM_MEMBER(name)                                                                                                                                                \
@@ -1385,9 +1393,6 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
 #define ADD_EXT_UNIFORM_MEMBER(name)                                                                                                                                                \
     spv_params.name##_id = curr_field_id;                                                                                                                                           \
     b.addMemberDecoration(render_buf_type, curr_field_id, spv::DecorationOffset, RenderFragUniformBlockExtended::get_##name##_offset(uniform_buffer_count, uniform_texture_count)); \
-        ADD_FRAG_UNIFORM_MEMBER(dither_enabled);
-        ADD_FRAG_UNIFORM_MEMBER(point_flip_u);
-        ADD_FRAG_UNIFORM_MEMBER(point_flip_v);
     b.addMemberName(render_buf_type, curr_field_id++, #name)
 
         if (uniform_buffer_count > 0) {
@@ -2172,6 +2177,13 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
     b.makeReturn(false);
     b.setBuildPoint(last_build_point);
 
+        const spv::Id point_size_var = b.createVariable(spv::NoPrecision, spv::StorageClassOutput, b.makeFloatType(32), "gl_PointSize");
+        b.addDecoration(point_size_var, spv::DecorationBuiltIn, spv::BuiltInPointSize);
+        translation_state.interfaces.push_back(point_size_var);
+        const spv::Id size_ptr = utils::create_access_chain(b, spv::StorageClassUniform, translation_state.render_info_id, { b.makeIntConstant(VERT_UNIFORM_point_size) });
+        b.createStore(b.createLoad(size_ptr, spv::NoPrecision), point_size_var);
+    }
+
     return vert_fin_func;
 }
 
@@ -2216,6 +2228,21 @@ static spv::Function *make_frag_initialize_function(spv::Builder &b, Translation
 
     b.makeReturn(false);
     b.setBuildPoint(last_build_point);
+
+    if (translate_state.point_coord_input_id != spv::NoResult && translate_state.point_coord_private_id != spv::NoResult) {
+        // x' = x + flip * (1 - 2x) per axis: PROVISIONAL point sprite coordinate modes of the polygon mode (raster_model.h)
+        const spv::Id f32 = b.makeFloatType(32);
+        const spv::Id v2 = b.makeVectorType(f32, 2);
+        const spv::Id point_coord = b.createLoad(translate_state.point_coord_input_id, spv::NoPrecision);
+        const spv::Id flip_u = b.createLoad(utils::create_access_chain(b, spv::StorageClassUniform, translate_state.render_info_id, { b.makeIntConstant(FRAG_UNIFORM_point_flip_u) }), spv::NoPrecision);
+        const spv::Id flip_v = b.createLoad(utils::create_access_chain(b, spv::StorageClassUniform, translate_state.render_info_id, { b.makeIntConstant(FRAG_UNIFORM_point_flip_v) }), spv::NoPrecision);
+        const auto flipped = [&](const unsigned comp, const spv::Id flip) {
+            const spv::Id x = b.createCompositeExtract(point_coord, f32, comp);
+            const spv::Id one_minus_2x = b.createBinOp(spv::OpFSub, f32, b.makeFloatConstant(1.0f), b.createBinOp(spv::OpFMul, f32, x, b.makeFloatConstant(2.0f)));
+            return b.createBinOp(spv::OpFAdd, f32, x, b.createBinOp(spv::OpFMul, f32, flip, one_minus_2x));
+        };
+        b.createStore(b.createCompositeConstruct(v2, { flipped(0, flip_u), flipped(1, flip_v) }), translate_state.point_coord_private_id);
+    }
 
     return frag_init_func;
 }

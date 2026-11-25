@@ -22,6 +22,7 @@
 
 #include <renderer/types.h>
 #include <renderer/vulkan/depth_stencil_model.h>
+#include <renderer/vulkan/raster_model.h>
 #include <shader/uniform_block.h>
 #include <renderer/vulkan/frame_command_buffer_cursor.h>
 #include <renderer/vulkan/yuv_convert.h>
@@ -328,6 +329,7 @@ struct VKContext : public renderer::Context {
     vk::DescriptorSet rendertarget_set;
 
     uint16_t last_vert_texture_count = ~0;
+    raster::Strips inside_clip;
     vk::DescriptorSet last_vert_texture_descriptor;
     // region clip INSIDE: the rectangles outside the region, one draw per rectangle (count 0 for the other modes)
     uint16_t last_frag_texture_count = ~0;
