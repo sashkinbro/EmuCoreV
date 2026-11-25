@@ -24,7 +24,7 @@ data class InstalledThemePackage(
     val id: String get() = spec.id
     val isSupported: Boolean
         get() = spec.formatVersion <= ThemePackageSpec.SUPPORTED_FORMAT_VERSION &&
-            spec.minAppVersionCode <= BuildConfig.VERSION_CODE
+            spec.minAppVersionCode <= com.sbro.emucorev.data.store.StoreClient.ENGINE_VERSION_CODE
 }
 
 class ThemePackageException(message: String) : IllegalArgumentException(message)

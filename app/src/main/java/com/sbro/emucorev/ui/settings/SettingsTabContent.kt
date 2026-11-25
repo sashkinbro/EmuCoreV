@@ -428,6 +428,7 @@ private fun AudioTab(uiState: SettingsUiState, defaults: VitaCoreConfig, viewMod
             onChooseAudio = onOpenTrophySoundPicker,
             onPreview = viewModel::previewTrophySound
         )
+        com.sbro.emucorev.ui.store.StoreEntryButton(tab = "sounds")
         Button(
             shape = neonButtonShape(),
             onClick = refreshCoreSettingsClick,

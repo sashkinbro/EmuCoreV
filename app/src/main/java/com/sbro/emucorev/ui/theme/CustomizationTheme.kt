@@ -35,7 +35,7 @@ internal fun rememberCustomizedTypography(settings: CustomizationSettings): Typo
         AppFont.SYSTEM -> FontFamily.Default
         AppFont.RUBIK -> RubikFontFamily
         AppFont.EXO2 -> Exo2FontFamily
-        AppFont.CUSTOM -> remember(settings.customFontPath) {
+        AppFont.CUSTOM -> remember(settings.customFontPath, settings.customFontPath?.let { File(it).lastModified() }) {
             settings.customFontPath?.let { path ->
                 runCatching { fileFontFamily(File(path)) }.getOrNull()
             }
