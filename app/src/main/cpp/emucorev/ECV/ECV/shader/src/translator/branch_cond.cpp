@@ -213,7 +213,7 @@ spv::Id USSETranslatorVisitor::vtst_impl(Instruction inst, ExtPredicate pred, in
     const DataType load_data_type = inst.opr.src1.type;
     const DataType store_data_type = inst.opr.dest.type;
 
-    bool has_4_comp = std::popcount(load_mask) == 4;
+    const int comp_count = std::popcount(load_mask);
 
     static const spv::Op tb_comp_ops[3][2][4] = {
         { { spv::OpFOrdNotEqual,
@@ -246,7 +246,7 @@ spv::Id USSETranslatorVisitor::vtst_impl(Instruction inst, ExtPredicate pred, in
     spv::Id lhs = spv::NoResult;
     spv::Id rhs = spv::NoResult;
 
-    const spv::Id pred_type = utils::make_vector_or_scalar_type(m_b, m_b.makeBoolType(), has_4_comp ? 4 : 1);
+    const spv::Id pred_type = utils::make_vector_or_scalar_type(m_b, m_b.makeBoolType(), comp_count);
 
     // Zero test number:
     // 0 - alway pass
@@ -302,18 +302,16 @@ spv::Id USSETranslatorVisitor::vtst_impl(Instruction inst, ExtPredicate pred, in
                 inst.opr.dest.num, disasm::operand_to_str(inst.opr.src1, load_mask), disasm::operand_to_str(inst.opr.src2, load_mask));
         }
 
-        lhs = do_alu_op(inst, load_mask, has_4_comp ? 0b1111 : 0b1);
+        lhs = do_alu_op(inst, load_mask, static_cast<Imm4>((1 << comp_count) - 1));
 
-        const spv::Id c0_type = utils::make_vector_or_scalar_type(m_b, m_b.makeFloatType(32), has_4_comp ? 4 : 1);
-        spv::Id c0 = utils::make_uniform_vector_from_type(m_b, c0_type, 0.0f);
-
+        spv::Id c0_comp_type = m_b.makeFloatType(32);
         if (is_signed_integer_data_type(load_data_type)) {
-            c0 = m_b.makeIntConstant(0);
+            c0_comp_type = m_b.makeIntType(32);
         } else if (is_unsigned_integer_data_type(load_data_type)) {
-            c0 = m_b.makeUintConstant(0);
+            c0_comp_type = m_b.makeUintType(32);
         }
-
-        rhs = c0;
+        // zero of the compared type, one lane per tested channel
+        rhs = utils::make_uniform_vector_from_type(m_b, utils::make_vector_or_scalar_type(m_b, c0_comp_type, comp_count), 0);
     }
 
     if (lhs == spv::NoResult || rhs == spv::NoResult) {
@@ -361,17 +359,21 @@ bool USSETranslatorVisitor::vtst(
     Instruction inst;
     inst.opcode = test_op;
 
+    // chan_cc 0-3 test one channel. 4-6 test several channels at once and fold the per-channel results into the single predicate bit
+    // with test_crcomb_and (AND when set, OR when clear).
+    // UNVERIFIED (no ISA document): the channel sets of 4-6 are taken as the prefixes xy, xyz, xyzw, which is the layout the 7-entry mask table of
+    // the original decoder implies (4 single channels + 3 combined ones); 7 is reserved. No title in the shader corpus uses chan_cc >= 4.
     const Imm4 tb_decode_load_mask[] = {
         0b0001,
         0b0010,
         0b0100,
         0b1000,
-        0b0000,
-        0b0000,
-        0b0000
+        0b0011,
+        0b0111,
+        0b1111
     };
 
-    if (chan_cc >= 4) {
+    if (chan_cc >= 7) {
         LOG_ERROR("Unsupported comparision with requested channels ordinal: {}", chan_cc);
         return false;
     }
@@ -400,7 +402,15 @@ bool USSETranslatorVisitor::vtst(
     pred_op.num = pdst_n;
     inst.opr.dest = pred_op;
 
-    const spv::Id pred_result = vtst_impl(inst, pred, zero_test, sign_test, load_mask, false);
+    spv::Id pred_result = vtst_impl(inst, pred, zero_test, sign_test, load_mask, false);
+    if (pred_result == spv::NoResult) {
+        // the test operation could not be built (the cause is logged); report the instruction as not translated
+        return false;
+    }
+
+    if (std::popcount(load_mask) > 1) {
+        pred_result = m_b.createUnaryOp(test_crcomb_and ? spv::OpAll : spv::OpAny, m_b.makeBoolType(), pred_result);
+    }
 
     store(inst.opr.dest, pred_result);
     return true;
@@ -467,9 +477,12 @@ bool USSETranslatorVisitor::vtstmsk(
     }
 
     if (!test_wben) {
-        // TODO support it
-        LOG_ERROR("Write disabled vmsktst is not supported yet.");
-        return false;
+        // Write-back disabled. The mask written to the destination register is the only output of vtstmsk (unlike vtst it has no
+        // predicate destination), so a write-disabled test changes no register state: it is a no-op by construction, not a dropped result.
+        // UNVERIFIED: the hardware might still latch the test outcome in a state that nothing in the corpus (or in this translator) reads.
+        LOG_DISASM("{:016x}: {}VTSTMSK (write disabled) {} {}", m_instr, disasm::e_predicate_str(pred), disasm::operand_to_str(inst.opr.src1, 0b1),
+            disasm::operand_to_str(inst.opr.src2, 0b1));
+        return true;
     }
 
     // input is always 4 in case of a dot product instruction
@@ -477,6 +490,10 @@ bool USSETranslatorVisitor::vtstmsk(
     const bool output_4 = (alu_sel == 0 && tst_mask_type == 2);
 
     spv::Id pred_result = vtst_impl(inst, pred, zero_test, sign_test, (is_vdp || output_4) ? 0b1111 : 0b1, true);
+    if (pred_result == spv::NoResult) {
+        // the test operation could not be built (the cause is logged); report the instruction as not translated instead of emitting an invalid select
+        return false;
+    }
 
     spv::Id output_type;
     spv::Id zeros;

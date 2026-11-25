@@ -51,6 +51,10 @@ struct UsseTranslationStats {
     uint32_t unmatched_count = 0;
     // a handler matched but reported the instruction as unsupported (returned false)
     uint32_t unsupported_count = 0;
+    // number of stores the shader performs into the storage-buffer copy of the guest buffers (memory mapping disabled). Non-zero means the
+    // shader's buffer container is declared writable: the renderer has to bind it writable and copy the written ranges back to guest memory.
+    // (With memory mapping the stores go through buffer device address and need nothing from the renderer.)
+    uint32_t buffer_store_count = 0;
     // first offending instruction words (at most max_recorded_words)
     uint32_t recorded_word_count = 0;
     uint64_t recorded_words[max_recorded_words] = {};

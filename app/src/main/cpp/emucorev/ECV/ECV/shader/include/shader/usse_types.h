@@ -391,6 +391,9 @@ struct AttributeInputSource {
 // Face-flag register index in the USSE GLOBAL bank (non-zero = front-facing)
 constexpr uint32_t GLOBAL_REG_FRONT_FACING = 16;
 
+// Number of 32-bit words modelled in the GLOBAL bank (the register number has 6 bits once the bank flag 0x40 is removed)
+constexpr uint32_t GLOBAL_REG_COUNT = 64;
+
 struct LiteralInputSource {
     // The constant data
     float data;

@@ -131,18 +131,47 @@ bool USSETranslatorVisitor::vbw(
     spv::Id result;
 
     spv::Op operation;
+    bool is_rotate = false;
     switch (inst.opcode) {
     case Opcode::OR: operation = spv::Op::OpBitwiseOr; break;
     case Opcode::AND: operation = spv::Op::OpBitwiseAnd; break;
     case Opcode::XOR: operation = spv::Op::OpBitwiseXor; break;
-    case Opcode::ROL:
-        LOG_WARN("Bitwise Rotate Left operation unsupported.");
-        return false; // TODO: SPIRV doesn't seem to have a rotate left operation!
+    case Opcode::ROL: is_rotate = true; operation = spv::Op::OpShiftLeftLogical; break;
     case Opcode::ASR: operation = spv::Op::OpShiftRightArithmetic; break;
     case Opcode::SHL: operation = spv::Op::OpShiftLeftLogical; break;
     case Opcode::SHR: operation = spv::Op::OpShiftRightLogical; break;
     default: return false;
     }
+    if (is_rotate) {
+        // ROL: dest = src1 rotated left by src2. The amount is taken modulo the operand width (5 bits, 4 bits for the 16-bit partial form),
+        // like the shifts of the same instruction group. SPIR-V has no rotate, so build it from two shifts; the right shift count
+        // (width - n) & (width - 1) is 0 for n = 0, which keeps both shifts defined and makes the n = 0 rotate an identity.
+        // UNVERIFIED on hardware: that the amount is read from src2 (and not src1), and the 16-bit width of the partial form (same assumption as the
+        // src2 rotate field above).
+        const uint32_t width = type == DataType::UINT16 ? 16 : 32;
+        spv::Id src1 = load(inst.opr.src1, 0b0001, src1_repeat_offset);
+        if (src1 == spv::NoResult) {
+            LOG_ERROR("Source not loaded");
+            return false;
+        }
+        const spv::Id mask_c = m_b.makeUintConstant(width - 1);
+        const spv::Id amount = m_b.createBinOp(spv::OpBitwiseAnd, type_ui32, src2, mask_c);
+        const spv::Id inverse = m_b.createBinOp(spv::OpBitwiseAnd, type_ui32, m_b.createBinOp(spv::OpISub, type_ui32, m_b.makeUintConstant(width), amount), mask_c);
+        if (type == DataType::UINT16)
+            src1 = m_b.createBinOp(spv::OpBitwiseAnd, type_ui32, src1, m_b.makeUintConstant(0xFFFF));
+        const spv::Id left = m_b.createBinOp(spv::OpShiftLeftLogical, type_ui32, src1, amount);
+        const spv::Id right = m_b.createBinOp(spv::OpShiftRightLogical, type_ui32, src1, inverse);
+        result = m_b.createBinOp(spv::OpBitwiseOr, type_ui32, left, right);
+        if (type == DataType::UINT16)
+            result = m_b.createBinOp(spv::OpBitwiseAnd, type_ui32, result, m_b.makeUintConstant(0xFFFF));
+        store(inst.opr.dest, result, 0b0001, dest_repeat_offset);
+
+        LOG_DISASM("{:016x}: {}{}{} {} {} {}", m_instr, disasm::e_predicate_str(pred), disasm::opcode_str(inst.opcode), bitwise_partial ? "16" : "",
+            disasm::operand_to_str(inst.opr.dest, 0b0001, dest_repeat_offset), disasm::operand_to_str(inst.opr.src1, 0b0001, src1_repeat_offset),
+            immediate ? log_hex(value) : disasm::operand_to_str(inst.opr.src2, 0b0001, src2_repeat_offset));
+        continue;
+    }
+
     // optimisation. (any OR 0 || any XOR 0 || any AND 0xFFFFFFFF) -> assign
     bool is_const = m_b.getOpCode(src2) == spv::Op::OpConstant;
     auto const_val = is_const ? m_b.getConstantScalar(src2) : 1; // default value is intentionally non zero
@@ -266,63 +295,41 @@ bool USSETranslatorVisitor::i8mad(
     bool add_swizz_rgb_src0 = true;
 
     if ((csel0 != 0) || (asel0 != 0)) {
-        // We build source0 (the add component in this loop)
-        // Using OpVectorShuffle to construct the final one.
-        std::vector<spv::Id> shuffle_ops = { src0_add, src1_mul };
-
-        switch (csel0) {
-        case 0:
-            shuffle_ops.insert(shuffle_ops.end(), { 0, 1, 2 });
-            break;
-
-        case 1:
-            // Use src1 rgb
-            shuffle_ops.insert(shuffle_ops.end(), { 4, 5, 6 });
-            add_swizz_rgb_src0 = false;
-
-            break;
-
-        case 2:
-            // Use src0 full alpha
-            shuffle_ops.insert(shuffle_ops.end(), { 3, 3, 3 });
-            add_swizz_rgb = { usse::SwizzleChannel::C_W, usse::SwizzleChannel::C_W, usse::SwizzleChannel::C_W };
-
-            break;
-
-        case 3:
-            // Use src1 full alpha
-            shuffle_ops.insert(shuffle_ops.end(), { 7, 7, 7 });
-            add_swizz_rgb = { usse::SwizzleChannel::C_W, usse::SwizzleChannel::C_W, usse::SwizzleChannel::C_W };
-            add_swizz_rgb_src0 = false;
-
-            break;
-
-        default:
-            assert(false);
-            break;
+        // Build the add term from the selected parts of source 0 and source 1: colour (rgb) = csel0 {0: src0.rgb, 1: src1.rgb, 2: src0.a in all
+        // three, 3: src1.a in all three}, alpha = asel0 {0: src0.a, 1: src1.a}.
+        // "src1" here is the register as it is stored: the csel1 alpha-splat of the multiplier does not apply to the add term.
+        // UNVERIFIED on hardware (no ISA reference): the selector meaning is the one the field names and the original builder code imply; the
+        // original code built this term and then added plain src0 instead, so csel0 / asel0 had no effect.
+        spv::Id src1_plain = spv::NoResult;
+        if (csel0 == 1 || csel0 == 3 || asel0) {
+            Operand src1_raw = inst.opr.src1;
+            src1_raw.swizzle = SWIZZLE_CHANNEL_4_DEFAULT;
+            src1_plain = load(src1_raw, 0b1111, src1_repeat_offset);
         }
 
-        switch (asel0) {
-        case 0:
-            // Use src0 alpha
-            shuffle_ops.push_back(3);
-            break;
+        const spv::Id lane_type = utils::unwrap_type(m_b, m_b.getTypeId(src0_add));
+        const auto lane = [&](spv::Id vec, int index) { return m_b.createBinOp(spv::OpVectorExtractDynamic, lane_type, vec, m_b.makeIntConstant(index)); };
 
-        case 1:
-            // Use src1 alpha
-            shuffle_ops.push_back(7);
-            break;
-
-        default:
-            assert(false);
-            break;
+        std::vector<spv::Id> lanes(4);
+        for (int c = 0; c < 3; c++) {
+            switch (csel0) {
+            case 0: lanes[c] = lane(src0_add, c); break;
+            case 1: lanes[c] = lane(src1_plain, c); break;
+            case 2: lanes[c] = lane(src0_add, 3); break;
+            default: lanes[c] = lane(src1_plain, 3); break;
+            }
         }
+        lanes[3] = lane(asel0 ? src1_plain : src0_add, 3);
 
-        final_add = m_b.createOp(spv::OpVectorShuffle, m_b.getTypeId(src0_add), shuffle_ops);
+        add_swizz_rgb_src0 = (csel0 == 0 || csel0 == 2);
+        if (csel0 >= 2)
+            add_swizz_rgb = { usse::SwizzleChannel::C_W, usse::SwizzleChannel::C_W, usse::SwizzleChannel::C_W };
+
+        final_add = m_b.createCompositeConstruct(m_b.getTypeId(src0_add), lanes);
     }
 
     spv::Id result = m_b.createBinOp(spv::OpIMul, m_b.getTypeId(src1_mul), src1_mul, src2_mul);
-    result = m_b.createBinOp(src0_neg ? spv::OpISub : spv::OpIAdd, m_b.getTypeId(src1_mul), result, src0_add);
+    result = m_b.createBinOp(src0_neg ? spv::OpISub : spv::OpIAdd, m_b.getTypeId(src1_mul), result, final_add);
 
     store(inst.opr.dest, result, 0b1111, dest_repeat_offset);
 

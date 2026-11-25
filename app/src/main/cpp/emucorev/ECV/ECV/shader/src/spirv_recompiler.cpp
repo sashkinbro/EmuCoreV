@@ -1264,7 +1264,7 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
             is_vert ? "vertexData" : "fragmentData");
 
         b.addDecoration(spv_params.buffer_container, spv::DecorationRestrict);
-        b.addDecoration(spv_params.buffer_container, spv::DecorationNonWritable);
+        // NonWritable is added after the program is translated, and only when it contains no store into the container (set where the shader body is generated)
         const int ssbo_binding = (is_vert ? 0 : 1) + (translation_state.is_vulkan ? 2 : 0);
         b.addDecoration(spv_params.buffer_container, spv::DecorationBinding, ssbo_binding);
         if (translation_state.is_vulkan)
@@ -2469,6 +2469,11 @@ static SpirvCode convert_gxp_to_spirv_impl(const SceGxmProgram &program, const s
         }
 
         generate_shader_body(b, parameters, program, features, utils, begin_hook_func, end_hook_func, texture_queries, translation_state.render_info_id, spv_func_main, translation_state.interfaces, translation_state.usse_stats);
+        translation_state.usse_stats.buffer_store_count = utils.buffer_store_count;
+        // A shader that writes the container must not declare it NonWritable (see UsseTranslationStats::buffer_store_count). The read-only
+        // declaration stays for every other shader so the driver can keep treating it as a constant buffer.
+        if (parameters.buffer_container && utils.buffer_store_count == 0)
+            b.addDecoration(parameters.buffer_container, spv::DecorationNonWritable);
     } else {
         generate_update_mask_body(b, translation_state);
     }

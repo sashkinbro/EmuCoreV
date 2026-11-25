@@ -26,6 +26,9 @@
 #include <shader/thread_buffer_bounds.h>
 #include <util/log.h>
 
+#include <algorithm>
+#include <bit>
+#include <cstring>
 #include <numeric>
 
 using namespace shader;
@@ -171,10 +174,8 @@ bool USSETranslatorVisitor::vmov(
         }
     }
 
-    if (inst.opr.dest.bank == RegisterBank::SPECIAL || inst.opr.src0.bank == RegisterBank::SPECIAL || inst.opr.src1.bank == RegisterBank::SPECIAL || inst.opr.src2.bank == RegisterBank::SPECIAL) {
-        LOG_WARN("Special regs unsupported");
-        return false;
-    }
+    // Operands of the SPECIAL bank never get here: the operand decoders resolve them to the FPCONSTANT bank (constants) or the GLOBAL
+    // bank (global registers, modelled by load()/store() in usse_utilities.cpp), so there is nothing left to reject.
 
     // Recompile
 
@@ -453,10 +454,8 @@ bool USSETranslatorVisitor::vpck(
     inst.opr.src1 = decode_src12(inst.opr.src1, src1_n, src1_bank_sel, src1_bank_ext, should_src1_dreg, 7, m_second_program);
     inst.opr.src2 = decode_src12(inst.opr.src2, src2_n, src2_bank_sel, src2_bank_ext, true, 7, m_second_program);
 
-    if (inst.opr.dest.bank == RegisterBank::SPECIAL || inst.opr.src0.bank == RegisterBank::SPECIAL || inst.opr.src1.bank == RegisterBank::SPECIAL || inst.opr.src2.bank == RegisterBank::SPECIAL) {
-        LOG_WARN("Special regs unsupported");
-        return false;
-    }
+    // Operands of the SPECIAL bank never get here: the operand decoders resolve them to the FPCONSTANT bank (constants) or the GLOBAL
+    // bank (global registers, modelled by load()/store() in usse_utilities.cpp), so there is nothing left to reject.
 
     Imm2 comp_sel_0 = comp_sel_0_bit0;
 
@@ -755,68 +754,239 @@ bool USSETranslatorVisitor::vldst(
         disasm::operand_to_str(inst.opr.src0, 0b1, src0_offset),
         disasm::operand_to_str(inst.opr.src1, 0b1, src1_offset), is_store ? "0" : disasm::operand_to_str(inst.opr.src2, 0b1, src2_offset), current_bytes_to_fetch);
 
-    // check if we handle this literal or texture read
-    auto check_for_literal_texture_read = [&]() {
-        if (mask_count > 0) {
-            LOG_ERROR("Unimplemented literal buffer access with repeat");
-            return false;
-        }
-        if (to_store.type != DataType::F32) {
-            LOG_ERROR("Unimplemented non-f32 literal buffer access");
-            return false;
-        }
-        if (inst.opr.src1.bank != RegisterBank::IMMEDIATE || inst.opr.src2.bank != RegisterBank::IMMEDIATE) {
-            LOG_ERROR("Unimplemented non-immediate literal buffer access");
-            return false;
-        }
-        if (is_store) {
-            LOG_ERROR("Unhandled literal buffer store");
+    // The texture and literal buffers are not memory the GPU can read: the texture buffer holds the (translation-time) texture unit of each slot,
+    // the literal buffer is constant data of the program. Reads are resolved here instead of going through the memory paths below.
+    const bool is_texture_buffer = inst.opr.src0.bank == RegisterBank::SECATTR && inst.opr.src0.num == m_spirv_params.texture_buffer_sa_offset;
+    const bool is_literal_buffer = inst.opr.src0.bank == RegisterBank::SECATTR && inst.opr.src0.num == m_spirv_params.literal_buffer_sa_offset;
+    if (is_texture_buffer || is_literal_buffer) {
+        const int element_size = get_data_type_size(type_to_ldst);
+        if (type_to_ldst == DataType::UNK || element_size <= 0) {
+            LOG_ERROR("Literal/texture buffer access with an unknown data type");
             return false;
         }
 
-        return true;
-    };
+        const int element_count = current_number_to_fetch;
+        const spv::Id type_u32 = m_b.makeUintType(32);
+        const spv::Id type_i32 = m_b.makeIntType(32);
 
-    if (inst.opr.src0.bank == RegisterBank::SECATTR && inst.opr.src0.num == m_spirv_params.texture_buffer_sa_offset) {
-        // We are reading the texture buffer
+        // Byte offset of the access inside the buffer. Loads add src1 and src2, stores only src1 (src2 is the data register). Immediate
+        // operands make it a translation-time constant; register operands (indexed by a runtime value) make it a runtime value. A register
+        // src1 is based on 0x10000 like the memory path below (UNVERIFIED for these two buffers: no corpus shader indexes them by register).
+        const bool src1_const = inst.opr.src1.bank == RegisterBank::IMMEDIATE;
+        const bool src2_const = is_store || inst.opr.src2.bank == RegisterBank::IMMEDIATE;
+        const bool offset_const = src1_const && src2_const;
+        int const_offset = is_texture_buffer ? m_spirv_params.texture_buffer_base : m_spirv_params.literal_buffer_base;
+        if (src1_const)
+            const_offset += static_cast<int>(inst.opr.src1.num);
+        if (!is_store && inst.opr.src2.bank == RegisterBank::IMMEDIATE)
+            const_offset += static_cast<int>(inst.opr.src2.num);
 
-        if (!check_for_literal_texture_read())
-            return true;
-
-        int offset = (m_spirv_params.texture_buffer_base + inst.opr.src1.num + inst.opr.src2.num) / sizeof(uint32_t);
-        // we store the texture index in the first texture register, we don't do anything with the other 3
-        if (offset % 4 != 0)
-            continue;
-
-        // The slot a texture occupies in the texture buffer is chosen by the shader compiler and is not the texture unit
-        const int slot = offset / 4;
-        int texture_unit = slot;
-        const SceGxmDependentSampler *tb_layout = m_program.texture_buffer_dependent_sampler();
-        for (uint32_t i = 0; i < m_program.texture_buffer_dependent_sampler_count; i++) {
-            if (tb_layout[i].resource_index_layout_offset % 4 != 0)
-                continue;
-            if (tb_layout[i].sa_offset / 4 == slot) {
-                texture_unit = tb_layout[i].resource_index_layout_offset / 4;
-                break;
+        spv::Id runtime_offset = spv::NoResult;
+        if (!offset_const) {
+            runtime_offset = m_b.makeIntConstant(const_offset);
+            if (!src1_const) {
+                const spv::Id v = load(inst.opr.src1, 0b1, src1_offset);
+                if (v == spv::NoResult)
+                    return false;
+                runtime_offset = m_b.createBinOp(spv::OpIAdd, type_i32, runtime_offset, m_b.createBinOp(spv::OpISub, type_i32, v, m_b.makeIntConstant(0x10000)));
+            }
+            if (!src2_const) {
+                const spv::Id v = load(inst.opr.src2, 0b1, src2_offset);
+                if (v == spv::NoResult)
+                    return false;
+                runtime_offset = m_b.createBinOp(spv::OpIAdd, type_i32, runtime_offset, v);
             }
         }
-        if (texture_unit != slot)
-            LOG_INFO("Texture buffer slot {} holds texture unit {}", slot, texture_unit);
 
-        to_store.type = DataType::INT32;
-        store(to_store, m_b.makeIntConstant(texture_unit), 0b1);
-        continue;
-    } else if (inst.opr.src0.bank == RegisterBank::SECATTR && inst.opr.src0.num == m_spirv_params.literal_buffer_sa_offset) {
-        // We are reading the literal buffer
+        if (is_texture_buffer) {
+            if (is_store || type_to_ldst != DataType::F32) {
+                LOG_ERROR("Unsupported texture buffer {}", is_store ? "store" : "access with a non-32-bit data type");
+                return false;
+            }
 
-        if (!check_for_literal_texture_read())
-            return true;
+            // The slot a texture occupies in the texture buffer is chosen by the shader compiler and is not the texture unit
+            const SceGxmDependentSampler *tb_layout = m_program.texture_buffer_dependent_sampler();
+            const auto unit_of_slot = [&](int slot) {
+                int texture_unit = slot;
+                for (uint32_t i = 0; i < m_program.texture_buffer_dependent_sampler_count; i++) {
+                    if (tb_layout[i].resource_index_layout_offset % 4 != 0)
+                        continue;
+                    if (tb_layout[i].sa_offset / 4 == slot) {
+                        texture_unit = tb_layout[i].resource_index_layout_offset / 4;
+                        break;
+                    }
+                }
+                return texture_unit;
+            };
 
-        int offset = m_spirv_params.literal_buffer_base + inst.opr.src1.num + inst.opr.src2.num;
-        const uint8_t *literal_buffer = m_program.literal_buffer_data();
-        const float literal = *reinterpret_cast<const float *>(literal_buffer + offset);
+            // we store the texture index in the first texture register (word 0 of a 4-word slot), we don't do anything with the other 3
+            for (int i = 0; i < element_count; i++) {
+                Operand index_dest = to_store;
+                index_dest.type = DataType::INT32;
+                index_dest.num = to_store.num + i;
 
-        store(to_store, m_b.makeFloatConstant(literal), 0b1);
+                if (offset_const) {
+                    const int word = const_offset / static_cast<int>(sizeof(uint32_t)) + i;
+                    if (word % 4 != 0)
+                        continue;
+                    const int slot = word / 4;
+                    const int texture_unit = unit_of_slot(slot);
+                    if (texture_unit != slot)
+                        LOG_INFO("Texture buffer slot {} holds texture unit {}", slot, texture_unit);
+                    store(index_dest, m_b.makeIntConstant(texture_unit), 0b1);
+                } else {
+                    // runtime slot: select the unit through the compile-time slot table. The first word of a slot gets the unit, other words keep their value.
+                    const spv::Id word = m_b.createBinOp(spv::OpIAdd, type_i32, m_b.createBinOp(spv::OpShiftRightArithmetic, type_i32, runtime_offset, m_b.makeIntConstant(2)), m_b.makeIntConstant(i));
+                    const spv::Id slot = m_b.createBinOp(spv::OpShiftRightArithmetic, type_i32, word, m_b.makeIntConstant(2));
+                    spv::Id unit = slot;
+                    for (uint32_t k = 0; k < m_program.texture_buffer_dependent_sampler_count; k++) {
+                        if (tb_layout[k].resource_index_layout_offset % 4 != 0)
+                            continue;
+                        const spv::Id is_slot = m_b.createBinOp(spv::OpIEqual, m_b.makeBoolType(), slot, m_b.makeIntConstant(tb_layout[k].sa_offset / 4));
+                        unit = m_b.createTriOp(spv::OpSelect, type_i32, is_slot, m_b.makeIntConstant(tb_layout[k].resource_index_layout_offset / 4), unit);
+                    }
+                    const spv::Id aligned = m_b.createBinOp(spv::OpIEqual, m_b.makeBoolType(), m_b.createBinOp(spv::OpBitwiseAnd, type_i32, word, m_b.makeIntConstant(3)), m_b.makeIntConstant(0));
+                    const spv::Id old_value = load(index_dest, 0b1);
+                    store(index_dest, m_b.createTriOp(spv::OpSelect, type_i32, aligned, unit, old_value), 0b1);
+                }
+            }
+            continue;
+        }
+
+        // ---- literal buffer ----
+        // PROVISIONAL: literal_buffer_count is taken as a count of 32-bit words (in the corpus the literal data of a program is
+        // 4 * literal_buffer_count bytes long, starting right behind the literal table). Accesses outside of it read the last word (dynamic
+        // index) or zero (constant offset); both are logged, never silent.
+        const uint8_t *literal_data = m_program.literal_buffer_data();
+        const uint32_t literal_words = m_program.literal_buffer_count;
+        const uint32_t literal_bytes = literal_words * 4;
+
+        // Private mirror of the literal data, used for runtime offsets and as soon as the shader stores to the literal buffer
+        // (a store only changes the invocation's copy: the program's literal data is not writable memory).
+        const auto literal_array = [&]() {
+            if (!m_util_funcs.literal_buffer_array) {
+                const uint32_t words = std::max<uint32_t>(1, literal_words);
+                std::vector<spv::Id> initial(words);
+                for (uint32_t w = 0; w < words; w++) {
+                    uint32_t value = 0;
+                    if (w < literal_words)
+                        std::memcpy(&value, literal_data + w * 4, sizeof(value));
+                    initial[w] = m_b.makeUintConstant(value);
+                }
+                const spv::Id array_type = m_b.makeArrayType(type_u32, m_b.makeUintConstant(words), 0);
+                m_util_funcs.literal_buffer_array = m_b.createVariable(spv::NoPrecision, spv::StorageClassPrivate, array_type, "literal_buffer",
+                    m_b.makeCompositeConstant(array_type, initial));
+            }
+            return m_util_funcs.literal_buffer_array;
+        };
+        const auto literal_word_ptr = [&](spv::Id word_index_u32) {
+            const spv::Id last = m_b.makeUintConstant(std::max<uint32_t>(1, literal_words) - 1);
+            const spv::Id clamped = m_b.createBuiltinCall(type_u32, std_builtins, GLSLstd450UMin, { word_index_u32, last });
+            return utils::create_access_chain(m_b, spv::StorageClassPrivate, literal_array(), { clamped });
+        };
+        const auto to_u32 = [&](spv::Id value) { return m_b.getTypeId(value) == type_u32 ? value : m_b.createUnaryOp(spv::OpBitcast, type_u32, value); };
+
+        // raw (zero extended) value of element i, read at translation time
+        const auto literal_element_const = [&](int i) {
+            uint32_t value = 0;
+            const int64_t address = static_cast<int64_t>(const_offset) + static_cast<int64_t>(i) * element_size;
+            for (int byte = 0; byte < element_size; byte++) {
+                const int64_t a = address + byte;
+                if (a < 0 || a >= static_cast<int64_t>(literal_bytes)) {
+                    LOG_WARN_ONCE("Literal buffer read at byte {} is outside the {} literal bytes of the program, reads zero", a, literal_bytes);
+                    continue;
+                }
+                value |= static_cast<uint32_t>(literal_data[a]) << (8 * byte);
+            }
+            return m_b.makeUintConstant(value);
+        };
+        // raw (zero extended) value of element i, read from the private mirror
+        const auto literal_element_dynamic = [&](int i) {
+            const spv::Id address = m_b.createBinOp(spv::OpIAdd, type_u32, to_u32(offset_const ? m_b.makeIntConstant(const_offset) : runtime_offset), m_b.makeUintConstant(i * element_size));
+            const spv::Id word_index = m_b.createBinOp(spv::OpShiftRightLogical, type_u32, address, m_b.makeUintConstant(2));
+            const spv::Id shift = m_b.createBinOp(spv::OpShiftLeftLogical, type_u32, m_b.createBinOp(spv::OpBitwiseAnd, type_u32, address, m_b.makeUintConstant(3)), m_b.makeUintConstant(3));
+            const spv::Id lo = m_b.createLoad(literal_word_ptr(word_index), spv::NoPrecision);
+            const spv::Id hi = m_b.createLoad(literal_word_ptr(m_b.createBinOp(spv::OpIAdd, type_u32, word_index, m_b.makeUintConstant(1))), spv::NoPrecision);
+            // an unaligned element spans two words; a shift by 32 is undefined, so the inverse shift is taken modulo 32 and ignored for aligned ones
+            const spv::Id inverse = m_b.createBinOp(spv::OpBitwiseAnd, type_u32, m_b.createBinOp(spv::OpISub, type_u32, m_b.makeUintConstant(32), shift), m_b.makeUintConstant(31));
+            const spv::Id merged = m_b.createBinOp(spv::OpBitwiseOr, type_u32, m_b.createBinOp(spv::OpShiftRightLogical, type_u32, lo, shift),
+                m_b.createBinOp(spv::OpShiftLeftLogical, type_u32, hi, inverse));
+            spv::Id value = m_b.createTriOp(spv::OpSelect, type_u32, m_b.createBinOp(spv::OpIEqual, m_b.makeBoolType(), shift, m_b.makeUintConstant(0)), lo, merged);
+            if (element_size < 4)
+                value = m_b.createBinOp(spv::OpBitwiseAnd, type_u32, value, m_b.makeUintConstant((1u << (element_size * 8)) - 1u));
+            return value;
+        };
+
+        if (is_store) {
+            // Raw value of the element from the data register, packed densely (4 / element_size elements per register word, lowest lane
+            // first) like the loads below unpack them. UNVERIFIED on hardware, same assumption as the memory store path.
+            const int pack = 4 / element_size;
+            Operand raw_word = to_store;
+            raw_word.type = DataType::UINT32;
+            spv::Id value = load(raw_word, 0b1, to_store_offset / pack);
+            if (value == spv::NoResult)
+                return false;
+            if (element_size < 4) {
+                value = m_b.createBinOp(spv::OpShiftRightLogical, type_u32, value, m_b.makeUintConstant((to_store_offset % pack) * element_size * 8));
+                value = m_b.createBinOp(spv::OpBitwiseAnd, type_u32, value, m_b.makeUintConstant((1u << (element_size * 8)) - 1u));
+            }
+
+            const spv::Id address = to_u32(offset_const ? m_b.makeIntConstant(const_offset) : runtime_offset);
+            const spv::Id word_index = m_b.createBinOp(spv::OpShiftRightLogical, type_u32, address, m_b.makeUintConstant(2));
+            const spv::Id shift = m_b.createBinOp(spv::OpShiftLeftLogical, type_u32, m_b.createBinOp(spv::OpBitwiseAnd, type_u32, address, m_b.makeUintConstant(3)), m_b.makeUintConstant(3));
+            const spv::Id mask = element_size == 4 ? m_b.makeUintConstant(0xFFFFFFFFu) : m_b.makeUintConstant((1u << (element_size * 8)) - 1u);
+            // an element spanning two words (unaligned 32-bit store) is not modelled: only the part inside the first word is written
+            const spv::Id ptr = literal_word_ptr(word_index);
+            const spv::Id kept = m_b.createBinOp(spv::OpBitwiseAnd, type_u32, m_b.createLoad(ptr, spv::NoPrecision),
+                m_b.createUnaryOp(spv::OpNot, type_u32, m_b.createBinOp(spv::OpShiftLeftLogical, type_u32, mask, shift)));
+            m_b.createStore(m_b.createBinOp(spv::OpBitwiseOr, type_u32, kept, m_b.createBinOp(spv::OpShiftLeftLogical, type_u32, value, shift)), ptr);
+            m_util_funcs.literal_buffer_written = true;
+            continue;
+        }
+
+        // loads
+        std::vector<spv::Id> raw(element_count);
+        for (int i = 0; i < element_count; i++)
+            raw[i] = (offset_const && !m_util_funcs.literal_buffer_written) ? literal_element_const(i) : literal_element_dynamic(i);
+
+        if (element_size == 4) {
+            for (int i = 0; i < element_count; i++) {
+                Operand word_dest = to_store;
+                word_dest.num = to_store.num + i;
+                const spv::Id f32_value = m_b.isConstant(raw[i]) ? m_b.makeFloatConstant(std::bit_cast<float>(static_cast<uint32_t>(m_b.getConstantScalar(raw[i]))))
+                                                                  : m_b.createUnaryOp(spv::OpBitcast, type_f32, raw[i]);
+                store(word_dest, f32_value, 0b1);
+            }
+        } else if (m_features.enable_memory_mapping) {
+            // typed destination: sign extended elements stored four at a time, exactly what the memory load path does
+            for (int first = 0; first < element_count; first += 4) {
+                const int group = std::min(4, element_count - first);
+                std::vector<spv::Id> lanes(group);
+                for (int i = 0; i < group; i++) {
+                    const spv::Id as_int = m_b.createUnaryOp(spv::OpBitcast, type_i32, raw[first + i]);
+                    lanes[i] = m_b.createOp(spv::OpBitFieldSExtract, type_i32, { as_int, m_b.makeIntConstant(0), m_b.makeIntConstant(element_size * 8) });
+                }
+                const spv::Id group_value = group == 1 ? lanes[0] : m_b.createCompositeConstruct(m_b.makeVectorType(type_i32, group), lanes);
+                store(to_store, group_value, static_cast<Imm4>((1 << group) - 1));
+                to_store.num += element_size;
+            }
+        } else {
+            // untyped destination: the raw words, zero padded at the end (a partial last word keeps its unused lanes at zero)
+            const int pack = 4 / element_size;
+            for (int first = 0; first < element_count; first += pack) {
+                spv::Id word_value = spv::NoResult;
+                for (int i = first; i < std::min(first + pack, element_count); i++) {
+                    spv::Id lane = raw[i];
+                    if (i > first)
+                        lane = m_b.createBinOp(spv::OpShiftLeftLogical, type_u32, lane, m_b.makeUintConstant((i - first) * element_size * 8));
+                    word_value = word_value == spv::NoResult ? lane : m_b.createBinOp(spv::OpBitwiseOr, type_u32, word_value, lane);
+                }
+                Operand word_dest = to_store;
+                word_dest.type = DataType::UINT32;
+                word_dest.num = to_store.num + first / pack;
+                store(word_dest, word_value, 0b1);
+            }
+        }
         continue;
     }
 
@@ -893,8 +1063,28 @@ bool USSETranslatorVisitor::vldst(
         utils::buffer_address_access(m_b, m_spirv_params, m_util_funcs, m_features, to_store, to_store_offset, base, get_data_type_size(type_to_ldst), current_number_to_fetch, -1, is_store);
     } else {
         if (is_store) {
-            LOG_ERROR("Store opcode is not supported without memory mapping");
-            return true;
+            // Without memory mapping the guest buffers exist as the storage-buffer copy (params.buffer_container) the loads below read through
+            // fetchMemory. A store writes the same copy; the container is then declared writable and the renderer copies the written
+            // ranges back (UsseTranslationStats::buffer_store_count tells it to).
+            // The element is read from the data register densely packed (4 / size elements per word, lowest lane first), like the mapped route.
+            const int element_size = get_data_type_size(type_to_ldst);
+            if (type_to_ldst == DataType::UNK || element_size <= 0) {
+                LOG_ERROR("Memory store with an unknown data type");
+                return false;
+            }
+            const int pack = 4 / element_size;
+            Operand raw_word = to_store;
+            raw_word.type = DataType::UINT32;
+            spv::Id value = load(raw_word, 0b1, to_store_offset / pack);
+            if (value == spv::NoResult)
+                return false;
+            if (element_size < 4) {
+                const spv::Id type_u32 = m_b.makeUintType(32);
+                value = m_b.createBinOp(spv::OpShiftRightLogical, type_u32, value, m_b.makeUintConstant((to_store_offset % pack) * element_size * 8));
+                value = m_b.createBinOp(spv::OpBitwiseAnd, type_u32, value, m_b.makeUintConstant((1u << (element_size * 8)) - 1u));
+            }
+            utils::store_memory(m_b, m_spirv_params, m_util_funcs, base, value, element_size * 8);
+            continue;
         }
 
         for (int i = 0; i < total_bytes_fo_fetch / 4; ++i) {

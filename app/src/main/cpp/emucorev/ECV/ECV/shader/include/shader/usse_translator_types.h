@@ -74,6 +74,10 @@ struct SpirvShaderParameters {
     // Store boolean, use for conditional execution.
     SpirvVarRegBank predicates;
 
+    // Mapped to the USSE GLOBAL register bank (g0-g63, bank SPECIAL with bit 6 set). Created lazily by the first access (0 = not created):
+    // only a few shaders touch it, and the hardware-defined meaning of its registers is mostly unknown (see usse_utilities.cpp).
+    mutable SpirvVarRegBank globals = 0;
+
     // Sampler map. Since all banks are a flat array, sampler must be in an explicit bank.
     SamplerMap samplers;
 

@@ -373,11 +373,6 @@ bool USSETranslatorVisitor::smp(
             return true;
         }
 
-        if (sb_mode != 0) {
-            LOG_ERROR("Unhandled load using texture buffer with sb mode {} and lod mode {}", sb_mode, lod_mode);
-            return true;
-        }
-
         is_texture_buffer_load = true;
         inst.opr.src1.type = DataType::INT32;
         texture_index = load(inst.opr.src1, 0b1);
@@ -437,18 +432,85 @@ bool USSETranslatorVisitor::smp(
 
     spv::Id image_sampler = m_b.createLoad(sampler.id, spv::NoPrecision);
 
-    if (sb_mode == 2) {
-        if (lod_mode != 0)
-            LOG_WARN("SMP info with non-zero lod mode is not implemented");
+    // Extra operands of the LOD mode: none, bias, replace, gradient. They are loaded for every sb mode: the plain fetch, gather4 and the
+    // info query (which reports the LOD the fetch would use) all depend on them.
+    // Either LOD number (replace), bias or ddx
+    spv::Id extra1 = spv::NoResult;
+    // ddy
+    spv::Id extra2 = spv::NoResult;
 
+    if (lod_mode != 0) {
+        inst.opr.src2 = decode_src12(inst.opr.src2, src2_n, src2_bank, src2_ext, true, 8, m_second_program);
+        inst.opr.src2.type = inst.opr.src0.type;
+
+        switch (lod_mode) {
+        case 1:
+        case 2:
+            extra1 = load(inst.opr.src2, 0b1);
+            break;
+
+        case 3:
+            switch (dim) {
+            case 2:
+                extra1 = load(inst.opr.src2, 0b0011);
+                extra2 = load(inst.opr.src2, 0b1100);
+                break;
+            case 3:
+                extra1 = load(inst.opr.src2, 0b0111);
+                extra2 = load(inst.opr.src2, 0b0111, 1);
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    // SMP info: reports where the fetch would sample. xy are the bilinear uv coefficients, z the trilinear fraction, w the LOD level, all as u8.
+    // With a LOD mode the LOD is the one that mode selects (bias: added to the computed LOD, replace: the given LOD, gradient: derived from the
+    // given gradients), exactly as the matching fetch would use it. UNVERIFIED on hardware: that the info query follows the LOD mode of the
+    // instruction (the encoding has the field), and the clamp of the biased / explicit LOD to >= 0.
+    const auto emit_info = [&](Operand dest, spv::Id sampled_image, spv::Id info_coords) {
         const spv::Id v4u32 = m_b.makeVectorType(type_ui32, 4);
 
         // query info
-        const spv::Id query_lod = m_b.createOp(spv::OpImageQueryLod, type_f32_v[2], { image_sampler, coords });
-        const spv::Id lod = m_b.createBinOp(spv::OpVectorExtractDynamic, type_f32, query_lod, m_b.makeIntConstant(0));
+        const spv::Id query_lod = m_b.createOp(spv::OpImageQueryLod, type_f32_v[2], { sampled_image, info_coords });
+        spv::Id lod = m_b.createBinOp(spv::OpVectorExtractDynamic, type_f32, query_lod, m_b.makeIntConstant(0));
+
+        const spv::Id zero_f = m_b.makeFloatConstant(0.0f);
+        switch (lod_mode) {
+        case 1:
+            lod = m_b.createBinOp(spv::OpFAdd, type_f32, lod, extra1);
+            lod = m_b.createBuiltinCall(type_f32, std_builtins, GLSLstd450FMax, { lod, zero_f });
+            break;
+        case 2:
+            lod = m_b.createBuiltinCall(type_f32, std_builtins, GLSLstd450FMax, { extra1, zero_f });
+            break;
+        case 3: {
+            // isotropic LOD of the gradients: log2 of the larger gradient length in texels of the base level
+            const spv::Id v2i32 = m_b.makeVectorType(m_b.makeIntType(32), 2);
+            const spv::Id image_type = m_b.makeImageType(type_f32, spv::Dim2D, false, false, false, 1, spv::ImageFormatUnknown);
+            const spv::Id image = m_b.createUnaryOp(spv::OpImage, image_type, sampled_image);
+            spv::Id size = m_b.createOp(spv::OpImageQuerySizeLod, v2i32, { image, m_b.makeIntConstant(0) });
+            size = m_b.createUnaryOp(spv::OpConvertSToF, type_f32_v[2], size);
+            const auto to_xy = [&](spv::Id v) {
+                return m_b.getNumComponents(v) == 2 ? v : m_b.createOp(spv::OpVectorShuffle, type_f32_v[2], { { true, v }, { true, v }, { false, 0 }, { false, 1 } });
+            };
+            const spv::Id dx = m_b.createBinOp(spv::OpFMul, type_f32_v[2], to_xy(extra1), size);
+            const spv::Id dy = m_b.createBinOp(spv::OpFMul, type_f32_v[2], to_xy(extra2), size);
+            const spv::Id len_x = m_b.createBuiltinCall(type_f32, std_builtins, GLSLstd450Length, { dx });
+            const spv::Id len_y = m_b.createBuiltinCall(type_f32, std_builtins, GLSLstd450Length, { dy });
+            const spv::Id rho = m_b.createBuiltinCall(type_f32, std_builtins, GLSLstd450FMax, { len_x, len_y });
+            lod = m_b.createBuiltinCall(type_f32, std_builtins, GLSLstd450Log2, { rho });
+            lod = m_b.createBuiltinCall(type_f32, std_builtins, GLSLstd450FMax, { lod, zero_f });
+            break;
+        }
+        default:
+            break;
+        }
 
         // xy are the uv coefficients
-        spv::Id uv = get_uv_coeffs(m_b, m_features, std_builtins, image_sampler, coords, lod);
+        spv::Id uv = get_uv_coeffs(m_b, m_features, std_builtins, sampled_image, info_coords, lod);
         // z is the trilinear fraction, w the LOD
         spv::Id tri_frac = m_b.createBuiltinCall(type_f32, std_builtins, GLSLstd450Fract, { lod });
         m_b.setPrecision(tri_frac, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
@@ -463,171 +525,161 @@ bool USSETranslatorVisitor::smp(
         const spv::Id v = m_b.createBinOp(spv::OpVectorExtractDynamic, type_ui32, uv, m_b.makeIntConstant(1));
 
         const spv::Id result = m_b.createCompositeConstruct(v4u32, { u, v, tri_frac, lod_level });
-        inst.opr.dest.type = DataType::UINT8;
-        store(inst.opr.dest, result, 0b1111);
-    } else {
-        // Either LOD number or ddx
-        spv::Id extra1 = spv::NoResult;
-        // ddy
-        spv::Id extra2 = spv::NoResult;
+        dest.type = DataType::UINT8;
+        store(dest, result, 0b1111);
+    };
 
-        // LOD mode: none, bias, replace, gradient
-        if (lod_mode != 0) {
-            inst.opr.src2 = decode_src12(inst.opr.src2, src2_n, src2_bank, src2_ext, true, 8, m_second_program);
-            inst.opr.src2.type = inst.opr.src0.type;
-
-            switch (lod_mode) {
-            case 1:
-            case 2:
-                extra1 = load(inst.opr.src2, 0b1);
-                break;
-
-            case 3:
-                switch (dim) {
-                case 2:
-                    extra1 = load(inst.opr.src2, 0b0011);
-                    extra2 = load(inst.opr.src2, 0b1100);
-                    break;
-                case 3:
-                    extra1 = load(inst.opr.src2, 0b0111);
-                    extra2 = load(inst.opr.src2, 0b0111, 1);
-                }
-                break;
-
-            default:
-                break;
-            }
+    // gather4 (sb mode 1) and gather4 + bilinear coefficients (sb mode 3) of the sampler `smp_info`, written at `dest` (taken by value: the
+    // destination register advances while the result is written)
+    const auto emit_gather = [&](Operand dest, const SamplerInfo &smp_info, int smp_dim, spv::Id sampled_image, spv::Id gather_coords) {
+        // first gather all components
+        std::vector<spv::Id> g4_comps;
+        g4_comps.reserve(smp_info.component_count);
+        for (int comp = 0; comp < smp_info.component_count; comp++) {
+            g4_comps.push_back(do_fetch_texture(sampled_image, smp_info.index, smp_dim, { gather_coords, static_cast<int>(DataType::F32) }, dest.type, lod_mode, extra1, extra2, comp));
         }
 
-        if (is_texture_buffer_load) {
-            // maybe put this in a function instead
-
-            // do a big switch with all the different textures:
-            // switch(texture_idx) {
-            // case 0:
-            //   dest = texture(texture0, pos);
-            //   break;
-            // case 1:
-            //   dest = texture(texture1, pos);
-            //   break;
-            // ....
-
-            std::vector<const SamplerInfo *> samplers;
-            std::vector<int> sampler_indices;
-            std::vector<int> index_to_segment;
-            constexpr int sa_count = 32 * 4;
-            // the instruction dim is only the coord count the compiler allocated, so a 2D texture can still turn up in an SMP3d switch
-            spv::Id coords_2d = coords;
-            if (dim == 3)
-                coords_2d = m_b.createOp(spv::OpVectorShuffle, type_f32_v[2], { { true, coords }, { true, coords }, { false, 0 }, { false, 1 } });
-            for (auto &smp : m_spirv_params.samplers) {
-                if (smp.first < sa_count)
-                    continue;
-
-                if (dim == 2 && smp.second.is_cube)
-                    continue;
-
-                samplers.push_back(&smp.second);
-                index_to_segment.push_back(sampler_indices.size());
-                sampler_indices.push_back(smp.first - sa_count);
-            }
-
-            if (samplers.empty()) {
-                LOG_ERROR("Texture buffer load with dim {} has no compatible sampler", dim);
-                store(inst.opr.dest, utils::make_uniform_vector_from_type(m_b, type_f32_v[4], 0.0f), 0b1111);
-                return true;
-            }
-
-            std::vector<spv::Block *> segment_blocks;
-            m_b.makeSwitch(texture_index, spv::SelectionControlMaskNone, samplers.size(), sampler_indices, index_to_segment, -1, segment_blocks);
-            for (size_t s = 0; s < samplers.size(); s++) {
-                const SamplerInfo *smp = samplers[s];
-
-                m_b.nextSwitchSegment(segment_blocks, s);
-                if (tb_dest_fmt[fconv_type] == DataType::UNK)
-                    inst.opr.dest.type = smp->component_type;
-
-                const int case_dim = smp->is_cube ? 3 : 2;
-                spv::Id result = do_fetch_texture(m_b.createLoad(smp->id, spv::NoPrecision), smp->index, case_dim, { smp->is_cube ? coords : coords_2d, static_cast<int>(DataType::F32) }, inst.opr.dest.type, lod_mode, extra1, extra2);
-                const Imm4 dest_mask = (1U << smp->component_count) - 1;
-                store(inst.opr.dest, result, dest_mask);
-
-                m_b.addSwitchBreak(true);
-            }
-            m_b.endSwitch(segment_blocks);
-        } else if (sb_mode == 0) {
-            spv::Id result = do_fetch_texture(image_sampler, sampler.index, dim, { coords, static_cast<int>(DataType::F32) }, inst.opr.dest.type, lod_mode, extra1, extra2);
-            const Imm4 dest_mask = (1U << sampler.component_count) - 1;
-            store(inst.opr.dest, result, dest_mask);
+        if (smp_info.component_count == 1) {
+            // easy, no need to do all this reordering
+            store(dest, g4_comps[0], 0b1111);
+            dest.num += get_data_type_size(dest.type);
         } else {
-            // sb_mode = 1 or 3 : gather 4 (+ uv if sb_mode = 3)
-            // first gather all components
-            std::vector<spv::Id> g4_comps;
-            g4_comps.reserve(sampler.component_count);
-            for (int comp = 0; comp < sampler.component_count; comp++) {
-                g4_comps.push_back(do_fetch_texture(image_sampler, sampler.index, dim, { coords, static_cast<int>(DataType::F32) }, inst.opr.dest.type, lod_mode, extra1, extra2, comp));
-            }
+            if (smp_info.component_count == 3)
+                LOG_ERROR("Sampler is not supposed to have 3 components");
 
-            if (sampler.component_count == 1) {
-                // easy, no need to do all this reordering
-                store(inst.opr.dest, g4_comps[0], 0b1111);
-                inst.opr.dest.num += get_data_type_size(inst.opr.dest.type);
-            } else {
-                if (sampler.component_count == 3)
-                    LOG_ERROR("Sampler is not supposed to have 3 components");
+            // we have the values in the following layout x1 x2 ... y1 y2 ...
+            // we want to store them with the layout x1 x2 x3 ... y1 y2 y3 ...
+            const spv::Id comp_type = utils::unwrap_type(m_b, m_b.getTypeId(g4_comps[0]));
 
-                // we have the values in the following layout x1 x2 ... y1 y2 ...
-                // we want to store them with the layout x1 x2 x3 ... y1 y2 y3 ...
-                const spv::Id comp_type = utils::unwrap_type(m_b, m_b.getTypeId(g4_comps[0]));
-
-                std::vector<spv::Id> comps_alone;
-                for (int pixel = 0; pixel < 4; pixel++) {
-                    for (int comp = 0; comp < sampler.component_count; comp++) {
-                        comps_alone.push_back(m_b.createBinOp(spv::OpVectorExtractDynamic, comp_type, g4_comps[comp], m_b.makeIntConstant(pixel)));
-                    }
-                }
-
-                for (size_t idx = 0; idx < comps_alone.size(); idx += 4) {
-                    // pack them by 4 so each pack size is a multiple of 32 bits
-                    const spv::Id comp_packed = m_b.createCompositeConstruct(m_b.getTypeId(g4_comps[0]), { comps_alone[idx], comps_alone[idx + 1], comps_alone[idx + 2], comps_alone[idx + 3] });
-                    store(inst.opr.dest, comp_packed, 0b1111);
-
-                    inst.opr.dest.num += get_data_type_size(inst.opr.dest.type);
+            std::vector<spv::Id> comps_alone;
+            for (int pixel = 0; pixel < 4; pixel++) {
+                for (int comp = 0; comp < smp_info.component_count; comp++) {
+                    comps_alone.push_back(m_b.createBinOp(spv::OpVectorExtractDynamic, comp_type, g4_comps[comp], m_b.makeIntConstant(pixel)));
                 }
             }
 
-            if (sb_mode == 3) {
-                // compute and save bilinear coefficients
-                const spv::Id uv = get_uv_coeffs(m_b, m_features, std_builtins, image_sampler, coords);
-                // the pixels returned by gather4 are in the following order : (0,1) (1,1) (1,0) (0,0)
-                // so at the end we want (1-u)v uv u(1-v) (1-u)(1-v)
-                // however, looking at the generated shader code in some games, it looks like the coefficients are
-                // expected to be in this order but reversed...
-                const spv::Id one = m_b.makeFloatConstant(1.0);
-                const spv::Id u = m_b.createBinOp(spv::OpVectorExtractDynamic, type_f32, uv, m_b.makeIntConstant(0));
-                const spv::Id v = m_b.createBinOp(spv::OpVectorExtractDynamic, type_f32, uv, m_b.makeIntConstant(1));
+            for (size_t idx = 0; idx < comps_alone.size(); idx += 4) {
+                // pack them by 4 so each pack size is a multiple of 32 bits
+                const spv::Id comp_packed = m_b.createCompositeConstruct(m_b.getTypeId(g4_comps[0]), { comps_alone[idx], comps_alone[idx + 1], comps_alone[idx + 2], comps_alone[idx + 3] });
+                store(dest, comp_packed, 0b1111);
 
-                const spv::Id onemu = m_b.createBinOp(spv::OpFSub, type_f32, one, u);
-                m_b.setPrecision(onemu, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
-                const spv::Id onemv = m_b.createBinOp(spv::OpFSub, type_f32, one, v);
-                m_b.setPrecision(onemv, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
-
-                // (1-u) u
-                const spv::Id x_coeffs = m_b.createCompositeConstruct(type_f32_v[2], { onemu, u });
-                // (1-u)v uv
-                const spv::Id comp1 = m_b.createBinOp(spv::OpVectorTimesScalar, type_f32_v[2], x_coeffs, v);
-                m_b.setPrecision(comp1, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
-                // (1-u)(1-v) u(1-v)
-                const spv::Id comp2 = m_b.createBinOp(spv::OpVectorTimesScalar, type_f32_v[2], x_coeffs, onemv);
-                m_b.setPrecision(comp2, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
-                // (1-u)v uv u(1-v) (1-u)(1-v) in reversed order
-                const spv::Id coeffs = m_b.createOp(spv::OpVectorShuffle, type_f32_v[4], { { true, comp1 }, { true, comp2 }, { false, 2 }, { false, 3 }, { false, 1 }, { false, 0 } });
-
-                // bilinear coeffs are stored as float16
-                inst.opr.dest.type = DataType::F16;
-                store(inst.opr.dest, coeffs, 0b1111);
+                dest.num += get_data_type_size(dest.type);
             }
         }
+
+        if (sb_mode == 3) {
+            // compute and save bilinear coefficients
+            const spv::Id uv = get_uv_coeffs(m_b, m_features, std_builtins, sampled_image, gather_coords);
+            // the pixels returned by gather4 are in the following order : (0,1) (1,1) (1,0) (0,0)
+            // so at the end we want (1-u)v uv u(1-v) (1-u)(1-v)
+            // however, looking at the generated shader code in some games, it looks like the coefficients are
+            // expected to be in this order but reversed...
+            const spv::Id one = m_b.makeFloatConstant(1.0);
+            const spv::Id u = m_b.createBinOp(spv::OpVectorExtractDynamic, type_f32, uv, m_b.makeIntConstant(0));
+            const spv::Id v = m_b.createBinOp(spv::OpVectorExtractDynamic, type_f32, uv, m_b.makeIntConstant(1));
+
+            const spv::Id onemu = m_b.createBinOp(spv::OpFSub, type_f32, one, u);
+            m_b.setPrecision(onemu, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
+            const spv::Id onemv = m_b.createBinOp(spv::OpFSub, type_f32, one, v);
+            m_b.setPrecision(onemv, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
+
+            // (1-u) u
+            const spv::Id x_coeffs = m_b.createCompositeConstruct(type_f32_v[2], { onemu, u });
+            // (1-u)v uv
+            const spv::Id comp1 = m_b.createBinOp(spv::OpVectorTimesScalar, type_f32_v[2], x_coeffs, v);
+            m_b.setPrecision(comp1, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
+            // (1-u)(1-v) u(1-v)
+            const spv::Id comp2 = m_b.createBinOp(spv::OpVectorTimesScalar, type_f32_v[2], x_coeffs, onemv);
+            m_b.setPrecision(comp2, m_features.force_full_precision ? spv::NoPrecision : spv::DecorationRelaxedPrecision);
+            // (1-u)v uv u(1-v) (1-u)(1-v) in reversed order
+            const spv::Id coeffs = m_b.createOp(spv::OpVectorShuffle, type_f32_v[4], { { true, comp1 }, { true, comp2 }, { false, 2 }, { false, 3 }, { false, 1 }, { false, 0 } });
+
+            // bilinear coeffs are stored as float16
+            dest.type = DataType::F16;
+            store(dest, coeffs, 0b1111);
+        }
+    };
+
+    if (is_texture_buffer_load) {
+        // maybe put this in a function instead
+
+        // do a big switch with all the different textures:
+        // switch(texture_idx) {
+        // case 0:
+        //   dest = texture(texture0, pos);
+        //   break;
+        // case 1:
+        //   dest = texture(texture1, pos);
+        //   break;
+        // ....
+
+        std::vector<const SamplerInfo *> samplers;
+        std::vector<int> sampler_indices;
+        std::vector<int> index_to_segment;
+        constexpr int sa_count = 32 * 4;
+        // the instruction dim is only the coord count the compiler allocated, so a 2D texture can still turn up in an SMP3d switch
+        spv::Id coords_2d = coords;
+        if (dim == 3)
+            coords_2d = m_b.createOp(spv::OpVectorShuffle, type_f32_v[2], { { true, coords }, { true, coords }, { false, 0 }, { false, 1 } });
+        for (auto &smp : m_spirv_params.samplers) {
+            if (smp.first < sa_count)
+                continue;
+
+            if (dim == 2 && smp.second.is_cube)
+                continue;
+
+            samplers.push_back(&smp.second);
+            index_to_segment.push_back(sampler_indices.size());
+            sampler_indices.push_back(smp.first - sa_count);
+        }
+
+        if (samplers.empty()) {
+            LOG_ERROR("Texture buffer load with dim {} has no compatible sampler", dim);
+            store(inst.opr.dest, utils::make_uniform_vector_from_type(m_b, type_f32_v[4], 0.0f), 0b1111);
+            return true;
+        }
+
+        std::vector<spv::Block *> segment_blocks;
+        m_b.makeSwitch(texture_index, spv::SelectionControlMaskNone, samplers.size(), sampler_indices, index_to_segment, -1, segment_blocks);
+        for (size_t s = 0; s < samplers.size(); s++) {
+            const SamplerInfo *smp = samplers[s];
+
+            m_b.nextSwitchSegment(segment_blocks, s);
+            // every case writes from the instruction's own destination (the gather modes advance the register they write)
+            Operand case_dest = inst.opr.dest;
+            if (tb_dest_fmt[fconv_type] == DataType::UNK)
+                case_dest.type = smp->component_type;
+
+            const int case_dim = smp->is_cube ? 3 : 2;
+            const spv::Id case_image = m_b.createLoad(smp->id, spv::NoPrecision);
+            const spv::Id case_coords = smp->is_cube ? coords : coords_2d;
+            if (sb_mode == 2) {
+                if (smp->is_cube) {
+                    // the bilinear coefficients are defined for 2D images only
+                    store(case_dest, utils::make_uniform_vector_from_type(m_b, m_b.makeVectorType(type_ui32, 4), 0u), 0b1111);
+                } else {
+                    emit_info(case_dest, case_image, case_coords);
+                }
+            } else if (sb_mode != 0) {
+                emit_gather(case_dest, *smp, case_dim, case_image, case_coords);
+            } else {
+                spv::Id result = do_fetch_texture(case_image, smp->index, case_dim, { case_coords, static_cast<int>(DataType::F32) }, case_dest.type, lod_mode, extra1, extra2);
+                const Imm4 dest_mask = (1U << smp->component_count) - 1;
+                store(case_dest, result, dest_mask);
+            }
+
+            m_b.addSwitchBreak(true);
+        }
+        m_b.endSwitch(segment_blocks);
+    } else if (sb_mode == 2) {
+        emit_info(inst.opr.dest, image_sampler, coords);
+    } else if (sb_mode == 0) {
+        spv::Id result = do_fetch_texture(image_sampler, sampler.index, dim, { coords, static_cast<int>(DataType::F32) }, inst.opr.dest.type, lod_mode, extra1, extra2);
+        const Imm4 dest_mask = (1U << sampler.component_count) - 1;
+        store(inst.opr.dest, result, dest_mask);
+    } else {
+        // sb_mode = 1 or 3 : gather 4 (+ uv if sb_mode = 3)
+        emit_gather(inst.opr.dest, sampler, dim, image_sampler, coords);
     }
 
     return true;

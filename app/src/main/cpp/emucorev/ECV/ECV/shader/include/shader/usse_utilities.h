@@ -38,6 +38,20 @@ struct SpirvUtilFunctions {
     // this is technically not a function but is the best place to put it
     // buffer_address_vec[0] is for a packed float[] array
     spv::Id buffer_address_vec[5][2] = {};
+
+    // writable uint[] view of a mapped buffer (physical storage buffer pointer), used for the atomic read-modify-write of 8/16-bit stores
+    spv::Id buffer_address_uint_rw{};
+
+    // storeMemory(addr, value, bits): write of 8/16/32 bits into the storage-buffer copy of the guest uniform buffers (memory mapping disabled)
+    spv::Function *store_memory{ nullptr };
+    // number of store_memory() call sites emitted. Non-zero means the shader writes the container, which is then declared writable
+    // (and the renderer must write it back, see UsseTranslationStats::buffer_store_count)
+    uint32_t buffer_store_count{ 0 };
+
+    // Private uint[] copy of the program's literal buffer, created on the first dynamic-index (or store) access
+    spv::Id literal_buffer_array{};
+    // set once a store to the literal buffer has been emitted: later literal reads must see the written data (read the mirror, not the constants)
+    bool literal_buffer_written{ false };
 };
 
 spv::Id finalize(spv::Builder &b, spv::Id first, spv::Id second, const Swizzle4 swizz, spv::Id offset, const Imm4 dest_mask);
@@ -51,6 +65,9 @@ spv::Id unpack_one(spv::Builder &b, SpirvUtilFunctions &utils, const FeatureStat
 spv::Id pack_one(spv::Builder &b, SpirvUtilFunctions &utils, const FeatureState &features, spv::Id vec, const DataType source_type);
 
 spv::Id fetch_memory(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunctions &utils, spv::Id addr);
+// Writes `value` (uint32, only the low `bits` bits are used) at byte address `addr` of the storage-buffer copy of the guest buffers.
+// Only valid when memory mapping is disabled (params.buffers / params.buffer_container are then populated).
+void store_memory(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunctions &utils, spv::Id addr, spv::Id value, int bits);
 void buffer_address_access(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunctions &utils, const FeatureState &features, Operand dest, int dest_offset, spv::Id addr, uint32_t component_size, uint32_t nb_components, int buffer_idx = -1, bool is_buffer_store = false);
 
 spv::Id make_vector_or_scalar_type(spv::Builder &b, spv::Id component, int size);

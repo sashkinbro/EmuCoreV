@@ -504,6 +504,68 @@ spv::Id USSETranslatorVisitor::do_alu_op(Instruction &inst, const Imm4 source_ma
         result = m_b.createBinOp(spv::OpISub, m_b.makeIntType(32), vsrc1, vsrc2);
         break;
 
+    // The remaining integer test operations (vtst/vtstmsk alu_sel 1 and 2). The compare forms above subtract; these produce the sum / product
+    // that is then compared against zero. Operands are loaded already extended to 32 bits, so the 32-bit result is truncated to the lane width of
+    // the operation before the zero test (a 16-bit sum that overflows must wrap, as it does in the hardware lane).
+    case Opcode::IADD32:
+    case Opcode::IADDU32:
+    case Opcode::IADD16:
+    case Opcode::IADDU16:
+    case Opcode::IADD8:
+    case Opcode::IADDU8:
+    case Opcode::IMUL16:
+    case Opcode::IMULU16:
+    case Opcode::IMUL8:
+    case Opcode::IMULU8: {
+        const bool is_mul = inst.opcode == Opcode::IMUL16 || inst.opcode == Opcode::IMULU16 || inst.opcode == Opcode::IMUL8 || inst.opcode == Opcode::IMULU8;
+        result = m_b.createBinOp(is_mul ? spv::OpIMul : spv::OpIAdd, source_type, vsrc1, vsrc2);
+        const DataType lane_type = inst.opr.src1.type;
+        const int lane_bits = static_cast<int>(get_data_type_size(lane_type)) * 8;
+        if (lane_bits < 32) {
+            // BitFieldSExtract / BitFieldUExtract keep the lane value in the type the compare expects (signed lanes sign-extended)
+            const spv::Op extract_op = is_signed_integer_data_type(lane_type) ? spv::OpBitFieldSExtract : spv::OpBitFieldUExtract;
+            result = m_b.createOp(extract_op, source_type, { result, m_b.makeIntConstant(0), m_b.makeIntConstant(lane_bits) });
+        }
+        break;
+    }
+
+    case Opcode::ROL: {
+        // same rotate as the vbw ROL instruction (see ialu.cpp): amount modulo the 32-bit width, per channel
+        const spv::Id uvec_type = utils::make_vector_or_scalar_type(m_b, m_b.makeUintType(32), m_b.getNumComponents(vsrc1));
+        const auto as_uint = [&](spv::Id v) { return m_b.getTypeId(v) == uvec_type ? v : m_b.createUnaryOp(spv::OpBitcast, uvec_type, v); };
+        const spv::Id c31 = utils::make_uniform_vector_from_type(m_b, uvec_type, 31u);
+        const spv::Id c32 = utils::make_uniform_vector_from_type(m_b, uvec_type, 32u);
+        const spv::Id value = as_uint(vsrc1);
+        const spv::Id amt = m_b.createBinOp(spv::OpBitwiseAnd, uvec_type, as_uint(vsrc2), c31);
+        const spv::Id inv = m_b.createBinOp(spv::OpBitwiseAnd, uvec_type, m_b.createBinOp(spv::OpISub, uvec_type, c32, amt), c31);
+        const spv::Id rot = m_b.createBinOp(spv::OpBitwiseOr, uvec_type, m_b.createBinOp(spv::OpShiftLeftLogical, uvec_type, value, amt),
+            m_b.createBinOp(spv::OpShiftRightLogical, uvec_type, value, inv));
+        result = source_type == uvec_type ? rot : m_b.createUnaryOp(spv::OpBitcast, source_type, rot);
+        break;
+    }
+
+    // Complex-unit tests: same functions as the VCOMP instruction applies to its one channel (see vcomp below). They are only meaningful on
+    // a single channel, which is what chan_cc 0-3 loads.
+    case Opcode::VRCP:
+        result = m_b.createBinOp(spv::OpFDiv, source_type, m_b.makeFloatConstant(1.0f), vsrc1);
+        break;
+
+    case Opcode::VRSQ:
+        result = m_b.createBuiltinCall(source_type, std_builtins, GLSLstd450InverseSqrt, { vsrc1 });
+        break;
+
+    case Opcode::VLOG:
+        result = m_b.createBuiltinCall(source_type, std_builtins, GLSLstd450Log2, { vsrc1 });
+        break;
+
+    case Opcode::VEXP: {
+        const spv::Id exp_val = m_b.createBuiltinCall(source_type, std_builtins, GLSLstd450Exp2, { vsrc1 });
+        const spv::Id ones = utils::make_uniform_vector_from_type(m_b, source_type, 1.0f);
+        const spv::Id is_nan = m_b.createUnaryOp(spv::OpIsNan, utils::make_vector_or_scalar_type(m_b, m_b.makeBoolType(), m_b.getNumComponents(vsrc1)), vsrc1);
+        result = m_b.createTriOp(spv::OpSelect, source_type, is_nan, ones, exp_val);
+        break;
+    }
+
     default: {
         LOG_ERROR("Unimplemented ALU opcode instruction: {}", disasm::opcode_str(inst.opcode));
         break;

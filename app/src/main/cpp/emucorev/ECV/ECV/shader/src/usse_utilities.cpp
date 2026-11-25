@@ -141,8 +141,20 @@ spv::Id create_access_chain(spv::Builder &b, const spv::StorageClass storage_cla
     return b.createAccessChain(storage_class, base, offsets);
 }
 
+// The GLOBAL bank is created on first use so shaders that never touch it do not carry the variable.
+static void ensure_global_bank(spv::Builder &b, const shader::usse::SpirvShaderParameters &params) {
+    if (params.globals)
+        return;
+
+    const spv::Id f32_v4_type = b.makeVectorType(b.makeFloatType(32), 4);
+    const spv::Id arr_type = b.makeArrayType(f32_v4_type, b.makeIntConstant(GLOBAL_REG_COUNT / 4), 0);
+    params.globals = b.createVariable(spv::NoPrecision, spv::StorageClassPrivate, arr_type, "g", b.makeNullConstant(arr_type));
+}
+
 static const SpirvVarRegBank *get_reg_bank(const shader::usse::SpirvShaderParameters &params, shader::usse::RegisterBank reg_bank) {
     switch (reg_bank) {
+    case RegisterBank::GLOBAL:
+        return params.globals ? &params.globals : nullptr;
     case RegisterBank::PRIMATTR:
         return &params.ins;
     case RegisterBank::SECATTR:
@@ -632,6 +644,118 @@ spv::Id fetch_memory(spv::Builder &b, const SpirvShaderParameters &params, Spirv
     return b.createFunctionCall(utils.fetch_memory, { addr });
 }
 
+// storeMemory(int addr, uint value, int bits). Inverse of fetchMemory: the address is a byte address in the combined container, the
+// element can be unaligned, so the affected words are read-modified-written. 8/16-bit stores are the same operation with a narrower mask.
+// The container elements are floats, the words are moved through bitcasts (bit exact).
+// NOT atomic: two invocations writing different bytes of the same word race (the mapped route uses atomics for that, see below). A float
+// write-back through the renderer is last-writer-wins anyway.
+static spv::Function *make_store_memory_func(spv::Builder &b, const SpirvShaderParameters &params) {
+    const spv::Id type_f32 = b.makeFloatType(32);
+    const spv::Id type_u32 = b.makeUintType(32);
+    const spv::Id type_i32 = b.makeIntType(32);
+    const spv::Id type_bool = b.makeBoolType();
+
+    spv::Block *func_block;
+    spv::Block *last_build_point = b.getBuildPoint();
+
+    spv::Function *store_func = b.makeFunctionEntry(spv::NoPrecision, b.makeVoidType(), "storeMemory", spv::LinkageTypeMax, { type_i32, type_u32, type_i32 },
+        {}, &func_block);
+    b.setupFunctionDebugInfo(store_func, "storeMemory", { type_i32, type_u32, type_i32 }, { "addr", "value", "bits" });
+
+    const spv::Id addr = store_func->getParamId(0);
+    const spv::Id value = store_func->getParamId(1);
+    const spv::Id bits = store_func->getParamId(2);
+
+    const spv::Id all_ones = b.makeUintConstant(0xFFFFFFFFu);
+    const spv::Id c32 = b.makeIntConstant(32);
+
+    // mask of the written bits (a shift by 32 is undefined, so 32 bits are selected explicitly)
+    const spv::Id is_full = b.createBinOp(spv::OpIEqual, type_bool, bits, c32);
+    const spv::Id narrow_mask = b.createBinOp(spv::OpISub, type_u32, b.createBinOp(spv::OpShiftLeftLogical, type_u32, b.makeUintConstant(1), bits), b.makeUintConstant(1));
+    const spv::Id vmask = b.createTriOp(spv::OpSelect, type_u32, is_full, all_ones, narrow_mask);
+    const spv::Id v = b.createBinOp(spv::OpBitwiseAnd, type_u32, value, vmask);
+
+    std::stack<std::unique_ptr<spv::Builder::If>> store_stacks;
+
+    for (auto &[index, buffer_info] : params.buffers) {
+        if (!store_stacks.empty()) {
+            store_stacks.top()->makeBeginElse();
+        }
+
+        const spv::Id range_begin = b.makeIntConstant(buffer_info.base);
+        const spv::Id range_end = b.makeIntConstant(buffer_info.base + buffer_info.size);
+        const spv::Id in_range = b.createBinOp(spv::OpLogicalAnd, type_bool, b.createBinOp(spv::OpSGreaterThanEqual, type_bool, addr, range_begin),
+            b.createBinOp(spv::OpSLessThan, type_bool, addr, range_end));
+        store_stacks.push(std::make_unique<spv::Builder::If>(in_range, spv::SelectionControlMaskNone, b));
+
+        const spv::Id local = b.createBinOp(spv::OpISub, type_i32, addr, range_begin);
+        const spv::Id word = b.createBinOp(spv::OpShiftRightArithmetic, type_i32, local, b.makeIntConstant(2));
+        const spv::Id shift = b.createUnaryOp(spv::OpBitcast, type_u32, b.createBinOp(spv::OpShiftLeftLogical, type_i32, b.createBinOp(spv::OpBitwiseAnd, type_i32, local, b.makeIntConstant(3)), b.makeIntConstant(3)));
+
+        const auto word_ptr = [&](spv::Id word_index) {
+            const spv::Id vec_index = b.createBinOp(spv::OpShiftRightArithmetic, type_i32, word_index, b.makeIntConstant(2));
+            const spv::Id comp_index = b.createBinOp(spv::OpBitwiseAnd, type_i32, word_index, b.makeIntConstant(3));
+            return utils::create_access_chain(b, spv::StorageClassStorageBuffer, params.buffer_container, { b.makeIntConstant(buffer_info.index_in_container), vec_index, comp_index });
+        };
+        const auto read_word = [&](spv::Id ptr) { return b.createUnaryOp(spv::OpBitcast, type_u32, b.createLoad(ptr, spv::NoPrecision)); };
+        const auto write_word = [&](spv::Id ptr, spv::Id merged) { b.createStore(b.createUnaryOp(spv::OpBitcast, type_f32, merged), ptr); };
+
+        // low word: bits [shift, shift + bits) of the element, clipped at 32
+        {
+            const spv::Id ptr = word_ptr(word);
+            const spv::Id lo_mask = b.createBinOp(spv::OpShiftLeftLogical, type_u32, vmask, shift);
+            const spv::Id lo_val = b.createBinOp(spv::OpShiftLeftLogical, type_u32, v, shift);
+            const spv::Id kept = b.createBinOp(spv::OpBitwiseAnd, type_u32, read_word(ptr), b.createUnaryOp(spv::OpNot, type_u32, lo_mask));
+            write_word(ptr, b.createBinOp(spv::OpBitwiseOr, type_u32, kept, lo_val));
+        }
+
+        // high word: only when the element crosses the word boundary (unaligned 32-bit store, 16-bit store at an odd 3 mod 4 address)
+        {
+            const spv::Id end_bit = b.createBinOp(spv::OpIAdd, type_u32, shift, b.createUnaryOp(spv::OpBitcast, type_u32, bits));
+            const spv::Id crosses = b.createBinOp(spv::OpUGreaterThan, type_bool, end_bit, b.makeUintConstant(32));
+            const spv::Id next_in_buffer = b.createBinOp(spv::OpSLessThan, type_bool, b.createBinOp(spv::OpIMul, type_i32, b.createBinOp(spv::OpIAdd, type_i32, word, b.makeIntConstant(1)), b.makeIntConstant(4)),
+                b.makeIntConstant(buffer_info.size));
+            spv::Builder::If cross_if(b.createBinOp(spv::OpLogicalAnd, type_bool, crosses, next_in_buffer), spv::SelectionControlMaskNone, b);
+            const spv::Id ptr = word_ptr(b.createBinOp(spv::OpIAdd, type_i32, word, b.makeIntConstant(1)));
+            // crosses implies shift > 0, so 32 - shift is in [8, 24]
+            const spv::Id back = b.createBinOp(spv::OpISub, type_u32, b.makeUintConstant(32), shift);
+            const spv::Id hi_mask = b.createBinOp(spv::OpShiftRightLogical, type_u32, vmask, back);
+            const spv::Id hi_val = b.createBinOp(spv::OpShiftRightLogical, type_u32, v, back);
+            const spv::Id kept = b.createBinOp(spv::OpBitwiseAnd, type_u32, read_word(ptr), b.createUnaryOp(spv::OpNot, type_u32, hi_mask));
+            write_word(ptr, b.createBinOp(spv::OpBitwiseOr, type_u32, kept, hi_val));
+            cross_if.makeEndIf();
+        }
+
+        b.makeReturn(false);
+    }
+
+    while (!store_stacks.empty()) {
+        std::unique_ptr<spv::Builder::If> store_if = std::move(store_stacks.top());
+        store_if->makeEndIf();
+
+        store_stacks.pop();
+    }
+
+    b.makeReturn(false);
+    b.setBuildPoint(last_build_point);
+
+    return store_func;
+}
+
+void store_memory(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunctions &utils, spv::Id addr, spv::Id value, int bits) {
+    if (params.buffers.empty() || params.buffer_container == 0) {
+        LOG_ERROR("Shader stores to memory but has no storage-buffer copy of the guest buffers");
+        return;
+    }
+
+    if (!utils.store_memory) {
+        utils.store_memory = make_store_memory_func(b, params);
+    }
+
+    utils.buffer_store_count++;
+    b.createFunctionCall(utils.store_memory, { addr, value, b.makeIntConstant(bits) });
+}
+
 static spv::Id make_or_get_buffer_ptr(spv::Builder &b, shader::usse::utils::SpirvUtilFunctions &utils, int nb_components, int stride = 16, bool is_write = false) {
     const int buffer_utils_idx = (stride == 4) ? 0 : nb_components;
 
@@ -740,7 +864,48 @@ void buffer_address_access(spv::Builder &b, const SpirvShaderParameters &params,
         }
     } else {
         if (is_buffer_store) {
-            LOG_ERROR("non-32 bit buffer store is not implemented! Please report it to the devs.");
+            // 8/16-bit store. The register data is read like the loads below write it: the elements of the repeat sequence are packed
+            // densely into the register words (4/component_size per word, lowest lane first). UNVERIFIED on hardware: a store could as well
+            // read each element from the low lane of its own register.
+            // The memory word is shared with up to three neighbours, other invocations may write them concurrently: use atomic AND/OR
+            // on the containing word instead of a plain read-modify-write.
+            if (!utils.buffer_address_uint_rw) {
+                const spv::Id runtime_array = b.makeRuntimeArray(u32);
+                b.addDecoration(runtime_array, spv::DecorationArrayStride, 4);
+                const spv::Id buffer_data = b.makeStructType({ runtime_array }, "buffer_ptr_u32_rw");
+                b.addDecoration(buffer_data, spv::DecorationBlock);
+                b.addMemberName(buffer_data, 0, "data");
+                b.addMemberDecoration(buffer_data, 0, spv::DecorationOffset, 0);
+                utils.buffer_address_uint_rw = b.makePointer(spv::StorageClassPhysicalStorageBuffer, buffer_data);
+            }
+            const spv::Id uint_container = utils.buffer_address_uint_rw;
+            const uint32_t pack = sizeof(uint32_t) / component_size;
+            const spv::Id element_mask = b.makeUintConstant((1u << (component_size * 8)) - 1u);
+            const spv::Id scope_device = b.makeUintConstant(spv::ScopeDevice);
+            const spv::Id semantics_relaxed = b.makeUintConstant(spv::MemorySemanticsMaskNone);
+
+            for (uint32_t component_idx = 0; component_idx < nb_components; component_idx++) {
+                const uint32_t element = static_cast<uint32_t>(dest_offset) + component_idx;
+                Operand raw_word = dest;
+                raw_word.type = DataType::UINT32;
+                spv::Id word = load(b, params, utils, features, raw_word, 0b1, static_cast<int>(element / pack));
+                spv::Id value = b.createBinOp(spv::OpShiftRightLogical, u32, word, b.makeUintConstant((element % pack) * component_size * 8));
+                value = b.createBinOp(spv::OpBitwiseAnd, u32, value, element_mask);
+
+                spv::Id component_addr = add_uvec2_uint(b, buffer_address, b.makeUintConstant(component_idx * component_size));
+                spv::Id addr_low_bits = b.createCompositeExtract(component_addr, u32, 0);
+                spv::Id shift = b.createBinOp(spv::OpShiftLeftLogical, u32, b.createBinOp(spv::OpBitwiseAnd, u32, addr_low_bits, b.makeUintConstant(0b11u)), b.makeUintConstant(3));
+                addr_low_bits = b.createBinOp(spv::OpBitwiseAnd, u32, addr_low_bits, b.makeUintConstant(~0b11u));
+                component_addr = b.createCompositeInsert(addr_low_bits, component_addr, b.getTypeId(component_addr), 0);
+
+                component_addr = b.createUnaryOp(spv::OpBitcast, uint_container, component_addr);
+                const spv::Id word_ptr = utils::create_access_chain(b, spv::StorageClassPhysicalStorageBuffer, component_addr, { zero, zero });
+
+                const spv::Id keep_mask = b.createUnaryOp(spv::OpNot, u32, b.createBinOp(spv::OpShiftLeftLogical, u32, element_mask, shift));
+                const spv::Id insert = b.createBinOp(spv::OpShiftLeftLogical, u32, value, shift);
+                b.createOp(spv::OpAtomicAnd, u32, { word_ptr, scope_device, semantics_relaxed, keep_mask });
+                b.createOp(spv::OpAtomicOr, u32, { word_ptr, scope_device, semantics_relaxed, insert });
+            }
             return;
         }
 
@@ -812,6 +977,13 @@ spv::Id unpack_one(spv::Builder &b, SpirvUtilFunctions &utils, const FeatureStat
 
         return b.createFunctionCall(utils.unpack_fx10, { scalar });
     }
+    // 32-bit lanes occupy a whole register word: nothing to unpack, only a reinterpretation of the word
+    case DataType::F32:
+        return scalar;
+    case DataType::INT32:
+        return b.createUnaryOp(spv::OpBitcast, b.makeIntType(32), scalar);
+    case DataType::UINT32:
+        return b.createUnaryOp(spv::OpBitcast, b.makeUintType(32), scalar);
     default: {
         LOG_ERROR("Unsupported unpack type: 0x{:0X}", fmt::underlying(type));
         break;
@@ -846,6 +1018,13 @@ spv::Id pack_one(spv::Builder &b, SpirvUtilFunctions &utils, const FeatureState 
         }
         return b.createFunctionCall(iter->second, { vec });
     }
+
+    // 32-bit lanes occupy a whole register word: nothing to pack, only a reinterpretation as the float the register banks hold
+    case DataType::F32:
+        return vec;
+    case DataType::INT32:
+    case DataType::UINT32:
+        return b.createUnaryOp(spv::OpBitcast, b.makeFloatType(32), vec);
 
     default: {
         LOG_ERROR("Unsupported pack type: 0x{:0X}", fmt::underlying(source_type));
@@ -928,7 +1107,12 @@ spv::Id load(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunc
             return apply_modifiers(b, utils, op.flags, flag);
         }
 
-        LOG_WARN_ONCE("Unhandled USSE global register g{} read as zero", op.num);
+        // The hardware meaning of the other global registers is not documented anywhere we have (g16, the face flag, is the only one
+        // the corpus reads). They are modelled as zero-initialised per-invocation registers: a read returns what the shader wrote with
+        // an earlier store to the same global (which is what a plain register file does), and zero before that.
+        // UNVERIFIED: a read-only hardware global (position, sample id, ...) would return its hardware value here instead.
+        LOG_WARN_ONCE("USSE global register g{} has no modelled hardware meaning, treated as a per-invocation scratch register (zero until written)", op.num);
+        ensure_global_bank(b, params);
     }
 
     if (op.bank == RegisterBank::FPCONSTANT) {
@@ -1367,6 +1551,13 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
 
         b.createStore(source, var);
         return;
+    }
+
+    if (dest.bank == RegisterBank::GLOBAL) {
+        // g16 is the hardware face flag, read-only: a write cannot change it
+        if (dest.num == GLOBAL_REG_FRONT_FACING)
+            return;
+        ensure_global_bank(b, params);
     }
 
     if (!get_reg_bank(params, dest.bank)) {
