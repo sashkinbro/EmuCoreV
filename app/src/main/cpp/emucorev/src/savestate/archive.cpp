@@ -1,7 +1,11 @@
 #include <emucorev/savestate/archive.h>
 
 #include <miniz.h>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
+#include <atomic>
 #include <cstring>
 #include <algorithm>
 #include <array>
@@ -11,6 +15,17 @@
 namespace emucorev::savestate {
 
 namespace {
+
+// archive.cpp has no logger dependency (host test shims build it alone); report through the platform log.
+void log_backup_skipped(const fs::path &path, uint64_t size) {
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_WARN, "emucorev", "[savestate] no .bak for %s: storage cannot hard-link and the state (%llu bytes) is too big to copy",
+        path.string().c_str(), static_cast<unsigned long long>(size));
+#else
+    std::fprintf(stderr, "[savestate] no .bak for %s: storage cannot hard-link and the state (%llu bytes) is too big to copy\n",
+        path.string().c_str(), static_cast<unsigned long long>(size));
+#endif
+}
 
 bool file_size_of(FILE *file, uint64_t &size) {
     const int64_t current = std::ftell(file);
@@ -281,24 +296,36 @@ bool Writer::finalize(std::string &error) {
     }
 
     boost::system::error_code ec;
-    // Keep exactly one previous state as "<slot>.bak" (old .bak dropped first, old slot renamed to .bak) so a
-    // slot that later vanishes or fails to load can still be recovered by hand. The window between the two
-    // renames leaves the previous state in .bak; a failed commit moves it back.
+    // Keep exactly one previous state as "<slot>.bak" so a slot that later vanishes or fails to load can still
+    // be recovered by hand. The .bak is a hard link to the old data, so the slot is never renamed away: the
+    // single rename below replaces it atomically and the main file exists at every point. A failed backup must
+    // never block publishing the new state.
     fs::path backup_path = path_;
     backup_path += ".bak";
-    bool backed_up = false;
     if (fs::is_regular_file(path_, ec)) {
         fs::remove(backup_path, ec);
-        fs::rename(path_, backup_path, ec);
-        backed_up = !ec; // a failed backup must never block publishing the new state
+        bool backed_up = false;
+        if (!backup_hard_link_disabled) {
+            fs::create_hard_link(path_, backup_path, ec);
+            backed_up = !ec;
+        }
+        if (!backed_up) {
+            // Storage without hard links (FUSE/sdcardfs): copy small states, skip big ones.
+            const auto size = fs::file_size(path_, ec);
+            if (!ec && size <= backup_copy_limit) {
+                fs::copy_file(path_, backup_path, ec);
+            } else {
+                static std::atomic<bool> logged{false};
+                if (!logged.exchange(true))
+                    log_backup_skipped(path_, size);
+            }
+        }
     }
     // rename replaces the slot atomically on Android/POSIX and uses MOVEFILE_REPLACE_EXISTING on Windows.
     fs::rename(temp_path_, path_, ec);
     if (ec) {
         error = "unable to commit file: " + ec.message();
         fs::remove(temp_path_, ec);
-        if (backed_up)
-            fs::rename(backup_path, path_, ec);
         return false;
     }
 

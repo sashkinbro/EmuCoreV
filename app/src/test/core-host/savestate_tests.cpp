@@ -11,7 +11,9 @@
 
 #include "../../main/cpp/emucorev/src/savestate/savestate.cpp"
 
+#include <atomic>
 #include <cstdlib>
+#include <thread>
 #include <fstream>
 
 namespace {
@@ -238,39 +240,103 @@ std::vector<uint8_t> save_io_with_open_file(const fs::path &device_a, const char
 
 } // namespace
 
-TEST(SaveStateB149, FinalizeKeepsExactlyOnePreviousStateAsBak) {
-    const fs::path dir = scratch_dir("b149-bak");
-    const fs::path slot = dir / "quick.ecvs", bak = dir / "quick.ecvs.bak";
-    const auto write_state = [&](uint8_t marker) {
-        ss::Writer writer;
-        std::string error;
-        ASSERT_TRUE(writer.open(slot, error)) << error;
-        ASSERT_TRUE(writer.write_section(ss::SectionId::Meta, &marker, 1, false, error)) << error;
-        ASSERT_TRUE(writer.finalize(error)) << error;
-    };
-    const auto marker_of = [](const fs::path &file) {
-        ss::Reader reader;
-        std::string error;
-        std::vector<uint8_t> section;
-        EXPECT_TRUE(reader.open(file, error)) << error;
-        EXPECT_TRUE(reader.read_section(ss::SectionId::Meta, section, error)) << error;
-        return section.empty() ? 0 : section[0];
-    };
-    write_state(1);
-    EXPECT_FALSE(fs::exists(bak)); // nothing to keep on the first save
-    write_state(2);
-    ASSERT_TRUE(fs::exists(bak));
-    EXPECT_EQ(marker_of(slot), 2);
-    EXPECT_EQ(marker_of(bak), 1);
-    write_state(3); // the older .bak is replaced, never accumulated
-    EXPECT_EQ(marker_of(slot), 3);
-    EXPECT_EQ(marker_of(bak), 2);
+namespace {
+// Writes a one-byte-marker state to `slot`; returns true when finalize succeeded.
+bool write_marker_state(const fs::path &slot, uint8_t marker, size_t padding = 0) {
+    ss::Writer writer;
+    std::string error;
+    std::vector<uint8_t> payload(1 + padding, marker);
+    return writer.open(slot, error) && writer.write_section(ss::SectionId::Meta, payload.data(), payload.size(), false, error)
+        && writer.finalize(error);
+}
+int marker_of(const fs::path &file) {
+    ss::Reader reader;
+    std::string error;
+    std::vector<uint8_t> section;
+    if (!reader.open(file, error) || !reader.read_section(ss::SectionId::Meta, section, error) || section.empty())
+        return -1;
+    return section[0];
+}
+size_t count_files(const fs::path &dir) {
     size_t files = 0;
     for (const auto &entry : fs::directory_iterator(dir)) {
         (void)entry;
         ++files;
     }
-    EXPECT_EQ(files, 2u); // slot + .bak, no .tmp left behind
+    return files;
+}
+struct BackupHooks { // restore the test hooks even when an assertion fails
+    ~BackupHooks() {
+        ss::backup_hard_link_disabled = false;
+        ss::backup_copy_limit = 16ull << 20;
+    }
+};
+} // namespace
+
+TEST(SaveStateB149, FinalizeKeepsExactlyOnePreviousStateAsBak) {
+    BackupHooks hooks;
+    const fs::path dir = scratch_dir("b149-bak");
+    const fs::path slot = dir / "quick.ecvs", bak = dir / "quick.ecvs.bak";
+    ASSERT_TRUE(write_marker_state(slot, 1));
+    EXPECT_FALSE(fs::exists(bak)); // nothing to keep on the first save
+    ASSERT_TRUE(write_marker_state(slot, 2));
+    ASSERT_TRUE(fs::exists(bak));
+    EXPECT_EQ(marker_of(slot), 2);
+    EXPECT_EQ(marker_of(bak), 1);
+    ASSERT_TRUE(write_marker_state(slot, 3)); // the older .bak is replaced, never accumulated
+    EXPECT_EQ(marker_of(slot), 3);
+    EXPECT_EQ(marker_of(bak), 2);
+    EXPECT_EQ(count_files(dir), 2u); // slot + .bak, no .tmp left behind
+}
+
+TEST(SaveStateB149, MainFileIsNeverMissingWhileSaving) {
+    BackupHooks hooks;
+    const fs::path dir = scratch_dir("b149-atomic");
+    const fs::path slot = dir / "quick.ecvs";
+    ASSERT_TRUE(write_marker_state(slot, 1));
+    std::atomic<bool> stop{false};
+    std::atomic<int> missing{0};
+#ifdef _WIN32
+    // Windows refuses to replace a file another handle is probing, so the host run only exercises repeated
+    // link + rename; the polling check runs where the harness is built for POSIX.
+    std::thread poller([] {});
+#else
+    std::thread poller([&] {
+        while (!stop.load()) {
+            boost::system::error_code ec;
+            if (!fs::is_regular_file(slot, ec))
+                ++missing;
+        }
+    });
+#endif
+    for (int i = 2; i < 60; ++i)
+        ASSERT_TRUE(write_marker_state(slot, static_cast<uint8_t>(i), 4096));
+    stop = true;
+    poller.join();
+    EXPECT_EQ(missing.load(), 0);
+}
+
+TEST(SaveStateB149, BackupFallsBackToCopyWhenHardLinksAreUnavailable) {
+    BackupHooks hooks;
+    ss::backup_hard_link_disabled = true;
+    const fs::path dir = scratch_dir("b149-copy");
+    const fs::path slot = dir / "quick.ecvs", bak = dir / "quick.ecvs.bak";
+    ASSERT_TRUE(write_marker_state(slot, 1));
+    ASSERT_TRUE(write_marker_state(slot, 2));
+    EXPECT_EQ(marker_of(slot), 2);
+    EXPECT_EQ(marker_of(bak), 1);
+}
+
+TEST(SaveStateB149, BackupIsSkippedWhenLinkingFailsAndTheStateIsTooBigToCopy) {
+    BackupHooks hooks;
+    ss::backup_hard_link_disabled = true;
+    ss::backup_copy_limit = 0;
+    const fs::path dir = scratch_dir("b149-skip");
+    const fs::path slot = dir / "quick.ecvs", bak = dir / "quick.ecvs.bak";
+    ASSERT_TRUE(write_marker_state(slot, 1));
+    ASSERT_TRUE(write_marker_state(slot, 2)); // still published
+    EXPECT_EQ(marker_of(slot), 2);
+    EXPECT_FALSE(fs::exists(bak));
 }
 
 TEST(SaveStateB149, DeleteStateLeavesTheBakForManualRecovery) {

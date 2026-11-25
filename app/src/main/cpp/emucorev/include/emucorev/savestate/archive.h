@@ -76,6 +76,11 @@ struct Footer {
 };
 static_assert(sizeof(Footer) == 40);
 
+// "<slot>.bak" keeping: hard link first; when the storage cannot link, copy only files up to this size
+// (provisional, not measured), otherwise skip the backup. The hooks below exist for host tests.
+inline uint64_t backup_copy_limit = 16ull << 20;
+inline bool backup_hard_link_disabled = false;
+
 class Writer {
 public:
     ~Writer();
