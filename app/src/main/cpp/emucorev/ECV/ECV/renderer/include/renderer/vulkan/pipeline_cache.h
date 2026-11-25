@@ -118,6 +118,9 @@ private:
     // each entry is compiled by one thread, the others wait on its gate (never touch it without the gate)
     unordered_map_stable<Sha256Hash, CompileGate<vk::ShaderModule>> shaders;
     unordered_map_stable<uint64_t, vk::Pipeline> pipelines;
+    // P14: a second, independently seeded 64-bit hash of the same state per pipeline key. Together they make the identity 128 bits wide;
+    // a key whose check differs is a collision between two different states and is re-keyed instead of reusing the wrong pipeline.
+    std::unordered_map<uint64_t, uint64_t> pipeline_checks;
 
     // reads a precompiled module from the shader cache directory, does not touch the shaders map
     vk::ShaderModule load_cached_shader_module(const Sha256Hash &hash);

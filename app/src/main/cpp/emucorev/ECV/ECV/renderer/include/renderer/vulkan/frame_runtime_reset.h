@@ -9,7 +9,7 @@ namespace renderer::vulkan {
 // alias first: a target's deferred destruction can be owned by another frame.
 template <typename Frames, typename Drain, typename ResetPools>
 void reset_frame_runtime_after_idle(Frames &frames, Drain drain, ResetPools reset_pools) {
-    for (auto &frame : frames) frame.rendered_fences.clear();
+    for (auto &frame : frames) { frame.rendered_fences.clear(); frame.rendered_timeline_value = 0; }
     for (auto &frame : frames) drain(frame);
     for (auto &frame : frames) {
         reset_pools(frame);

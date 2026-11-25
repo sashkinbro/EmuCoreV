@@ -48,15 +48,28 @@ TEST(GpuStrategy, LadderFallsThroughRoaaLocalReadInputAttachmentCopy) {
 }
 
 TEST(GpuStrategy, DefaultImplementationTableNeverSelectsUnimplementedPaths) {
-    // today: no local-read, copy rung, timeline, lazy memory or ds-resolve implementation exists in the renderer
+    // today: the local-read and generic copy fbfetch rungs have no implementation (the renderer is VkRenderPass based, local-read needs
+    // dynamic rendering); timeline submit tracking, lazy transient attachments and the ds-resolve plan do
     const Strategy s = choose_strategy(tiler_caps());
     EXPECT_EQ(s.fbfetch, FbFetchPath::RasterOrderAttachmentAccess);
-    EXPECT_EQ(s.submit, SubmitTracking::Fences);
-    EXPECT_EQ(s.transient, TransientMemory::Normal);
-    EXPECT_EQ(s.msaa_resolve, MsaaResolvePath::ResolveAttachmentColorOnly);
+    EXPECT_EQ(s.submit, SubmitTracking::TimelineSemaphore);
+    EXPECT_EQ(s.transient, TransientMemory::Lazy);
+    EXPECT_EQ(s.msaa_resolve, MsaaResolvePath::ResolveAttachment);
+    Implemented none;
+    none.timeline = none.lazy_memory = none.ds_resolve = false;
+    const Strategy t = choose_strategy(tiler_caps(), {}, none);
+    EXPECT_EQ(t.submit, SubmitTracking::Fences);
+    EXPECT_EQ(t.transient, TransientMemory::Normal);
+    EXPECT_EQ(t.msaa_resolve, MsaaResolvePath::ResolveAttachmentColorOnly);
     GpuCaps c = tiler_caps();
     c.roaa_color = false;
     EXPECT_EQ(choose_strategy(c).fbfetch, FbFetchPath::InputAttachmentBarrier); // not the unimplemented local-read
+    ForcedPaths forced_timeline_off;
+    forced_timeline_off.fences = true;
+    EXPECT_EQ(choose_strategy(tiler_caps(), forced_timeline_off).submit, SubmitTracking::Fences);
+    ForcedPaths forced_normal;
+    forced_normal.normal_memory = true;
+    EXPECT_EQ(choose_strategy(tiler_caps(), forced_normal).transient, TransientMemory::Normal);
 }
 
 TEST(GpuStrategy, DesktopInterlockOnlyWhenNoBetterRungExists) {

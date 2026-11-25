@@ -22,6 +22,7 @@
 #include <renderer/vulkan/depth_clear.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
 #include <renderer/vulkan/render_pass_sync.h>
+#include <renderer/vulkan/render_pass_policy.h>
 #include <renderer/vulkan/state.h>
 #include <renderer/vulkan/surface_sync.h>
 
@@ -65,19 +66,32 @@ void VKContext::wait_thread_function(const MemState &mem) {
 void VKContext::wait_thread_body(const MemState &mem) {
     // try to wait for multiple fences at the same time if possible
     std::vector<vk::Fence> fences;
+    // timeline tracking: the highest value requested since the last wait (one semaphore wait replaces the whole fence list)
+    uint64_t timeline_target = 0;
+    bool timeline_mixed = false;
 
     auto wait_for_fences = [&]() {
         while (!fences.empty()) {
             // timeout so we can check for shutdown
-            auto result = state.device.waitForFences(fences, VK_TRUE, 100'000'000ULL);
+            vk::Result result;
+            if (timeline_target != 0 && state.submit_timeline) {
+                const vk::SemaphoreWaitInfo wait_info{ .semaphoreCount = 1, .pSemaphores = &state.submit_timeline, .pValues = &timeline_target };
+                result = state.device.waitSemaphoresKHR(wait_info, 100'000'000ULL);
+            } else {
+                result = state.device.waitForFences(fences, VK_TRUE, 100'000'000ULL);
+            }
             if (result == vk::Result::eSuccess) {
                 // don't reset them
                 fences.clear();
+                timeline_target = 0;
+                timeline_mixed = false;
                 break;
             }
             if (result == vk::Result::eTimeout) {
                 if (state.request_queue.is_aborted()) {
                     fences.clear();
+                    timeline_target = 0;
+                    timeline_mixed = false;
                     break;
                 }
                 continue;
@@ -86,6 +100,8 @@ void VKContext::wait_thread_body(const MemState &mem) {
             // let the caller signal syncs/notifications as completed: unwind to wait_thread_function.
             LOG_ERROR("Could not wait for fences: {}", vk::to_string(result));
             fences.clear();
+            timeline_target = 0;
+            timeline_mixed = false;
             throw vk::SystemError(vk::make_error_code(result), "waitForFences");
         }
     };
@@ -99,6 +115,11 @@ void VKContext::wait_thread_body(const MemState &mem) {
         std::visit(overloaded{
                        [&](FenceWaitRequest &request) {
                            fences.push_back(request.fence);
+                           // a request without a value (early submits) forces the fence wait for the whole list
+                           if (request.timeline_value == 0)
+                               timeline_target = 0, timeline_mixed = true;
+                           else if (!timeline_mixed)
+                               timeline_target = std::max(timeline_target, request.timeline_value);
                        },
                        [&](NotificationRequest &request) {
                            if (request.notifications[0].address || request.notifications[1].address) {
@@ -354,8 +375,11 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
         force_load = false;
         force_store = false;
     }
-    // GXM force_store controls write-back to the depth surface memory, not whether the buffer keeps its contents
-    force_store = true;
+    // GXM force_store controls write-back to the depth surface memory, not whether the buffer keeps its contents. The store is derived
+    // (render_pass_policy.h): dropped only when the depth is provably dead. A scene may restart its pass and LOAD what the first instance
+    // stored (mid-scene flush, casts, fbfetch restarts, depth transfers), and that is not known when the scene begins, so today the
+    // answer is always "store" unless a producer of "this scene cannot restart" exists.
+    force_store = derive_depth_store({ force_store, ds_surface_fin != nullptr, /*scene_may_restart*/ true });
 
 #if ECV_ORACLE
     bool oracle_depth_valid = true;
@@ -850,6 +874,18 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
 
     vk::SubmitInfo submit_info{};
     submit_info.setCommandBuffers(cmdbuffers_to_submit);
+    // timeline submit tracking: this submit also signals the next value; the fence stays for the per-scene recycling
+    uint64_t timeline_value = 0;
+    vk::TimelineSemaphoreSubmitInfo timeline_info{};
+    if (state.submit_timeline) {
+        timeline_value = ++state.submit_counter;
+        timeline_info.signalSemaphoreValueCount = 1;
+        timeline_info.pSignalSemaphoreValues = &timeline_value;
+        submit_info.pNext = &timeline_info;
+        submit_info.signalSemaphoreCount = 1;
+        submit_info.pSignalSemaphores = &state.submit_timeline;
+        state.frame().rendered_timeline_value = timeline_value;
+    }
 #if ECV_ORACLE
     if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_IDLE_SUBMIT))
         state.general_queue.waitIdle();
@@ -866,7 +902,7 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
 
     if (state.features.enable_memory_mapping) {
         // send it to the wait queue
-        state.request_queue.push(FenceWaitRequest{ fence });
+        state.request_queue.push(FenceWaitRequest{ fence, timeline_value });
 
         if (state.mapping_method == MappingMethod::DoubleBuffer) {
             // sync all the visibility buffers
@@ -1062,6 +1098,17 @@ void new_frame(VKContext &context) {
             }
         }
 
+        // timeline tracking: the semaphore value can be reached a moment before the same submit's fence is signalled, and a fence must be
+        // signalled before it is reset. Bounded like the waits above.
+        if (context.state.submit_timeline) {
+            vk::Result fence_result;
+            do {
+                fence_result = device.waitForFences(frame.rendered_fences, VK_TRUE, 100'000'000ULL);
+                if (fence_result == vk::Result::eTimeout && context.state.render_abort.load(std::memory_order_relaxed))
+                    return;
+            } while (fence_result == vk::Result::eTimeout);
+            frame.rendered_timeline_value = 0;
+        }
         // reset the fences in both case (the wait thread does not do that as they can still be used)
         device.resetFences(frame.rendered_fences);
         frame.rendered_fences.clear();

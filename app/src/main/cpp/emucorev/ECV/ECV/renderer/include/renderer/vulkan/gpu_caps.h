@@ -91,13 +91,13 @@ struct ForcedPaths {
 // (and is listed as `available-unused` in the log), so the table never claims a path the renderer cannot run.
 struct Implemented {
     bool sync2 = true; // vkutil::sync::Batch emits both vkCmdPipelineBarrier2 and legacy masks
-    bool timeline = false; // submit/fence tracking still uses fences
-    bool lazy_memory = false; // transient attachments still use normal memory
+    bool timeline = true; // scene submits signal a timeline semaphore; frame waits use it (fences stay for per-scene recycling)
+    bool lazy_memory = true; // Image::init_transient_attachment (used by MSAA attachments; no existing attachment is provably dead)
     bool fbfetch_roaa = true;
     bool fbfetch_local_read = false;
     bool fbfetch_input_attachment = true;
     bool fbfetch_copy = false; // the generic copy rung (only the SceShell glow snapshot exists)
-    bool ds_resolve = false; // MSAA is not rendered yet (B140, C:\w\msaa); helpers exist in this table only
+    bool ds_resolve = true; // render_pass_policy.h::plan_ds_resolve; MSAA itself is B140 (C:\w\msaa)
 };
 
 struct Strategy {

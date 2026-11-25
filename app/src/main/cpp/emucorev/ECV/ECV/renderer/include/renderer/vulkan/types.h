@@ -123,6 +123,8 @@ struct FrameObject {
     vk::CommandPool prerender_pool;
 
     std::vector<vk::Fence> rendered_fences;
+    // highest timeline value signalled by this frame slot's scene submits (0 = none / timeline tracking off)
+    uint64_t rendered_timeline_value = 0;
     // Changes whenever this shared frame slot's command pools are reset.
     uint64_t pool_epoch = 0;
 
@@ -200,6 +202,8 @@ struct VisibilityBuffer {
 
 struct FenceWaitRequest {
     vk::Fence fence;
+    // timeline submit tracking: value the scene submit signals on VKState::submit_timeline (0 = not used, wait on the fence)
+    uint64_t timeline_value = 0;
 };
 
 // request to trigger a notification after the previous fences have been waited for

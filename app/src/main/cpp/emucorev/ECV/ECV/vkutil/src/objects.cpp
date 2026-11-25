@@ -83,7 +83,7 @@ Image::~Image() {
     destroy();
 }
 
-void Image::init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping, const vk::ImageCreateFlags image_create_flags, const void *pNext) {
+void Image::init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping, const vk::ImageCreateFlags image_create_flags, const void *pNext, const vma::AllocationCreateInfo &alloc_info) {
     sync.reset();
     vk::ImageCreateInfo image_info{
         .pNext = pNext,
@@ -103,7 +103,7 @@ void Image::init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping, 
         .initialLayout = vk::ImageLayout::eUndefined,
     };
 
-    std::tie(image, allocation) = allocator.createImage(image_info, vma_auto_alloc);
+    std::tie(image, allocation) = allocator.createImage(image_info, alloc_info);
 
     // only create a view if one of these flags is set
     constexpr vk::ImageUsageFlags view_usages = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eStorage;
@@ -129,6 +129,44 @@ void Image::init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping, 
         .format = format,
         .components = mapping,
         .subresourceRange = range
+    };
+    view = allocator.getAllocatorInfo().device.createImageView(view_info);
+}
+
+void Image::init_transient_attachment(vk::ImageUsageFlags attachment_usage, bool lazy, vk::SampleCountFlagBits samples) {
+    // the multisampled variant needs the sample count in the create info: init_image creates single-sample images, so create it here
+    vma::AllocationCreateInfo alloc = vma_auto_alloc;
+    vk::ImageUsageFlags usage = attachment_usage;
+    if (lazy) {
+        alloc.usage = vma::MemoryUsage::eGpuLazilyAllocated;
+        usage |= vk::ImageUsageFlagBits::eTransientAttachment;
+    }
+    if (samples == vk::SampleCountFlagBits::e1) {
+        init_image(usage, default_comp_mapping, vk::ImageCreateFlags(), nullptr, alloc);
+        return;
+    }
+    sync.reset();
+    vk::ImageCreateInfo image_info{
+        .imageType = vk::ImageType::e2D,
+        .format = format,
+        .extent = vk::Extent3D{ .width = width, .height = height, .depth = 1 },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = samples,
+        .tiling = vk::ImageTiling::eOptimal,
+        .usage = usage,
+        .sharingMode = vk::SharingMode::eExclusive,
+        .initialLayout = vk::ImageLayout::eUndefined,
+    };
+    std::tie(image, allocation) = allocator.createImage(image_info, alloc);
+    const bool ds = format == vk::Format::eD16UnormS8Uint || format == vk::Format::eD24UnormS8Uint || format == vk::Format::eD32SfloatS8Uint
+        || format == vk::Format::eX8D24UnormPack32 || format == vk::Format::eD16Unorm || format == vk::Format::eD32Sfloat;
+    vk::ImageViewCreateInfo view_info{
+        .image = image,
+        .viewType = vk::ImageViewType::e2D,
+        .format = format,
+        .components = default_comp_mapping,
+        .subresourceRange = ds ? ds_subresource_range : color_subresource_range
     };
     view = allocator.getAllocatorInfo().device.createImageView(view_info);
 }

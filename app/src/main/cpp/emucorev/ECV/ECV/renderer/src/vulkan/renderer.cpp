@@ -736,6 +736,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         bool support_external_memory = false;
         bool support_shader_interlock = false;
         bool support_sync2 = false;
+        bool support_timeline = false;
         const std::map<std::string_view, bool *> optional_extensions = {
             { vk::KHRGetMemoryRequirements2ExtensionName, &temp_bool },
             // can be used by vma to improve performance
@@ -759,6 +760,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             { vk::EXTDeviceFaultExtensionName, &support_device_fault },
             // barrier granularity of the sync tracker (vkutil/sync_tracker.h); legacy masks otherwise
             { vk::KHRSynchronization2ExtensionName, &support_sync2 },
+            // submit/frame completion tracking through one timeline semaphore (strategy table: SubmitTracking)
+            { VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, &support_timeline },
             // eMirrorClampToEdge sampler address mode (no feature bit, the extension is the enable)
             { VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME, &temp_bool },
 #ifdef __APPLE__
@@ -942,6 +945,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             support_rasterized_order_access = gpu_strategy.fbfetch == FbFetchPath::RasterOrderAttachmentAccess;
             support_shader_interlock = gpu_strategy.use_shader_interlock;
             support_sync2 = gpu_strategy.barriers == BarrierStyle::Sync2;
+            support_timeline = gpu_strategy.submit == SubmitTracking::TimelineSemaphore;
             vkutil::sync::config().use_sync2 = support_sync2;
             LOG_INFO("GPU paths: {}", describe(gpu_caps, gpu_strategy));
             publish_paths_line(describe(gpu_caps, gpu_strategy));
@@ -980,7 +984,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             vk::PhysicalDeviceFragmentShaderInterlockFeaturesEXT,
             vk::PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT,
             vk::PhysicalDeviceFaultFeaturesEXT,
-            vk::PhysicalDeviceSynchronization2Features>
+            vk::PhysicalDeviceSynchronization2Features,
+            vk::PhysicalDeviceTimelineSemaphoreFeatures>
             device_info{
                 vk::DeviceCreateInfo{
                     .pEnabledFeatures = &enabled_features },
@@ -998,7 +1003,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 vk::PhysicalDeviceFaultFeaturesEXT{
                     .deviceFault = VK_TRUE },
                 vk::PhysicalDeviceSynchronization2Features{
-                    .synchronization2 = VK_TRUE }
+                    .synchronization2 = VK_TRUE },
+                vk::PhysicalDeviceTimelineSemaphoreFeatures{
+                    .timelineSemaphore = VK_TRUE }
             };
         device_info.get().setQueueCreateInfos(queue_infos);
         device_info.get().setPEnabledExtensionNames(device_extensions);
@@ -1026,6 +1033,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             device_info.unlink<vk::PhysicalDeviceFaultFeaturesEXT>();
         if (!support_sync2)
             device_info.unlink<vk::PhysicalDeviceSynchronization2Features>();
+        if (!support_timeline)
+            device_info.unlink<vk::PhysicalDeviceTimelineSemaphoreFeatures>();
 
         if (sampler_device_support.ycbcr_conversion) {
             ycbcr_features.pNext = const_cast<void *>(device_info.get().pNext);
@@ -1045,6 +1054,12 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         }
         VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
         sampler_support = make_sampler_support(physical_device_properties, enabled_features, sampler_device_support);
+        if (support_timeline) {
+            const vk::SemaphoreTypeCreateInfo type_info{ .semaphoreType = vk::SemaphoreType::eTimeline, .initialValue = 0 };
+            const vk::SemaphoreCreateInfo sem_info{ .pNext = &type_info };
+            submit_timeline = device.createSemaphore(sem_info);
+            submit_counter = 0;
+        }
     }
 
     // Get Queues
@@ -1512,6 +1527,7 @@ void VKState::cleanup() {
 
     for (int i = 0; i < MAX_FRAMES_RENDERING; i++) {
         frames[i].rendered_fences.clear();
+        frames[i].rendered_timeline_value = 0;
         for (auto &descriptor : frames[i].vert_descriptors)
             release_descriptor_sets(descriptor);
         for (auto &descriptor : frames[i].frag_descriptors)
@@ -1527,6 +1543,11 @@ void VKState::cleanup() {
     screen_renderer.cleanup();
 
     overlay_renderer.destroy();
+
+    if (submit_timeline) {
+        device.destroySemaphore(submit_timeline);
+        submit_timeline = nullptr;
+    }
 
     surface_cache.cleanup();
 

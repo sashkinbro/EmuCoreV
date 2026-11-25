@@ -55,7 +55,12 @@ struct Image {
     Image(const Image &) = delete;
     Image &operator=(Image const &) = delete;
 
-    void init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping = default_comp_mapping, const vk::ImageCreateFlags image_create_flags = vk::ImageCreateFlags(), const void *pNext = nullptr);
+    void init_image(vk::ImageUsageFlags usage, vk::ComponentMapping mapping = default_comp_mapping, const vk::ImageCreateFlags image_create_flags = vk::ImageCreateFlags(), const void *pNext = nullptr,
+        const vma::AllocationCreateInfo &alloc_info = vma_auto_alloc);
+    // Attachment whose content never leaves the render pass (MSAA colour/depth that is resolved in-pass, depth that is dead after the
+    // scene): TRANSIENT_ATTACHMENT usage in LAZILY_ALLOCATED memory when `lazy` (GpuCaps::lazily_allocated_memory chosen by the
+    // strategy table), otherwise the same image in normal memory (storeOp must be DONT_CARE either way). `samples` is for the MSAA user.
+    void init_transient_attachment(vk::ImageUsageFlags attachment_usage, bool lazy, vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
     // called by ~Image
     void destroy();
 

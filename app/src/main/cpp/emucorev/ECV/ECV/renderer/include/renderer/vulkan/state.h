@@ -71,6 +71,9 @@ struct VKState : public renderer::State {
     // capability layer + the path table chosen from it at device creation (gpu_caps.h)
     GpuCaps gpu_caps;
     Strategy gpu_strategy;
+    // SubmitTracking::TimelineSemaphore: every scene submit signals ++submit_counter (render thread only); null when fences are used
+    vk::Semaphore submit_timeline = nullptr;
+    uint64_t submit_counter = 0;
 
     ScreenRenderer screen_renderer;
     OverlayRenderer overlay_renderer;

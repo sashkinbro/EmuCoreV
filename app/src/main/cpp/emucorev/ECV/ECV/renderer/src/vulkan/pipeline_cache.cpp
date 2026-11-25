@@ -1107,6 +1107,20 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     {
         const uint64_t parts[4] = { key, fragment_program.blending_hash, vertex_program_gxm.key_hash, static_cast<uint64_t>(type) };
         key = XXH3_64bits(parts, sizeof(parts));
+        const uint64_t check_parts[5] = { XXH3_64bits_withSeed(&record, record_pipeline_len, 0x9E3779B97F4A7C15ull), parts[1], parts[2], parts[3], static_cast<uint64_t>(record.color_surface.colorFormat) };
+        const uint64_t check = XXH3_64bits_withSeed(check_parts, sizeof(check_parts), 0xC2B2AE3D27D4EB4Full);
+        for (int attempt = 0; attempt < 8; attempt++) {
+            const auto found = pipeline_checks.find(key);
+            if (found == pipeline_checks.end()) {
+                pipeline_checks.emplace(key, check);
+                break;
+            }
+            if (found->second == check)
+                break;
+            // same 64-bit key, different state: never hand out the other state's pipeline
+            LOG_ERROR_ONCE("Pipeline key collision detected, re-keying");
+            key = XXH3_64bits_withSeed(&key, sizeof(key), check);
+        }
     }
 
     // the render pass is chosen per scene from the depth/stencil surface: its format and which tests exist change the pipeline,
