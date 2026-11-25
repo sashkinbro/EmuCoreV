@@ -93,6 +93,17 @@ object LiveGraphicsSettings {
     fun normalizeResolution(requested: Float, limit: Float): Float? =
         resolutionChoices(limit).firstOrNull { kotlin.math.abs(it - requested) < 1e-3f }
 
+    /**
+     * A save-state load restores the session at the save's internal resolution (its surfaces need it).
+     * The configured (profile) resolution still wins: this is the value to switch back to live after
+     * the load, or null when nothing is to be done (already there, nothing rendering, or the
+     * configured value is not selectable here). The profile itself is never rewritten from a save.
+     */
+    fun resolutionAfterLoad(configured: Float, live: Float, limit: Float): Float? {
+        if (live <= 0f || kotlin.math.abs(configured - live) < 1e-3f) return null
+        return normalizeResolution(configured, limit)
+    }
+
     fun formatResolution(value: Float): String =
         if (value == value.toInt().toFloat()) "${value.toInt()}x" else "${value}x"
 }

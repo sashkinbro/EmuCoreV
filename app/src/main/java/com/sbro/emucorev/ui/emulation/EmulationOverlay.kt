@@ -100,6 +100,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorev.R
 import com.sbro.emucorev.BuildConfig
+import com.sbro.emucorev.core.LiveGraphicsSettings
 import com.sbro.emucorev.core.LiveResolutionSwitch
 import com.sbro.emucorev.core.AndroidGyroscopeInput
 import com.sbro.emucorev.core.AndroidTouchHaptics
@@ -394,13 +395,14 @@ fun EmulationOverlayHost(
                     return@withSaveStateMenuPause
                 }
                 if (result.isOk && action is SaveStateAction.Load) {
-                    // A load switches the session to the save's internal resolution; keep the
-                    // menu and the per-game profile in step with what is rendering now.
+                    // A load restores the save's internal resolution; the per-game profile is
+                    // never rewritten from a save. Switch back live to the configured resolution
+                    // (same path as the menu) so the menu shows what renders.
                     val liveResolution = withContext(Dispatchers.Default) { activity.getLiveResolutionMultiplier() }
-                    if (liveResolution > 0f && abs(liveResolution - config.resolutionMultiplier) > 1e-3f) {
-                        config = config.copy(resolutionMultiplier = liveResolution)
-                        repository.savePreservingDriverOverride(gameId, config)
-                    }
+                    val limit = withContext(Dispatchers.Default) { activity.getLiveResolutionLimit() }
+                    val target = LiveGraphicsSettings.resolutionAfterLoad(config.resolutionMultiplier, liveResolution, limit)
+                    if (target != null && !withContext(Dispatchers.Default) { activity.setLiveResolutionMultiplier(target) })
+                        Toast.makeText(activity, R.string.emulation_menu_resolution_failed, Toast.LENGTH_SHORT).show()
                     menuOpen = false
                     userPaused = false
                 } else if (action is SaveStateAction.Load) {

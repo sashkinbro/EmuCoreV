@@ -23,6 +23,7 @@
 #include <config/settings.h>
 #include <ctrl/functions.h>
 #include <dialog/state.h>
+#include <emucorev/live_resolution.h>
 #include <emucorev/savestate/savestate.h>
 #include <emucorev/savestate/operation_mutex.h>
 #include <emucorev/savestate/session_pause.h>
@@ -299,17 +300,23 @@ private:
 } // namespace
 
 void register_state_frame_readiness(renderer::State &state) {
-    state.restore_presentation_callback = [](uint64_t generation, bool ready) {
+    state.restore_presentation_callback = [](uint64_t generation, bool ready) -> bool {
         auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
         auto activity = static_cast<jobject>(SDL_GetAndroidActivity());
-        if (!env || !activity) return;
+        if (!env || !activity) {
+            LOG_WARN("state frame {} generation {}: activity not reachable, will retry", ready ? "ready" : "pending", generation);
+            return false;
+        }
         const auto clazz = env->GetObjectClass(activity);
         const auto method = clazz ? get_optional_activity_method(env, clazz,
             ready ? "onStateFrameReady" : "onStateFramePending", "(J)V") : nullptr;
         if (method) env->CallVoidMethod(activity, method, static_cast<jlong>(generation));
+        else LOG_WARN("state frame {} generation {}: callback method missing, will retry", ready ? "ready" : "pending", generation);
         clear_activity_callback_exception(env);
         if (clazz) env->DeleteLocalRef(clazz);
         env->DeleteLocalRef(activity);
+        if (method) LOG_INFO("state frame {} delivered, generation {}", ready ? "ready" : "pending", generation);
+        return method != nullptr;
     };
 }
 
@@ -460,8 +467,12 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
         sync_current_game_id(launch_request.app_path);
 
         const bool has_launch_state = !load_state_path.empty();
+        float configured_resolution = 0.0f;
         if (has_launch_state) {
             startup_state_operation.lock();
+            // The save is restored at its own resolution (its surfaces need it); the configured one
+            // is switched to live right after the restore.
+            configured_resolution = emuenv->cfg.current_config.resolution_multiplier;
             const auto config_result = emucorev::savestate::prepare_launch_gpu_config(*emuenv, load_state_path);
             if (!config_result.ok()) {
 #if ECV_ORACLE
@@ -573,6 +584,18 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                 cleanup_launch(app::AppSessionStopReason::LaunchFailure);
                 break;
             }
+            const float restore_resolution = emuenv->renderer->res_multiplier;
+            if (emuenv->renderer->current_backend == renderer::Backend::Vulkan
+                && restore_resolution > emucorev::live_resolution::max_supported_multiplier(*emuenv)) {
+                // Refuse up front instead of failing half way through the restore.
+                const std::string error = fmt::format("save state needs {}x internal resolution, above this device's limit",
+                    restore_resolution);
+                LOG_ERROR("{}", error);
+                report_save_state_load_error(error);
+                exit_code = -1;
+                cleanup_launch(app::AppSessionStopReason::LaunchFailure);
+                break;
+            }
             LOG_INFO("Applying launch save state {}", requested_state_path);
             register_state_frame_readiness(*emuenv->renderer);
 #if ECV_ORACLE
@@ -586,6 +609,15 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
 #endif
             if (state_result.ok()) {
                 LOG_INFO("Loaded save state from {}", requested_state_path);
+                if (configured_resolution > 0.0f && configured_resolution != restore_resolution) {
+                    // The user's per-game resolution wins; the restore resolution was only needed for the surfaces.
+                    std::string resolution_error;
+                    const auto switched = emucorev::live_resolution::apply(*emuenv, configured_resolution, resolution_error);
+                    if (switched != emucorev::live_resolution::Result::Applied
+                        && switched != emucorev::live_resolution::Result::Unchanged)
+                        LOG_WARN("Staying at the save's {}x: cannot switch to the configured {}x: {}",
+                            restore_resolution, configured_resolution, resolution_error);
+                }
             } else {
                 LOG_ERROR("Failed to load save state {}: {}", requested_state_path, state_result.error);
                 report_save_state_load_error(state_result.error);

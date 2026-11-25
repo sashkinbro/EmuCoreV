@@ -25,7 +25,13 @@ object NativeLibraryLoader {
                 if (!loaded) {
                     // SDL may already have a live surface. Keep its Activity
                     // available while native initialization posts UI messages.
-                    SDL.setContext(if (context is org.libsdl.app.SDLActivity) context else appContext)
+                    // Never replace a live Activity context with the application context: native
+                    // callbacks (save-state progress / frame readiness) resolve their Activity
+                    // through it, and an app-startup pre-warm racing Emulator.onCreate used to
+                    // leave them calling methods on the Application (B007).
+                    val current = runCatching { SDL.getContext() }.getOrNull()
+                    if (context is org.libsdl.app.SDLActivity) SDL.setContext(context)
+                    else if (current !is org.libsdl.app.SDLActivity) SDL.setContext(appContext)
                     SDL.loadLibrary("ECV", appContext)
                     loaded = true
                     // Seed SDL's cached JNI globals (activity class, getContext,

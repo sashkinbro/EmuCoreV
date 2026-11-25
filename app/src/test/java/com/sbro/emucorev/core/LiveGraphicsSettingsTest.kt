@@ -185,4 +185,17 @@ class LiveGraphicsSettingsTest {
             assertTrue(emulator.contains("external fun $name"))
         }
     }
+
+    @Test
+    fun loadSwitchesBackToTheConfiguredResolution() {
+        // cold or in-game load restored the save's 1x while the profile says 3x
+        assertEquals(3f, LiveGraphicsSettings.resolutionAfterLoad(3f, 1f, 4f))
+        // nothing to do when the session already renders the configured value
+        assertNull(LiveGraphicsSettings.resolutionAfterLoad(3f, 3f, 4f))
+        // configured value above this device's limit stays at the restored resolution
+        assertNull(LiveGraphicsSettings.resolutionAfterLoad(5f, 1f, 4f))
+        // no running session
+        assertNull(LiveGraphicsSettings.resolutionAfterLoad(3f, 0f, 4f))
+        assertNull(LiveGraphicsSettings.resolutionAfterLoad(3f, 1f, 0f))
+    }
 }

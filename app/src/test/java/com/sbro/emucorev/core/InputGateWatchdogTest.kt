@@ -39,4 +39,27 @@ class InputGateWatchdogTest {
         now += 15_000
         assertTrue(watchdog.check(true))
     }
+
+    @Test fun progressRestartsTheClock() {
+        watchdog.check(true)
+        now += 14_000
+        watchdog.progress()
+        now += 14_000
+        assertFalse(watchdog.check(true))
+        now += 1_000
+        assertTrue(watchdog.check(true))
+    }
+
+    @Test fun timeInTheBackgroundIsNotCounted() {
+        watchdog.check(true)
+        now += 10_000
+        watchdog.setPaused(true)
+        now += 120_000
+        assertFalse(watchdog.check(true))
+        watchdog.setPaused(false)
+        now += 14_999
+        assertFalse(watchdog.check(true))
+        now += 1
+        assertTrue(watchdog.check(true))
+    }
 }

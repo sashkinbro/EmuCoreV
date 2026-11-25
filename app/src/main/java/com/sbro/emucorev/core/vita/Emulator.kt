@@ -236,6 +236,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     fun onLaunchStateProgress(progress: Float, active: Boolean) {
         runOnUiThread {
+            inputGateWatchdog.progress()
             if (!active && stateFrameWaiting) return@runOnUiThread
             launchStateLoading = launchStateLoading.onNativeProgress(progress, active)
             clearLoadMarkerIfSettled()
@@ -244,8 +245,10 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     fun onStateFramePending(generation: Long) {
         runOnUiThread {
+            Log.i(TAG, "state frame pending generation=$generation ready=$stateFrameReadyGeneration")
             if (generation > stateFrameReadyGeneration)
                 stateFramePendingGeneration = maxOf(stateFramePendingGeneration, generation)
+            inputGateWatchdog.progress()
             startInputGateWatchdog()
         }
     }
@@ -253,6 +256,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     fun onStateFrameReady(generation: Long) {
         LabSession.onStateFrameReady(this)
         runOnUiThread {
+            Log.i(TAG, "state frame ready generation=$generation pending=$stateFramePendingGeneration")
             if (generation < stateFramePendingGeneration) return@runOnUiThread
             stateFrameReadyGeneration = maxOf(stateFrameReadyGeneration, generation)
             launchStateLoading = launchStateLoading.onNativeProgress(1f, false)
@@ -287,11 +291,16 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
         }
     }
 
+    /**
+     * No progress for [InputGateWatchdog.TIMEOUT_MS] while resumed. The load itself is not judged: a native
+     * failure is reported through [showSaveStateLoadError]. Only the UI gate is opened; auto-save stays enabled
+     * and the load marker is left to the normal completion path.
+     */
     private fun onInputGateTimeout() {
-        Log.e(TAG, "Input gate stayed closed for ${InputGateWatchdog.TIMEOUT_MS} ms " +
-            "(loading=${launchStateLoading.active} frameWaiting=$stateFrameWaiting); clearing it")
+        Log.e(TAG, "Input gate stayed closed for ${InputGateWatchdog.TIMEOUT_MS} ms without progress " +
+            "(loading=${launchStateLoading.active} frameWaiting=$stateFrameWaiting); opening it")
         stateFrameReadyGeneration = maxOf(stateFrameReadyGeneration, stateFramePendingGeneration)
-        showSaveStateLoadError("input gate timed out")
+        launchStateLoading = launchStateLoading.onFailure()
     }
 
     fun setCurrentGameId(gameId: String) {
@@ -394,6 +403,8 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             // Every launch, whichever process requested it, is prepared here: failed preparation
             // must abort the native entry point rather than boot with stale state.
             if (!prepareLaunch()) return
+            // Native callbacks find this Activity through SDL's context (see NativeLibraryLoader).
+            org.libsdl.app.SDL.setContext(this)
             super.main()
         } finally {
             TrophySyncSessionGate.shared.gameStopped()
@@ -606,6 +617,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
 
     override fun onResume() {
         super.onResume()
+        inputGateWatchdog.setPaused(false)
         if (rebirthRequested || isFinishing) return
         if (isNativeShellSession && shellLaunchPending.getAndSet(false)) {
             exitScope.launch { withContext(Dispatchers.IO) {
@@ -640,6 +652,7 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     }
 
     override fun onPause() {
+        inputGateWatchdog.setPaused(true)
         shellCatalogCheckJob?.cancel()
         rearTouchInput.setActive(false)
         com.sbro.emucorev.core.input.RearTouchNative.setCamerasSuspended(true)
