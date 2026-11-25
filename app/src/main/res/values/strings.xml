@@ -43,6 +43,7 @@
     <string name="onboarding_firmware_cancel_download">Cancel</string>
     <string name="onboarding_firmware_downloading">Downloading %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Download failed. Try again.</string>
+    <string name="onboarding_firmware_download_corrupt">The downloaded file is incomplete or damaged. Try again.</string>
     <string name="onboarding_firmware_info_title">Official firmware download</string>
     <string name="onboarding_firmware_info_body">Firmware files are downloaded directly from Sony’s official update servers. EmuCoreV does not host, mirror, modify, or redistribute firmware from its own resources; it only opens the official public download links and installs the package you choose.</string>
     <string name="onboarding_back">Back</string>
@@ -729,6 +730,16 @@
     <string name="install_dialog_close">Close</string>
     <string name="install_dialog_unexpected_error">Something went wrong during installation.</string>
     <string name="install_dialog_firmware_failed">Firmware installation failed.</string>
+    <string name="install_dialog_firmware_validating">Checking the firmware package…</string>
+    <string name="install_dialog_firmware_decrypting">Decrypting %1$s…</string>
+    <string name="install_dialog_firmware_extracting">Extracting %1$s (%2$d files)…</string>
+    <string name="install_dialog_firmware_finalizing">Finishing installation…</string>
+    <string name="install_dialog_firmware_not_pup">This is not a PlayStation Vita firmware package (PUP).</string>
+    <string name="install_dialog_firmware_truncated">The firmware package is incomplete. Download it again or use a complete copy.</string>
+    <string name="install_dialog_firmware_corrupt">The firmware package is damaged or not supported.</string>
+    <string name="install_dialog_firmware_io_error">Writing the firmware files failed. Check the free storage and try again.</string>
+    <string name="install_dialog_firmware_internal">An unexpected error occurred. The previous firmware was not changed.</string>
+    <string name="install_dialog_firmware_no_space">Not enough free storage. About %1$d MB is needed.</string>
     <string name="install_dialog_content_failed">Game installation failed.</string>
     <string name="install_dialog_vitamin_unsupported">Vitamin dumps are not supported. Archive repair cannot fix them. Use a NoNpDrm or FAGDec dump of your own game, or its PKG and matching license.</string>
     <string name="install_dialog_content_try_repair">If this is a valid VPK or ZIP image, try Repair and install from the game install dialog.</string>

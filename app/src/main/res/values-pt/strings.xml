@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">Cancelar</string>
     <string name="onboarding_firmware_downloading">Baixando %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Falha ao baixar. Tente novamente.</string>
+    <string name="onboarding_firmware_download_corrupt">O ficheiro transferido está incompleto ou danificado. Tente novamente.</string>
     <string name="onboarding_back">Voltar</string>
     <string name="onboarding_next">Avançar</string>
     <string name="onboarding_get_started">Começar</string>
@@ -373,6 +374,16 @@
     <string name="install_dialog_close">Fechar</string>
     <string name="install_dialog_unexpected_error">Algo deu errado durante a instalação.</string>
     <string name="install_dialog_firmware_failed">A instalação do firmware falhou.</string>
+    <string name="install_dialog_firmware_validating">A verificar o pacote de firmware…</string>
+    <string name="install_dialog_firmware_decrypting">A desencriptar %1$s…</string>
+    <string name="install_dialog_firmware_extracting">A extrair %1$s (%2$d ficheiros)…</string>
+    <string name="install_dialog_firmware_finalizing">A concluir a instalação…</string>
+    <string name="install_dialog_firmware_not_pup">Este não é um pacote de firmware da PlayStation Vita (PUP).</string>
+    <string name="install_dialog_firmware_truncated">O pacote de firmware está incompleto. Transfira-o novamente ou use uma cópia completa.</string>
+    <string name="install_dialog_firmware_corrupt">O pacote de firmware está danificado ou não é suportado.</string>
+    <string name="install_dialog_firmware_io_error">Falha ao gravar os ficheiros do firmware. Verifique o espaço livre e tente novamente.</string>
+    <string name="install_dialog_firmware_internal">Ocorreu um erro inesperado. O firmware anterior não foi alterado.</string>
+    <string name="install_dialog_firmware_no_space">Armazenamento livre insuficiente. São necessários cerca de %1$d MB.</string>
     <string name="install_dialog_content_failed">A instalação do jogo falhou.</string>
     <string name="install_dialog_pkg_failed">A instalação do PKG falhou.</string>
     <string name="install_dialog_firmware_done">Pacote de firmware instalado com sucesso.</string>

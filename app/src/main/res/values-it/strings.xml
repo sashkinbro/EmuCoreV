@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">Annulla</string>
     <string name="onboarding_firmware_downloading">Download %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Download non riuscito. Riprova.</string>
+    <string name="onboarding_firmware_download_corrupt">Il file scaricato è incompleto o danneggiato. Riprova.</string>
     <string name="onboarding_back">Indietro</string>
     <string name="onboarding_next">Avanti</string>
     <string name="onboarding_get_started">Inizia</string>
@@ -373,6 +374,16 @@
     <string name="install_dialog_close">Chiudi</string>
     <string name="install_dialog_unexpected_error">Si è verificato un errore durante l\'installazione.</string>
     <string name="install_dialog_firmware_failed">Installazione del firmware non riuscita.</string>
+    <string name="install_dialog_firmware_validating">Controllo del pacchetto firmware…</string>
+    <string name="install_dialog_firmware_decrypting">Decifrazione di %1$s…</string>
+    <string name="install_dialog_firmware_extracting">Estrazione di %1$s (%2$d file)…</string>
+    <string name="install_dialog_firmware_finalizing">Completamento dell’installazione…</string>
+    <string name="install_dialog_firmware_not_pup">Questo non è un pacchetto firmware PlayStation Vita (PUP).</string>
+    <string name="install_dialog_firmware_truncated">Il pacchetto firmware è incompleto. Scaricalo di nuovo o usa una copia completa.</string>
+    <string name="install_dialog_firmware_corrupt">Il pacchetto firmware è danneggiato o non supportato.</string>
+    <string name="install_dialog_firmware_io_error">Scrittura dei file del firmware non riuscita. Controlla lo spazio libero e riprova.</string>
+    <string name="install_dialog_firmware_internal">Si è verificato un errore imprevisto. Il firmware precedente non è stato modificato.</string>
+    <string name="install_dialog_firmware_no_space">Spazio libero insufficiente. Servono circa %1$d MB.</string>
     <string name="install_dialog_content_failed">Installazione del gioco non riuscita.</string>
     <string name="install_dialog_pkg_failed">Installazione del PKG non riuscita.</string>
     <string name="install_dialog_firmware_done">Pacchetto firmware installato con successo.</string>

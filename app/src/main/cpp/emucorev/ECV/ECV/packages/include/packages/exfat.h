@@ -19,6 +19,8 @@
 
 #include <util/log.h>
 
+#include <functional>
+
 // Credits to relan for their original work on this https://github.com/relan/exfat
 
 #define EXFAT_ENAME_MAX 15
@@ -109,5 +111,6 @@ enum ExFATEntryType {
 };
 
 namespace exfat {
-void extract_exfat(const fs::path &partition_path, const std::string &partition, const fs::path &vita_fs_path);
+// EmuCoreV: `on_progress` gets the bytes just written (0 when a file is complete) and may throw to abort; I/O errors throw.
+void extract_exfat(const fs::path &partition_path, const std::string &partition, const fs::path &vita_fs_path, const std::function<void(uint64_t)> &on_progress = nullptr);
 } // namespace exfat

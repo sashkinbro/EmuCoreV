@@ -43,6 +43,7 @@
     <string name="onboarding_firmware_cancel_download">キャンセル</string>
     <string name="onboarding_firmware_downloading">ダウンロード中 %1$d%%</string>
     <string name="onboarding_firmware_download_failed">ダウンロードに失敗しました。もう一度お試しください。</string>
+    <string name="onboarding_firmware_download_corrupt">ダウンロードしたファイルが不完全または破損しています。もう一度お試しください。</string>
     <string name="onboarding_firmware_info_title">公式ファームウェアのダウンロード</string>
     <string name="onboarding_firmware_info_body">ファームウェアファイルはSonyの公式アップデートサーバーから直接ダウンロードされます。EmuCoreVが独自リソースでファームウェアをホスト、ミラー、改変、再配布することはありません。公式の公開ダウンロードリンクを開き、選択したパッケージをインストールするだけです。</string>
     <string name="onboarding_back">戻る</string>
@@ -729,6 +730,16 @@
     <string name="install_dialog_close">閉じる</string>
     <string name="install_dialog_unexpected_error">インストール中に問題が発生しました。</string>
     <string name="install_dialog_firmware_failed">ファームウェアのインストールに失敗しました。</string>
+    <string name="install_dialog_firmware_validating">ファームウェアパッケージを確認しています…</string>
+    <string name="install_dialog_firmware_decrypting">%1$s を復号しています…</string>
+    <string name="install_dialog_firmware_extracting">%1$s を展開しています（%2$d ファイル）…</string>
+    <string name="install_dialog_firmware_finalizing">インストールを完了しています…</string>
+    <string name="install_dialog_firmware_not_pup">これは PlayStation Vita のファームウェアパッケージ（PUP）ではありません。</string>
+    <string name="install_dialog_firmware_truncated">ファームウェアパッケージが不完全です。再ダウンロードするか、完全なコピーを使用してください。</string>
+    <string name="install_dialog_firmware_corrupt">ファームウェアパッケージが破損しているか、対応していません。</string>
+    <string name="install_dialog_firmware_io_error">ファームウェアファイルの書き込みに失敗しました。空き容量を確認して、もう一度お試しください。</string>
+    <string name="install_dialog_firmware_internal">予期しないエラーが発生しました。以前のファームウェアは変更されていません。</string>
+    <string name="install_dialog_firmware_no_space">空き容量が不足しています。約 %1$d MB 必要です。</string>
     <string name="install_dialog_content_failed">ゲームのインストールに失敗しました。</string>
     <string name="install_dialog_vitamin_unsupported">Vitaminダンプはサポートされていません。アーカイブの修復では直せません。所有するゲームのNoNpDrmまたはFAGDecダンプ、もしくはPKGと対応するライセンスを使用してください。</string>
     <string name="install_dialog_content_try_repair">これが有効なVPKまたはZIPイメージの場合は、ゲームインストールダイアログから「修復してインストール」を試してください。</string>

@@ -66,8 +66,10 @@ class LaunchIntentsTest {
 
     private fun installFirmware() {
         val root = EmulatorStorage.vitaRoot(context)
-        File(root, "vs0").mkdirs(); File(root, "vs0/file").writeText("x")
-        File(root, "sa0").mkdirs(); File(root, "sa0/file").writeText("x")
+        // Key files of a complete install (see FirmwareInstallState).
+        for (key in listOf(FirmwareInstallState.SHELL_KEY_FILE, FirmwareInstallState.FONT_KEY_FILE)) {
+            File(root, key).apply { parentFile.mkdirs() }.writeText("x")
+        }
     }
 
     private fun launch(titleId: String, statePath: String? = null): VitaLaunchBridge.LaunchResult {

@@ -29,6 +29,9 @@
 #include <self.h>
 
 #include <fstream>
+#include <memory>
+#include <stdexcept>
+#include <system_error>
 
 // Credits to TeamMolecule for their original work on this https://github.com/TeamMolecule/sceutils
 
@@ -600,10 +603,17 @@ void register_keys(KeyStore &SCE_KEYS, int type) {
     }
 }
 
-static void extract_file(Fat16::Image &img, Fat16::Entry &entry, const fs::path &path) {
+// EmuCoreV: every I/O failure while extracting a partition image is fatal and reported (std::system_error carries errno,
+// so callers can tell a full disk from other failures); the previous code ignored fopen/fwrite/fclose and short reads and
+// silently produced truncated or missing files. `on_progress(n)` is called with the bytes just written (n > 0) and once with
+// n == 0 when a file is complete; it may throw to abort the extraction.
+static void extract_file(Fat16::Image &img, Fat16::Entry &entry, const fs::path &path, const FatExtractProgress &on_progress) {
     const std::u16string filename_16 = entry.get_filename();
     const fs::path filename = path / std::wstring(filename_16.begin(), filename_16.end());
-    FILE *f = FOPEN(filename.native().c_str(), "wb");
+    std::unique_ptr<FILE, int (*)(FILE *)> keep(FOPEN(filename.native().c_str(), "wb"), [](FILE *file) { return file ? fclose(file) : 0; });
+    FILE *f = keep.get();
+    if (!f)
+        throw std::system_error(errno, std::generic_category(), "cannot create " + fs_utils::path_to_utf8(filename));
 
     static constexpr std::uint32_t CHUNK_SIZE = 0x10000;
 
@@ -616,19 +626,26 @@ static void extract_file(Fat16::Image &img, Fat16::Entry &entry, const fs::path 
     while (size_left != 0) {
         std::uint32_t size_to_take = std::min<std::uint32_t>(CHUNK_SIZE, size_left);
         if (img.read_from_cluster(&temp_buf[0], offset, entry.entry.starting_cluster, size_to_take) != size_to_take) {
-            break;
+            throw std::runtime_error("short read from partition image while extracting " + fs_utils::path_to_utf8(filename));
         }
 
         size_left -= size_to_take;
         offset += size_to_take;
 
-        fwrite(&temp_buf[0], 1, size_to_take, f);
+        if (fwrite(&temp_buf[0], 1, size_to_take, f) != size_to_take)
+            throw std::system_error(errno, std::generic_category(), "write failed for " + fs_utils::path_to_utf8(filename));
+        if (on_progress)
+            on_progress(size_to_take);
     }
 
-    fclose(f);
+    keep.release();
+    if (fclose(f) != 0)
+        throw std::system_error(errno, std::generic_category(), "close failed for " + fs_utils::path_to_utf8(filename));
+    if (on_progress)
+        on_progress(0);
 }
 
-static void traverse_directory(Fat16::Image &img, Fat16::Entry mee, const fs::path &dir_path) {
+static void traverse_directory(Fat16::Image &img, Fat16::Entry mee, const fs::path &dir_path, const FatExtractProgress &on_progress) {
     fs::create_directories(dir_path);
 
     while (img.get_next_entry(mee)) {
@@ -642,18 +659,22 @@ static void traverse_directory(Fat16::Image &img, Fat16::Entry mee, const fs::pa
 
                 auto dir_name = mee.get_filename();
 
-                traverse_directory(img, baby, dir_path / std::wstring(dir_name.begin(), dir_name.end()) / "");
+                traverse_directory(img, baby, dir_path / std::wstring(dir_name.begin(), dir_name.end()) / "", on_progress);
             }
         }
 
         if (mee.entry.file_attributes & (int)Fat16::EntryAttribute::ARCHIVE) {
-            extract_file(img, mee, dir_path / "");
+            extract_file(img, mee, dir_path / "", on_progress);
         }
     }
 }
 
-void extract_fat(const fs::path &partition_path, const std::string &partition, const fs::path &vita_fs_path) {
-    FILE *f = FOPEN((partition_path / partition).native().c_str(), "rb");
+void extract_fat(const fs::path &partition_path, const std::string &partition, const fs::path &vita_fs_path, const FatExtractProgress &on_progress) {
+    // EmuCoreV: RAII handle (an abort from on_progress must not leak the image) and a checked open.
+    std::unique_ptr<FILE, int (*)(FILE *)> image_file(FOPEN((partition_path / partition).native().c_str(), "rb"), [](FILE *file) { return file ? fclose(file) : 0; });
+    FILE *f = image_file.get();
+    if (!f)
+        throw std::system_error(errno, std::generic_category(), "cannot open partition image " + fs_utils::path_to_utf8(partition_path / partition));
     Fat16::Image img(
         f,
         // Read hook
@@ -668,9 +689,7 @@ void extract_fat(const fs::path &partition_path, const std::string &partition, c
         });
 
     Fat16::Entry first;
-    traverse_directory(img, first, vita_fs_path / partition.substr(0, 3));
-
-    fclose(f);
+    traverse_directory(img, first, vita_fs_path / partition.substr(0, 3), on_progress);
 }
 
 std::string decompress_segments(const std::vector<uint8_t> &decrypted_data, const uint64_t &size) {
@@ -714,11 +733,18 @@ std::string decompress_segments(const std::vector<uint8_t> &decrypted_data, cons
 }
 
 std::vector<SceSegment> get_segments(const uint8_t *input, const SceHeader &sce_hdr, KeyStore &SCE_KEYS, const uint64_t sysver, const SelfType self_type, int keytype, const uint8_t *klic) {
+    // EmuCoreV: reject headers whose lengths cannot hold the metadata block (a corrupt package would otherwise underflow
+    // the vector sizes below). Throws std::runtime_error, handled by the install bridge as a corrupt package.
+    if (static_cast<uint64_t>(sce_hdr.metadata_offset) + 48 + MetadataInfo::Size + MetadataHeader::Size > sce_hdr.header_length)
+        throw std::runtime_error("SCE header too small for its metadata block");
     std::vector<char> dat(sce_hdr.header_length - sce_hdr.metadata_offset - 48);
     memcpy(dat.data(), &input[sce_hdr.metadata_offset + 48], sce_hdr.header_length - sce_hdr.metadata_offset - 48);
 
     const std::string key = SCE_KEYS.get(KeyType::METADATA, sce_hdr.sce_type, sysver, sce_hdr.key_revision, self_type).key;
     const std::string iv = SCE_KEYS.get(KeyType::METADATA, sce_hdr.sce_type, sysver, sce_hdr.key_revision, self_type).iv;
+    // EmuCoreV: no key for this package (unknown firmware generation) -> fail instead of decrypting with an empty key.
+    if (key.empty() || iv.empty())
+        throw std::runtime_error("no metadata key for this package");
 
     EVP_CIPHER_CTX *cipher_ctx = EVP_CIPHER_CTX_new();
     EVP_CIPHER *cipher128 = EVP_CIPHER_fetch(nullptr, "AES-128-CBC", nullptr);
@@ -775,6 +801,16 @@ std::vector<SceSegment> get_segments(const uint8_t *input, const SceHeader &sce_
     std::copy(dec1.data(), &dec1[MetadataHeader::Size], dec2);
     MetadataHeader metadata_hdr = MetadataHeader((char *)dec2);
 
+    // EmuCoreV: the decrypted header must really contain the section table and key vault it announces (a wrong key or a
+    // damaged package yields garbage counts).
+    if (static_cast<uint64_t>(MetadataHeader::Size) + static_cast<uint64_t>(metadata_hdr.section_count) * MetadataSection::Size
+            + static_cast<uint64_t>(metadata_hdr.key_count) * 16 > dec1.size()) {
+        EVP_CIPHER_CTX_free(cipher_ctx);
+        EVP_CIPHER_free(cipher128);
+        EVP_CIPHER_free(cipher256);
+        throw std::runtime_error("corrupt SCE metadata header");
+    }
+
     std::vector<SceSegment> segs;
     const auto start = MetadataHeader::Size + metadata_hdr.section_count * MetadataSection::Size;
     std::vector<std::string> vault;
@@ -790,6 +826,13 @@ std::vector<SceSegment> get_segments(const uint8_t *input, const SceHeader &sce_
         MetadataSection metsec = MetadataSection((char *)dec3.data());
 
         if (metsec.encryption == EncryptionType::AES128CTR) {
+            // EmuCoreV: key/iv indices come from the (decrypted) package; never index the vault out of range.
+            if (metsec.key_idx >= vault.size() || metsec.iv_idx >= vault.size()) {
+                EVP_CIPHER_CTX_free(cipher_ctx);
+                EVP_CIPHER_free(cipher128);
+                EVP_CIPHER_free(cipher256);
+                throw std::runtime_error("corrupt SCE metadata: key index out of range");
+            }
             segs.push_back({ metsec.offset, metsec.seg_idx, metsec.size, metsec.compression == CompressionType::DEFLATE, vault[metsec.key_idx], vault[metsec.iv_idx] });
         }
     }

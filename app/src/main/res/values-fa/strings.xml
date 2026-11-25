@@ -43,6 +43,7 @@
     <string name="onboarding_firmware_cancel_download">لغو</string>
     <string name="onboarding_firmware_downloading">در حال دانلود %1$d%%</string>
     <string name="onboarding_firmware_download_failed">دانلود ناموفق بود. دوباره تلاش کنید.</string>
+    <string name="onboarding_firmware_download_corrupt">فایل دانلودشده ناقص یا آسیب‌دیده است. دوباره تلاش کنید.</string>
     <string name="onboarding_firmware_info_title">دانلود فریمور رسمی</string>
     <string name="onboarding_firmware_info_body">فایل‌های فریمور مستقیماً از سرورهای به‌روزرسانی رسمی سونی دانلود می‌شوند. EmuCoreV فریمور را از منابع خود میزبانی، آینه‌سازی، تغییر یا بازتوزیع نمی‌کند؛ فقط پیوندهای دانلود عمومی رسمی را باز می‌کند و بسته انتخابی شما را نصب می‌کند.</string>
     <string name="onboarding_back">بازگشت</string>
@@ -729,6 +730,16 @@
     <string name="install_dialog_close">بستن</string>
     <string name="install_dialog_unexpected_error">در حین نصب مشکلی پیش آمد.</string>
     <string name="install_dialog_firmware_failed">نصب فریمور ناموفق بود.</string>
+    <string name="install_dialog_firmware_validating">در حال بررسی بستهٔ سیستم‌افزار…</string>
+    <string name="install_dialog_firmware_decrypting">در حال رمزگشایی %1$s…</string>
+    <string name="install_dialog_firmware_extracting">در حال استخراج %1$s (%2$d فایل)…</string>
+    <string name="install_dialog_firmware_finalizing">در حال پایان نصب…</string>
+    <string name="install_dialog_firmware_not_pup">این یک بستهٔ سیستم‌افزار PlayStation Vita (PUP) نیست.</string>
+    <string name="install_dialog_firmware_truncated">بستهٔ سیستم‌افزار ناقص است. دوباره دانلود کنید یا از یک نسخهٔ کامل استفاده کنید.</string>
+    <string name="install_dialog_firmware_corrupt">بستهٔ سیستم‌افزار آسیب دیده یا پشتیبانی نمی‌شود.</string>
+    <string name="install_dialog_firmware_io_error">نوشتن فایل‌های سیستم‌افزار ناموفق بود. فضای خالی را بررسی کنید و دوباره تلاش کنید.</string>
+    <string name="install_dialog_firmware_internal">خطای پیش‌بینی‌نشده‌ای رخ داد. سیستم‌افزار قبلی تغییر نکرد.</string>
+    <string name="install_dialog_firmware_no_space">فضای ذخیره‌سازی کافی نیست. حدود %1$d مگابایت لازم است.</string>
     <string name="install_dialog_content_failed">نصب بازی ناموفق بود.</string>
     <string name="install_dialog_vitamin_unsupported">دامپ‌های Vitamin پشتیبانی نمی‌شوند. تعمیر آرشیو آن‌ها را اصلاح نمی‌کند. از دامپ NoNpDrm یا FAGDec بازی خود، یا فایل PKG آن و مجوز مطابق استفاده کنید.</string>
     <string name="install_dialog_content_try_repair">اگر این یک VPK یا ZIP معتبر است، از گزینه «تعمیر و نصب» در پنجره نصب بازی استفاده کنید.</string>

@@ -24,6 +24,8 @@
 
 #include <util/log.h>
 
+#include <functional>
+
 // Credits to TeamMolecule for their original work on this https://github.com/TeamMolecule/sceutils
 
 #define SCE_MAGIC 0x00454353
@@ -651,7 +653,10 @@ public:
 };
 
 void register_keys(KeyStore &SCE_KEYS, int type);
-void extract_fat(const fs::path &partition_path, const std::string &partition, const fs::path &vita_fs_path);
+// EmuCoreV: optional progress/abort hook (bytes just written, 0 when a file is complete; may throw to abort). Extraction
+// failures (I/O errors, short reads) throw std::system_error / std::runtime_error instead of being ignored.
+using FatExtractProgress = std::function<void(uint64_t)>;
+void extract_fat(const fs::path &partition_path, const std::string &partition, const fs::path &vita_fs_path, const FatExtractProgress &on_progress = nullptr);
 std::string decompress_segments(const std::vector<uint8_t> &decrypted_data, const uint64_t &size);
 std::tuple<uint64_t, SelfType> get_key_type(std::ifstream &file, const SceHeader &sce_hdr);
 std::vector<SceSegment> get_segments(const uint8_t *input, const SceHeader &sce_hdr, KeyStore &SCE_KEYS, uint64_t sysver = -1, SelfType self_type = static_cast<SelfType>(0), int keytype = 0, const uint8_t *klic = 0);

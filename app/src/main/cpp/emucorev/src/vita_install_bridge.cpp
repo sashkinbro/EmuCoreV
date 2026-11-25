@@ -7,6 +7,7 @@
 #include "interface.h"
 
 #include <archive.h>
+#include <emucorev/firmware_installer.h>
 #include <config/state.h>
 #include <emuenv/state.h>
 #include <jni.h>
@@ -19,6 +20,7 @@
 #include <util/string_utils.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -107,6 +109,12 @@ void configure_install_env(EmuEnvState &emuenv, const fs::path &vita_root, const
 
 } // namespace
 
+// Set from any thread (Kotlin cancel button); polled by the firmware installer between I/O chunks.
+std::atomic<bool> g_firmware_cancel{false};
+
+// Returns "<STATUS>|<payload>": "OK|<version>|<partition>:<files>,..." or "<NOT_PUP|TRUNCATED|CORRUPT|IO_ERROR|NO_SPACE|CANCELLED|INTERNAL>|<detail>"
+// (NO_SPACE carries the required byte count). Progress goes through onNativeProgress("firmware", percent, partitionIndex,
+// partitionCount, "<decrypt|extract|commit|validate>:<partition>:<files>").
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallFirmware(
     JNIEnv *env,
@@ -114,17 +122,40 @@ Java_com_sbro_emucorev_core_VitaInstallBridge_nativeInstallFirmware(
     jstring vita_root_path,
     jstring firmware_path,
     jint /*system_language*/) {
-    const auto version = guard_install("firmware", std::string{}, [&]() {
+    g_firmware_cancel.store(false);
+    const auto answer = guard_install("firmware", std::string("INTERNAL|exception"), [&]() {
         const auto vita_root = fs_utils::utf8_to_path(from_jstring(env, vita_root_path));
         const auto firmware = fs_utils::utf8_to_path(from_jstring(env, firmware_path));
         JavaProgressReporter reporter(env, thiz);
 
-        return install_pup(vita_root, firmware, [&](uint32_t progress) {
-            reporter.report("firmware", static_cast<float>(progress), 0.f, 0.f);
-        });
+        emucorev::firmware::Options options;
+        options.cancelled = [] { return g_firmware_cancel.load(); };
+        options.progress = [&](const emucorev::firmware::Progress &progress) {
+            static constexpr const char *phase_names[] = { "validate", "decrypt", "extract", "commit" };
+            const std::string detail = std::string(phase_names[static_cast<int>(progress.phase)]) + ":" + progress.partition + ":"
+                + std::to_string(progress.files);
+            reporter.report("firmware", progress.percent, static_cast<float>(progress.partition_index),
+                static_cast<float>(progress.partition_count), detail);
+        };
+        const auto result = emucorev::firmware::install(vita_root, firmware, options);
+        if (result.status == emucorev::firmware::Status::Ok) {
+            std::string version = result.version;
+            std::replace(version.begin(), version.end(), '|', '_');
+            std::string partitions;
+            for (const auto &[name, files] : result.files)
+                partitions += (partitions.empty() ? "" : ",") + name + ":" + std::to_string(files);
+            return "OK|" + version + "|" + partitions;
+        }
+        if (result.status == emucorev::firmware::Status::NoSpace)
+            return std::string("NO_SPACE|") + std::to_string(result.required_bytes);
+        return std::string(emucorev::firmware::status_name(result.status)) + "|" + result.detail;
     });
+    return env->NewStringUTF(answer.c_str());
+}
 
-    return version.empty() ? nullptr : env->NewStringUTF(version.c_str());
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorev_core_VitaInstallBridge_nativeCancelFirmwareInstall(JNIEnv * /*env*/, jobject /*thiz*/) {
+    g_firmware_cancel.store(true);
 }
 
 extern "C" JNIEXPORT jint JNICALL

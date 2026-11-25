@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">Annuler</string>
     <string name="onboarding_firmware_downloading">Téléchargement %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Échec du téléchargement. Réessayez.</string>
+    <string name="onboarding_firmware_download_corrupt">Le fichier téléchargé est incomplet ou endommagé. Réessayez.</string>
     <string name="onboarding_back">Retour</string>
     <string name="onboarding_next">Suivant</string>
     <string name="onboarding_get_started">Commencer</string>
@@ -373,6 +374,16 @@
     <string name="install_dialog_close">Fermer</string>
     <string name="install_dialog_unexpected_error">Un problème est survenu pendant l\'installation.</string>
     <string name="install_dialog_firmware_failed">L\'installation du firmware a échoué.</string>
+    <string name="install_dialog_firmware_validating">Vérification du paquet de firmware…</string>
+    <string name="install_dialog_firmware_decrypting">Déchiffrement de %1$s…</string>
+    <string name="install_dialog_firmware_extracting">Extraction de %1$s (%2$d fichiers)…</string>
+    <string name="install_dialog_firmware_finalizing">Finalisation de l’installation…</string>
+    <string name="install_dialog_firmware_not_pup">Ce n’est pas un paquet de firmware PlayStation Vita (PUP).</string>
+    <string name="install_dialog_firmware_truncated">Le paquet de firmware est incomplet. Téléchargez-le à nouveau ou utilisez une copie complète.</string>
+    <string name="install_dialog_firmware_corrupt">Le paquet de firmware est endommagé ou non pris en charge.</string>
+    <string name="install_dialog_firmware_io_error">L’écriture des fichiers du firmware a échoué. Vérifiez l’espace libre et réessayez.</string>
+    <string name="install_dialog_firmware_internal">Une erreur inattendue s’est produite. Le firmware précédent n’a pas été modifié.</string>
+    <string name="install_dialog_firmware_no_space">Espace de stockage insuffisant. Environ %1$d Mo sont nécessaires.</string>
     <string name="install_dialog_content_failed">L\'installation du jeu a échoué.</string>
     <string name="install_dialog_pkg_failed">L\'installation du PKG a échoué.</string>
     <string name="install_dialog_firmware_done">Paquet de firmware installé avec succès.</string>

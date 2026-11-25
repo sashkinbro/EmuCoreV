@@ -360,17 +360,13 @@ object EmulatorStorage {
             ?.trim('"', '\'')
             ?.takeIf { it.isNotBlank() && it != "." && it != ".." && it.none(::isPathSeparatorChar) }
 
-    fun hasInstalledFirmware(context: Context): Boolean {
-        val firmwareRoot = File(vitaRoot(context), "vs0")
-        if (!firmwareRoot.exists() || !firmwareRoot.isDirectory) return false
-        return firmwareRoot.walkTopDown().any { it.isFile }
-    }
+    /** Base firmware is complete (key files + completion marker); see [FirmwareInstallState]. */
+    fun hasInstalledFirmware(context: Context): Boolean =
+        FirmwareInstallState.isFirmwareInstalled(vitaRoot(context))
 
-    fun hasInstalledFirmwareUpdate(context: Context): Boolean {
-        val updateRoot = File(vitaRoot(context), "sa0")
-        if (!updateRoot.exists() || !updateRoot.isDirectory) return false
-        return updateRoot.walkTopDown().any { it.isFile }
-    }
+    /** The fonts/update package (sa0) is complete; see [FirmwareInstallState]. */
+    fun hasInstalledFirmwareUpdate(context: Context): Boolean =
+        FirmwareInstallState.isFontPackageInstalled(vitaRoot(context))
 
     fun iconPath(context: Context, titleId: String): File =
         File(ux0AppRoot(context), "$titleId/sce_sys/icon0.png")

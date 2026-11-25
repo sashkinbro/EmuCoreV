@@ -43,6 +43,7 @@
     <string name="onboarding_firmware_cancel_download">Batal</string>
     <string name="onboarding_firmware_downloading">Mengunduh %1$d%%</string>
     <string name="onboarding_firmware_download_failed">Unduhan gagal. Coba lagi.</string>
+    <string name="onboarding_firmware_download_corrupt">Berkas yang diunduh tidak lengkap atau rusak. Coba lagi.</string>
     <string name="onboarding_firmware_info_title">Unduhan firmware resmi</string>
     <string name="onboarding_firmware_info_body">File firmware diunduh langsung dari server pembaruan resmi Sony. EmuCoreV tidak menghosting, mencerminkan, memodifikasi, atau mendistribusikan ulang firmware dari sumber dayanya sendiri; aplikasi ini hanya membuka tautan unduhan publik resmi dan memasang paket yang Anda pilih.</string>
     <string name="onboarding_back">Kembali</string>
@@ -729,6 +730,16 @@
     <string name="install_dialog_close">Tutup</string>
     <string name="install_dialog_unexpected_error">Terjadi kesalahan saat pemasangan.</string>
     <string name="install_dialog_firmware_failed">Pemasangan firmware gagal.</string>
+    <string name="install_dialog_firmware_validating">Memeriksa paket firmware…</string>
+    <string name="install_dialog_firmware_decrypting">Mendekripsi %1$s…</string>
+    <string name="install_dialog_firmware_extracting">Mengekstrak %1$s (%2$d berkas)…</string>
+    <string name="install_dialog_firmware_finalizing">Menyelesaikan instalasi…</string>
+    <string name="install_dialog_firmware_not_pup">Ini bukan paket firmware PlayStation Vita (PUP).</string>
+    <string name="install_dialog_firmware_truncated">Paket firmware tidak lengkap. Unduh ulang atau gunakan salinan yang lengkap.</string>
+    <string name="install_dialog_firmware_corrupt">Paket firmware rusak atau tidak didukung.</string>
+    <string name="install_dialog_firmware_io_error">Gagal menulis berkas firmware. Periksa ruang penyimpanan kosong lalu coba lagi.</string>
+    <string name="install_dialog_firmware_internal">Terjadi kesalahan tak terduga. Firmware sebelumnya tidak diubah.</string>
+    <string name="install_dialog_firmware_no_space">Ruang penyimpanan tidak cukup. Dibutuhkan sekitar %1$d MB.</string>
     <string name="install_dialog_content_failed">Pemasangan game gagal.</string>
     <string name="install_dialog_vitamin_unsupported">Dump Vitamin tidak didukung. Perbaikan arsip tidak dapat memperbaikinya. Gunakan dump NoNpDrm atau FAGDec dari game milik Anda, atau PKG dan lisensi yang sesuai.</string>
     <string name="install_dialog_content_try_repair">Jika ini adalah image VPK atau ZIP yang valid, coba Perbaiki dan pasang dari dialog pemasangan game.</string>

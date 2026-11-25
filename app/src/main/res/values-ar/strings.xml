@@ -41,6 +41,7 @@
     <string name="onboarding_firmware_cancel_download">إلغاء</string>
     <string name="onboarding_firmware_downloading">جاري التنزيل %1$d%%</string>
     <string name="onboarding_firmware_download_failed">فشل التنزيل. حاول مرة أخرى.</string>
+    <string name="onboarding_firmware_download_corrupt">الملف الذي تم تنزيله غير مكتمل أو تالف. حاول مرة أخرى.</string>
     <string name="onboarding_firmware_info_title">تنزيل البرامج الثابتة الرسمية</string>
     <string name="onboarding_firmware_info_body">يتم تنزيل ملفات البرامج الثابتة مباشرة من خوادم التحديث الرسمية لشركة Sony. لا يقوم EmuCoreV باستضافة، أو عمل نسخة مطابقة، أو تعديل، أو إعادة توزيع البرامج الثابتة من موارده الخاصة؛ بل يفتح روابط التنزيل العامة الرسمية ويقوم بتثبيت الحزمة التي تختارها.</string>
     <string name="onboarding_back">رجوع</string>
@@ -585,6 +586,16 @@
     <string name="install_dialog_close">إغلاق</string>
     <string name="install_dialog_unexpected_error">حدث خطأ ما أثناء التثبيت.</string>
     <string name="install_dialog_firmware_failed">فشل تثبيت البرامج الثابتة.</string>
+    <string name="install_dialog_firmware_validating">جارٍ فحص حزمة البرنامج الثابت…</string>
+    <string name="install_dialog_firmware_decrypting">جارٍ فك تشفير %1$s…</string>
+    <string name="install_dialog_firmware_extracting">جارٍ استخراج %1$s (%2$d ملفات)…</string>
+    <string name="install_dialog_firmware_finalizing">جارٍ إنهاء التثبيت…</string>
+    <string name="install_dialog_firmware_not_pup">هذه ليست حزمة برنامج ثابت لجهاز PlayStation Vita ‏(PUP).</string>
+    <string name="install_dialog_firmware_truncated">حزمة البرنامج الثابت غير مكتملة. نزّلها مرة أخرى أو استخدم نسخة كاملة.</string>
+    <string name="install_dialog_firmware_corrupt">حزمة البرنامج الثابت تالفة أو غير مدعومة.</string>
+    <string name="install_dialog_firmware_io_error">تعذّرت كتابة ملفات البرنامج الثابت. تحقق من المساحة الفارغة وحاول مرة أخرى.</string>
+    <string name="install_dialog_firmware_internal">حدث خطأ غير متوقع. لم يتم تغيير البرنامج الثابت السابق.</string>
+    <string name="install_dialog_firmware_no_space">مساحة التخزين الفارغة غير كافية. يلزم حوالي %1$d ميغابايت.</string>
     <string name="install_dialog_content_failed">فشل تثبيت اللعبة.</string>
     <string name="install_dialog_pkg_failed">فشل تثبيت PKG.</string>
     <string name="install_dialog_firmware_done">تم تثبيت حزمة البرامج الثابتة بنجاح.</string>

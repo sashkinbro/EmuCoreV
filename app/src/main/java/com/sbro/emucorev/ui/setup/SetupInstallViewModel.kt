@@ -1,12 +1,17 @@
 package com.sbro.emucorev.ui.setup
 
 import android.app.Application
+import android.os.StatFs
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorev.R
 import com.sbro.emucorev.core.DocumentPathResolver
 import com.sbro.emucorev.core.EmulatorStorage
+import com.sbro.emucorev.core.FirmwareInstallPreflight
+import com.sbro.emucorev.core.FirmwareInstallStatus
+import com.sbro.emucorev.core.FirmwareProgressDetail
 import com.sbro.emucorev.core.InstallStateBus
 import com.sbro.emucorev.core.NativeInstallProgress
 import com.sbro.emucorev.core.VitaArchiveInspection
@@ -82,6 +87,8 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     private var pendingPackageChoice: CompletableDeferred<InstallerPackageCandidate?>? = null
     private var pendingPackageChoices: Map<Int, InstallerPackageCandidate> = emptyMap()
     private var runningInstallJob: Job? = null
+    @Volatile
+    private var firmwareCancelRequested = false
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -106,21 +113,49 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun cancelArchivePreparation() {
-        if (_uiState.value.cancellable) runningInstallJob?.cancel()
+        if (!_uiState.value.cancellable) return
+        if (_uiState.value.operation == InstallOperation.Firmware) {
+            // The native installer polls this between I/O chunks and unwinds (staging removed, old firmware kept).
+            firmwareCancelRequested = true
+            VitaInstallBridge.cancelFirmwareInstall()
+        } else {
+            runningInstallJob?.cancel()
+        }
     }
 
     fun installFirmware(uriString: String) {
+        firmwareCancelRequested = false
         runInstall(InstallOperation.Firmware) {
+            _uiState.value = _uiState.value.copy(cancellable = true)
             val path = resolveInstallSource(uriString)
             if (path == null) {
                 finishError(appContext.getString(R.string.install_dialog_firmware_failed))
                 return@runInstall
             }
-            val version = VitaInstallBridge.installFirmware(appContext, path, systemLanguage())
-            if (version != null) {
-                finishSuccess(appContext.getString(R.string.install_dialog_firmware_done))
-            } else {
-                finishError(appContext.getString(R.string.install_dialog_firmware_failed))
+            if (firmwareCancelRequested) {
+                finishCancelled()
+                return@runInstall
+            }
+            val packageBytes = File(path).length()
+            val vitaRoot = EmulatorStorage.vitaRoot(appContext)
+            val available = runCatching { StatFs(vitaRoot.absolutePath).availableBytes }.getOrDefault(Long.MAX_VALUE)
+            if (!FirmwareInstallPreflight.hasEnoughSpace(available, packageBytes)) {
+                finishNoSpace(FirmwareInstallPreflight.requiredBytes(packageBytes))
+                return@runInstall
+            }
+            val result = VitaInstallBridge.installFirmware(appContext, path, systemLanguage())
+            Log.i(TAG, "Firmware install finished: ${result.status} version='${result.version}' ${result.detail.orEmpty()}")
+            when (result.status) {
+                FirmwareInstallStatus.OK -> finishSuccess(appContext.getString(R.string.install_dialog_firmware_done))
+                FirmwareInstallStatus.CANCELLED -> finishCancelled()
+                FirmwareInstallStatus.NO_SPACE -> finishNoSpace(result.requiredBytes)
+                else -> {
+                    _uiState.value = _uiState.value.copy(detail = null) // drop the last progress line, show the reason
+                    finishError(
+                        appContext.getString(R.string.install_dialog_firmware_failed),
+                        appContext.getString(firmwareFailureDetail(result.status))
+                    )
+                }
             }
         }
     }
@@ -496,14 +531,48 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
 
     private fun handleProgress(progress: NativeInstallProgress) {
         EmulatorStorage.touchInstallInProgress(appContext)
-        val current = progress.current.takeIf { it > 0f }?.roundToInt()
+        val isFirmware = progress.stage == FIRMWARE_STAGE
+        // Firmware reports the 1-based partition being worked on; the dialog counts finished items.
+        val current = (if (isFirmware) progress.current - 1f else progress.current).takeIf { it > 0f }?.roundToInt()
         val total = progress.total.takeIf { it > 0f }?.roundToInt()
         val scaledProgress = nativeProgressOffset + progress.progress.coerceIn(0f, 100f) * nativeProgressScale
         _uiState.value = _uiState.value.copy(
             progress = scaledProgress.coerceIn(0f, 100f),
             current = current,
             total = total,
-            detail = progress.detail?.takeIf { it.isNotBlank() }
+            detail = if (isFirmware) firmwareProgressText(progress.detail) else progress.detail?.takeIf { it.isNotBlank() }
+        )
+    }
+
+    private fun firmwareProgressText(detail: String?): String? {
+        val parsed = FirmwareProgressDetail.parse(detail) ?: return null
+        return when (parsed.phase) {
+            FirmwareProgressDetail.Phase.VALIDATE -> appContext.getString(R.string.install_dialog_firmware_validating)
+            FirmwareProgressDetail.Phase.DECRYPT -> appContext.getString(R.string.install_dialog_firmware_decrypting, parsed.partition)
+            FirmwareProgressDetail.Phase.EXTRACT -> appContext.getString(
+                R.string.install_dialog_firmware_extracting,
+                parsed.partition,
+                parsed.files.toInt()
+            )
+            FirmwareProgressDetail.Phase.COMMIT -> appContext.getString(R.string.install_dialog_firmware_finalizing)
+        }
+    }
+
+    @StringRes
+    private fun firmwareFailureDetail(status: FirmwareInstallStatus): Int = when (status) {
+        FirmwareInstallStatus.NOT_PUP -> R.string.install_dialog_firmware_not_pup
+        FirmwareInstallStatus.TRUNCATED -> R.string.install_dialog_firmware_truncated
+        FirmwareInstallStatus.CORRUPT -> R.string.install_dialog_firmware_corrupt
+        FirmwareInstallStatus.IO_ERROR -> R.string.install_dialog_firmware_io_error
+        else -> R.string.install_dialog_firmware_internal
+    }
+
+    private fun finishNoSpace(requiredBytes: Long) {
+        val megabytes = ((requiredBytes + 1024L * 1024L - 1L) / (1024L * 1024L)).coerceAtLeast(1L).toInt()
+        _uiState.value = _uiState.value.copy(detail = null)
+        finishError(
+            appContext.getString(R.string.install_dialog_firmware_failed),
+            appContext.getString(R.string.install_dialog_firmware_no_space, megabytes)
         )
     }
 
@@ -603,6 +672,7 @@ class SetupInstallViewModel(application: Application) : AndroidViewModel(applica
             format != null && !directInstallableZip
 
         const val TAG = "SetupInstallViewModel"
+        const val FIRMWARE_STAGE = "firmware"
         const val REPAIR_NATIVE_PROGRESS_OFFSET = 45f
         const val REPAIR_NATIVE_PROGRESS_SCALE = 0.55f
         const val REPAIR_REPACK_PROGRESS_SCALE = 0.45f
