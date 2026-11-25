@@ -144,6 +144,25 @@ void transition_image_layout(vk::CommandBuffer cmd_buffer, vk::Image image, Imag
             src_layout == ImageLayout::Undefined ? vk::ImageLayout::eUndefined : src.layout, dst.layout, true });
 }
 
+vk::ImageSubresourceRange aspect_clamped_range(vk::Format format, vk::ImageSubresourceRange range) {
+    constexpr vk::ImageAspectFlags ds = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+    if (!(range.aspectMask & ds))
+        return range;
+    switch (format) {
+    case vk::Format::eD16Unorm:
+    case vk::Format::eD32Sfloat:
+    case vk::Format::eX8D24UnormPack32:
+        range.aspectMask &= vk::ImageAspectFlagBits::eDepth;
+        break;
+    case vk::Format::eS8Uint:
+        range.aspectMask &= vk::ImageAspectFlagBits::eStencil;
+        break;
+    default:
+        break;
+    }
+    return range;
+}
+
 vk::ImageLayout get_underlying_layout(ImageLayout layout) {
     return layout_transitions[static_cast<int>(layout)].layout;
 }

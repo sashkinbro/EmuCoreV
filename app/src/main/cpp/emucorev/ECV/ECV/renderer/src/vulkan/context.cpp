@@ -679,7 +679,7 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
         };
         begin_attachment(current_color_base_image, PassAttachment::Color, current_color_loaded, vkutil::color_subresource_range);
         begin_attachment(current_color_raw_image, PassAttachment::ColorRaw, true, vkutil::color_subresource_range);
-        begin_attachment(current_ds_image, PassAttachment::DepthStencil, current_ds_loaded, vkutil::ds_subresource_range);
+        begin_attachment(current_ds_image, PassAttachment::DepthStencil, current_ds_loaded, vkutil::aspect_clamped_range(current_ds_image ? current_ds_image->format : vk::Format::eUndefined, vkutil::ds_subresource_range));
         pass_batch.flush(render_cmd);
     }
 #if ECV_ORACLE
