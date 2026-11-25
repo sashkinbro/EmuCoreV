@@ -1137,7 +1137,9 @@ spv::Id load(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunc
             std::vector<spv::Id> ops(dest_comp_count, constant);
             spv::Id pass = b.makeCompositeConstant(b.makeVectorType(b.getTypeId(constant), static_cast<int>(dest_comp_count)), ops);
 
-            pass = finalize(b, pass, pass, op.swizzle, b.makeIntConstant(shift_offset), dest_mask);
+            // Every component of an immediate is the same constant, so the repeat offset must not shift the swizzle lookup: it would
+            // index past the dest_comp_count-wide constant on later repeats and read an undefined (zero) component.
+            pass = finalize(b, pass, pass, op.swizzle, b.makeIntConstant(0), dest_mask);
             return apply_modifiers(b, utils, op.flags, pass);
         }
     }
@@ -1433,6 +1435,15 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
     const int num_comp_in_float = get_packed_component_count(dest.type);
     nearest_swizz_on = nearest_swizz_on / num_comp_in_float * num_comp_in_float;
 
+    // Number of destination words the write covers, counted from the destination's first word up to the highest masked component.
+    // The source holds only the masked components, so with a sparse mask this is larger than the source component count and decides
+    // whether the write reaches into the next vec4 of the bank.
+    int dest_span = 0;
+    for (int i = 0; i < 4; i++) {
+        if (dest_mask & (1 << i))
+            dest_span = i + 1;
+    }
+
     if (dest.type != DataType::F32) {
         std::vector<spv::Id> composites;
         spv::Id vec_comp_type = utils::unwrap_type(b, b.getTypeId(source));
@@ -1508,6 +1519,7 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
 
         // Replace it with a full mask, since we have already pre-process this into storable F32
         dest_mask = 0b1111;
+        dest_span = total_comp_source;
     }
 
     // Now we do store!
@@ -1530,7 +1542,7 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
     std::vector<spv::IdImmediate> ops;
 
     // The provided source are stored in continuous order, however the dest mask may not be the same
-    const int total_elem_to_copy_first_vec = std::min<int>(4 - (insert_offset % 4), total_comp_source);
+    const int total_elem_to_copy_first_vec = 4 - (insert_offset % 4);
     std::uint32_t dest_comp_stored_so_far = 0;
 
     elem = b.createOp(spv::OpAccessChain, comp_type, { bank_base, b.makeIntConstant((insert_offset) >> 2) });
@@ -1554,9 +1566,9 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
     b.createStore(shuffled, elem);
 
     // Check if there's leftover to be stored to next vec4 element.
-    if ((insert_offset % 4) + total_comp_source > 4) {
+    if ((insert_offset % 4) + dest_span > 4) {
         ops.clear();
-        const int total_elem_left = ((insert_offset % 4) + total_comp_source) - 4;
+        const int total_elem_left = ((insert_offset % 4) + dest_span) - 4;
 
         elem = b.createOp(spv::OpAccessChain, comp_type, { bank_base, b.makeIntConstant((insert_offset + 3) >> 2) });
 
