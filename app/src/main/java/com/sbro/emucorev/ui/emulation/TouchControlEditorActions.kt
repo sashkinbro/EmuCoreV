@@ -13,9 +13,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorev.ui.theme.style.FilterChip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.sbro.emucorev.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf

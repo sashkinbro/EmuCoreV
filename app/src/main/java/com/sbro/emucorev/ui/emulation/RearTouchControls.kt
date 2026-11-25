@@ -14,6 +14,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.*
+import com.sbro.emucorev.ui.theme.style.Surface
+import com.sbro.emucorev.ui.theme.style.OutlinedButton
+import com.sbro.emucorev.ui.theme.style.TextButton
+import com.sbro.emucorev.ui.theme.style.FilterChip
+import com.sbro.emucorev.ui.theme.style.Switch
 import com.sbro.emucorev.ui.common.SyncedSlider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment

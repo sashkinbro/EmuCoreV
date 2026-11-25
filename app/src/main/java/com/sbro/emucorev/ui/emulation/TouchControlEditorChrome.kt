@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.sbro.emucorev.ui.theme.style.Surface
+import com.sbro.emucorev.ui.theme.style.Button
+import com.sbro.emucorev.ui.theme.style.OutlinedButton
+import com.sbro.emucorev.ui.theme.style.TextButton
 import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment

@@ -29,6 +29,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
+import com.sbro.emucorev.ui.theme.style.Surface
+import com.sbro.emucorev.ui.theme.style.Button
+import com.sbro.emucorev.ui.theme.style.OutlinedButton
+import com.sbro.emucorev.ui.theme.style.TextButton
+import com.sbro.emucorev.ui.theme.style.FilterChip
+import com.sbro.emucorev.ui.theme.style.Switch
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment

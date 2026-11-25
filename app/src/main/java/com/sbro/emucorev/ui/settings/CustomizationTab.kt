@@ -38,14 +38,14 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.TextFields
 import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorev.ui.theme.style.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
 import com.sbro.emucorev.ui.common.SyncedSlider
-import androidx.compose.material3.Surface
+import com.sbro.emucorev.ui.theme.style.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.sbro.emucorev.ui.theme.style.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +76,8 @@ import com.sbro.emucorev.ui.common.GameCoverAspectRatio
 import com.sbro.emucorev.ui.common.horizontalBleed
 import com.sbro.emucorev.ui.common.rememberDebouncedClick
 import com.sbro.emucorev.ui.theme.ThemeMode
+import com.sbro.emucorev.data.theme.ThemePackageRepository
+import androidx.compose.ui.platform.LocalConfiguration
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
 import com.sbro.emucorev.ui.theme.neon.NeonBlack
 import com.sbro.emucorev.ui.theme.neon.NeonBlue
@@ -97,6 +99,10 @@ fun CustomizationTab(
     val coverStyle by coverArt.style.collectAsState()
     val clearingCoverCache by viewModel.coverCacheClearInProgress.collectAsState()
     val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)
+    val themePackageRepository = remember(context) { ThemePackageRepository.getInstance(context) }
+    val installedThemePackages by themePackageRepository.installed.collectAsState()
+    val appliedThemePackageId by preferences.themePackageIdFlow.collectAsState(initial = preferences.themePackageId)
+    val themeLocaleTag = LocalConfiguration.current.locales[0]?.language ?: "en"
     val backgroundImported = stringResource(R.string.customization_background_imported)
     val backgroundFailed = stringResource(R.string.customization_background_failed)
     val fontImported = stringResource(R.string.customization_font_imported)
@@ -220,6 +226,18 @@ fun CustomizationTab(
                     enabled = preferences.proUnlocked,
                     onClick = { preferences.themeMode = ThemeMode.PRO }
                 )
+                installedThemePackages.filter { it.isSupported }.forEach { pkg ->
+                    val locked = pkg.spec.requiresPro && !preferences.proUnlocked
+                    val name = pkg.spec.displayName(themeLocaleTag)
+                    ThemeChip(
+                        selected = themeMode == ThemeMode.PACKAGE && appliedThemePackageId == pkg.id,
+                        label = if (locked) "$name (Pro)" else name,
+                        onClick = {
+                            if (locked) onOpenProTab()
+                            else preferences.applyThemePackage(pkg.id, pkg.spec.requiresPro)
+                        }
+                    )
+                }
             }
         }
 

@@ -1,5 +1,7 @@
 package com.sbro.emucorev.ui.settings
 
+import com.sbro.emucorev.ui.theme.style.HeaderSurface
+import com.sbro.emucorev.ui.theme.style.themedTitleCase
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
@@ -74,17 +76,17 @@ import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
 import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
+import com.sbro.emucorev.ui.theme.style.Button
+import com.sbro.emucorev.ui.theme.style.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorev.ui.theme.style.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import com.sbro.emucorev.ui.theme.style.Surface
+import com.sbro.emucorev.ui.theme.style.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.sbro.emucorev.ui.theme.style.TextButton
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -365,7 +367,7 @@ private fun SettingsCompactTopBar(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
-    Surface(
+    HeaderSurface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
@@ -396,7 +398,7 @@ private fun SettingsCompactTopBar(
                     .padding(start = 14.dp, end = 8.dp)
             ) {
                 Text(
-                    text = title,
+                    text = themedTitleCase(title),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,

@@ -46,6 +46,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
@@ -55,6 +56,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import com.sbro.emucorev.data.theme.ThemeShapeStyle
+import com.sbro.emucorev.ui.theme.LocalThemeExtras
 
 
 // Cyberpunk 2077 palette (identical values to the reference implementation).
@@ -152,46 +155,62 @@ private fun TextStyle.neonMonoStyle(): TextStyle = copy(fontFamily = FontFamily.
 // neon accents without changing anything for the other themes.
 val LocalNeonTheme = compositionLocalOf { false }
 
-// Rounded in every theme, asymmetric cyberpunk cut corners (topEnd + bottomStart)
-// while Neon is active. Drop-in replacement for hard-coded RoundedCornerShape(size).
+// The app-wide corner shape. Every call site passes the size it was designed with; the active
+// theme decides the style (rounded / cut / diagonal cut like Neon / square) and scale.
 @Composable
-fun neonShape(size: Dp): Shape = if (LocalNeonTheme.current) {
-    CutCornerShape(topEnd = size, bottomStart = size)
-} else {
-    RoundedCornerShape(size)
+fun neonShape(size: Dp): Shape {
+    val extras = LocalThemeExtras.current
+    // Huge radii (e.g. 999.dp) mean "pill": keep a pill per style instead of a degenerate cut.
+    if (size >= PILL_THRESHOLD) {
+        return if (extras.shapeStyle == ThemeShapeStyle.ROUNDED) RoundedCornerShape(50) else themedControlShape(RoundedCornerShape(50))
+    }
+    val scaled = size * extras.shapeScale
+    return when (extras.shapeStyle) {
+        ThemeShapeStyle.ROUNDED -> RoundedCornerShape(scaled)
+        ThemeShapeStyle.CUT -> CutCornerShape(scaled)
+        ThemeShapeStyle.CUT_DIAGONAL -> CutCornerShape(topEnd = scaled, bottomStart = scaled)
+        ThemeShapeStyle.SQUARE -> RectangleShape
+    }
 }
 
 // Cuts on the right side only (topEnd + bottomEnd) — used by top app bars.
 @Composable
-fun neonShapeRight(size: Dp): Shape = if (LocalNeonTheme.current) {
-    CutCornerShape(topEnd = size, bottomEnd = size)
-} else {
-    RoundedCornerShape(size)
-}
-
-// Chip shape: pronounced cut corners in Neon, stock M3 chip shape otherwise.
-@Composable
-fun neonChipShape(): Shape = if (LocalNeonTheme.current) {
-    CutCornerShape(topEnd = 10.dp, bottomStart = 10.dp)
-} else {
-    FilterChipDefaults.shape
-}
-
-// Button shape: cut corners in Neon, stock M3 pill otherwise.
-@Composable
-fun neonButtonShape(): Shape = if (LocalNeonTheme.current) {
-    CutCornerShape(topEnd = 10.dp, bottomStart = 10.dp)
-} else {
-    ButtonDefaults.shape
-}
-
-// Rotating accent cycle (yellow / cyan / red) used for corner decorations.
-fun neonAccentColor(index: Int): Color =
-    when (index % 3) {
-        0 -> NeonYellow
-        1 -> NeonBlue
-        else -> NeonRed
+fun neonShapeRight(size: Dp): Shape {
+    val extras = LocalThemeExtras.current
+    val scaled = size * extras.shapeScale
+    return when (extras.shapeStyle) {
+        ThemeShapeStyle.ROUNDED -> RoundedCornerShape(scaled)
+        ThemeShapeStyle.CUT -> CutCornerShape(scaled)
+        ThemeShapeStyle.CUT_DIAGONAL -> CutCornerShape(topEnd = scaled, bottomEnd = scaled)
+        ThemeShapeStyle.SQUARE -> RectangleShape
     }
+}
+
+// Chip shape: the theme's corner style, stock M3 chip shape for the default rounded style.
+@Composable
+fun neonChipShape(): Shape = themedControlShape(FilterChipDefaults.shape)
+
+// Button shape: the theme's corner style, stock M3 pill for the default rounded style.
+@Composable
+fun neonButtonShape(): Shape = themedControlShape(ButtonDefaults.shape)
+
+private val PILL_THRESHOLD = 100.dp
+
+@Composable
+private fun themedControlShape(stock: Shape): Shape {
+    val extras = LocalThemeExtras.current
+    val size = 10.dp * extras.shapeScale
+    return when (extras.shapeStyle) {
+        ThemeShapeStyle.ROUNDED -> if (extras.shapeScale == 1f) stock else RoundedCornerShape(size)
+        ThemeShapeStyle.CUT -> CutCornerShape(size)
+        ThemeShapeStyle.CUT_DIAGONAL -> CutCornerShape(topEnd = size, bottomStart = size)
+        ThemeShapeStyle.SQUARE -> RectangleShape
+    }
+}
+
+// Rotating decor accent cycle (yellow / cyan / red in Neon; the theme's accents otherwise).
+@Composable
+fun neonAccentColor(index: Int): Color = LocalThemeExtras.current.accent(index)
 
 // Draws the signature corner decorations over a card/chip: a small filled
 // triangle at the bottom-right corner and an accent bracket at the top-left.
@@ -261,16 +280,19 @@ fun NeonSystemBanner(
     )
     // Exactly like top app bar — opposite corners 24.dp, 45°.
     val shape = neonShape(24.dp)
+    val extras = LocalThemeExtras.current
+    val accent = extras.accent1
+    val alert = extras.accent3
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(NeonYellow.copy(alpha = 0.05f))
-            .border(1.dp, NeonYellow.copy(alpha = borderAlpha), shape)
+            .background(accent.copy(alpha = 0.05f))
+            .border(1.dp, accent.copy(alpha = borderAlpha), shape)
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
             drawLine(
-                color = NeonYellow.copy(alpha = 0.3f),
+                color = accent.copy(alpha = 0.3f),
                 start = Offset.Zero,
                 end = Offset(32.dp.toPx(), 0f),
                 strokeWidth = 4.dp.toPx()
@@ -278,13 +300,13 @@ fun NeonSystemBanner(
         }
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(6.dp).background(NeonRed))
+                Box(modifier = Modifier.size(6.dp).background(alert))
                 Spacer(modifier = Modifier.width(8.dp))
                 NeonTypewriterText(
                     text = label,
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = FontFamily.Monospace,
-                        color = NeonRed
+                        color = alert
                     )
                 )
             }
@@ -295,9 +317,9 @@ fun NeonSystemBanner(
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.Monospace,
-                        color = NeonYellow,
+                        color = accent,
                         letterSpacing = 1.sp,
-                        shadow = Shadow(color = NeonYellow.copy(alpha = 0.7f), blurRadius = 14f)
+                        shadow = Shadow(color = accent.copy(alpha = 0.7f), blurRadius = 14f)
                     )
                 )
             }
@@ -323,31 +345,41 @@ fun neonShapeCorners(
     topEnd: Dp = 0.dp,
     bottomEnd: Dp = 0.dp,
     bottomStart: Dp = 0.dp
-): Shape = if (LocalNeonTheme.current) {
-    CutCornerShape(topStart = topStart, topEnd = topEnd, bottomEnd = bottomEnd, bottomStart = bottomStart)
-} else {
-    RoundedCornerShape(
-        topStart = topStart,
-        topEnd = topEnd,
-        bottomEnd = bottomEnd,
-        bottomStart = bottomStart
-    )
+): Shape {
+    val extras = LocalThemeExtras.current
+    val scale = extras.shapeScale
+    return when (extras.shapeStyle) {
+        ThemeShapeStyle.CUT, ThemeShapeStyle.CUT_DIAGONAL -> CutCornerShape(
+            topStart = topStart * scale,
+            topEnd = topEnd * scale,
+            bottomEnd = bottomEnd * scale,
+            bottomStart = bottomStart * scale
+        )
+        ThemeShapeStyle.SQUARE -> RectangleShape
+        ThemeShapeStyle.ROUNDED -> RoundedCornerShape(
+            topStart = topStart * scale,
+            topEnd = topEnd * scale,
+            bottomEnd = bottomEnd * scale,
+            bottomStart = bottomStart * scale
+        )
+    }
 }
 
 // The signature tricolor strip (yellow / red / cyan) used under cyberpunk top bars.
 @Composable
 fun NeonTricolorDivider(modifier: Modifier = Modifier, horizontalPadding: Dp = 0.dp) {
+    val extras = LocalThemeExtras.current
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding)
             .height(2.dp)
     ) {
-        Box(modifier = Modifier.weight(0.3f).fillMaxHeight().background(NeonYellow))
+        Box(modifier = Modifier.weight(0.3f).fillMaxHeight().background(extras.accent1))
         Spacer(modifier = Modifier.width(4.dp))
-        Box(modifier = Modifier.weight(0.5f).fillMaxHeight().background(NeonRed))
+        Box(modifier = Modifier.weight(0.5f).fillMaxHeight().background(extras.accent3))
         Spacer(modifier = Modifier.width(4.dp))
-        Box(modifier = Modifier.weight(0.2f).fillMaxHeight().background(NeonBlue))
+        Box(modifier = Modifier.weight(0.2f).fillMaxHeight().background(extras.accent2))
     }
 }
 

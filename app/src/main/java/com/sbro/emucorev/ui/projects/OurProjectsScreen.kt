@@ -35,11 +35,11 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
+import com.sbro.emucorev.ui.theme.style.Button
+import com.sbro.emucorev.ui.theme.style.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
+import com.sbro.emucorev.ui.theme.style.OutlinedButton
+import com.sbro.emucorev.ui.theme.style.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable

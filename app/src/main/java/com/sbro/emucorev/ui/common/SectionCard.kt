@@ -19,7 +19,7 @@ import com.sbro.emucorev.ui.theme.neon.NeonYellow
 import com.sbro.emucorev.ui.theme.neon.neonShape
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.sbro.emucorev.ui.theme.style.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
