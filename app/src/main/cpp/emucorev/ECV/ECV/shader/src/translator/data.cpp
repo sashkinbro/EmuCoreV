@@ -1026,33 +1026,37 @@ bool USSETranslatorVisitor::vldst(
     if (is_thread_buffer_access) {
         // We are reading the thread buffer
 
-        // first some checks
-        if (mask_count > 0) {
-            LOG_ERROR("Unimplemented thread buffer access with repeat");
-            return true;
-        }
+        // Only 32-bit elements are modelled: the thread buffer is a float array and its sub-word layout is not known. Report the
+        // instruction as not translated (counted in the translation stats) instead of dropping it.
         if (to_store.type != DataType::F32) {
             LOG_ERROR("Unimplemented non-f32 thread buffer access");
-            return true;
+            return false;
         }
 
         if (m_spirv_params.thread_buffer_base != 0)
             source_1 = m_b.createBinOp(spv::OpIAdd, i32_type, source_1, m_b.makeIntConstant(m_spirv_params.thread_buffer_base));
 
-        // get the index in the float array, clamped to its declared bounds
-        spv::Id index = m_b.createBinOp(spv::OpShiftRightLogical, i32_type, source_1, m_b.makeUintConstant(2));
-        if (m_spirv_params.thread_buffer_f32_count > 0) {
-            const spv::Id last = m_b.makeIntConstant(static_cast<int>(shader::usse::thread_buffer_last_index(m_spirv_params.thread_buffer_f32_count)));
-            const spv::Id inside = m_b.createBinOp(spv::OpULessThanEqual, m_b.makeBoolType(), index, last);
-            index = m_b.createTriOp(spv::OpSelect, i32_type, inside, index, last);
-        }
-        spv::Id float_ptr = utils::create_access_chain(m_b, spv::StorageClassPrivate, m_spirv_params.thread_buffer, { index });
-        if (is_store) {
-            spv::Id value = load(to_store, 0b1);
-            m_b.createStore(value, float_ptr);
-        } else {
-            spv::Id value = m_b.createLoad(float_ptr, spv::NoPrecision);
-            store(to_store, value, 0b1);
+        // index of the first float, then one float per fetched word (loads with a mask count fetch consecutive words, stores repeat per word)
+        const spv::Id first_index = m_b.createBinOp(spv::OpShiftRightLogical, i32_type, source_1, m_b.makeUintConstant(2));
+        const int thread_words = is_store ? 1 : (current_bytes_to_fetch + 3) / 4;
+        for (int word = 0; word < thread_words; word++) {
+            // clamped to the declared bounds
+            spv::Id index = word == 0 ? first_index : m_b.createBinOp(spv::OpIAdd, i32_type, first_index, m_b.makeIntConstant(word));
+            if (m_spirv_params.thread_buffer_f32_count > 0) {
+                const spv::Id last = m_b.makeIntConstant(static_cast<int>(shader::usse::thread_buffer_last_index(m_spirv_params.thread_buffer_f32_count)));
+                const spv::Id inside = m_b.createBinOp(spv::OpULessThanEqual, m_b.makeBoolType(), index, last);
+                index = m_b.createTriOp(spv::OpSelect, i32_type, inside, index, last);
+            }
+            spv::Id float_ptr = utils::create_access_chain(m_b, spv::StorageClassPrivate, m_spirv_params.thread_buffer, { index });
+            Operand word_reg = to_store;
+            word_reg.num = to_store.num + word;
+            if (is_store) {
+                spv::Id value = load(word_reg, 0b1, to_store_offset);
+                m_b.createStore(value, float_ptr);
+            } else {
+                spv::Id value = m_b.createLoad(float_ptr, spv::NoPrecision);
+                store(word_reg, value, 0b1);
+            }
         }
         continue;
     }

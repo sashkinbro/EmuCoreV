@@ -1561,6 +1561,8 @@ void store(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFuncti
     }
 
     if (!get_reg_bank(params, dest.bank)) {
+        // the remaining banks (constants, immediates) are not writable registers: the write has no destination
+        LOG_WARN_ONCE("USSE write to the non-writable register bank {} is ignored", static_cast<int>(dest.bank));
         return;
     }
 

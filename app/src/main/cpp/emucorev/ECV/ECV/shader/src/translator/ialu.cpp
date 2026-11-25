@@ -189,9 +189,6 @@ bool USSETranslatorVisitor::vbw(
             return false;
         }
         result = m_b.createBinOp(operation, type_ui32, src1, src2);
-        if (m_b.isFloatType(m_b.getTypeId(src2))) {
-            result = m_b.createUnaryOp(spv::Op::OpBitcast, type_f32, src2);
-        }
     }
 
     store(inst.opr.dest, result, 0b0001, dest_repeat_offset);
@@ -352,8 +349,9 @@ bool USSETranslatorVisitor::i8mad(
 }
 
 bool USSETranslatorVisitor::i8mad2() {
-    LOG_DISASM("Unimplemented Opcode: i8mad2");
-    return true;
+    // no field layout is decoded for this opcode (0 uses in the corpus): report it as not translated, never as done
+    LOG_ERROR("Unimplemented Opcode: i8mad2");
+    return false;
 }
 
 bool USSETranslatorVisitor::i16mad(
