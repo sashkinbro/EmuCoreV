@@ -1435,7 +1435,8 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             translationZ = EMULATION_OVERLAY_ELEVATION
             setContent {
                 val themeMode by preferences.themeModeFlow.collectAsState(initial = preferences.themeMode)
-                EmuCoreVTheme(themeMode = themeMode, enableCrtOverlay = false) {
+                val themePackage = com.sbro.emucorev.ui.theme.rememberAppliedThemePackage(preferences)
+                EmuCoreVTheme(themeMode = themeMode, themePackage = themePackage, enableCrtOverlay = false) {
                     CompositionLocalProvider(LocalActivityResultRegistryOwner provides composeResultOwner) {
                         EmulationOverlayHost(activity = this@Emulator)
                     }

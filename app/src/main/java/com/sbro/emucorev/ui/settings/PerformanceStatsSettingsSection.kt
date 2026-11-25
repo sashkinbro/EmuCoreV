@@ -9,7 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
-import androidx.compose.material3.Switch
+import com.sbro.emucorev.ui.theme.style.Switch
 import com.sbro.emucorev.ui.theme.neon.neonShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorev.ui.theme.style.FilterChip
 import androidx.compose.foundation.layout.RowScope
 import com.sbro.emucorev.ui.gamemanager.ChoiceContainer as GameManagerChoiceContainer
 import com.sbro.emucorev.ui.gamemanager.ToggleRow as GameManagerToggleRow
@@ -25,8 +25,8 @@ import com.sbro.emucorev.ui.gamemanager.SliderRow as GameManagerSliderRow
 import androidx.compose.material3.MaterialTheme
 import com.sbro.emucorev.ui.common.SyncedSlider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Surface
+import com.sbro.emucorev.ui.theme.style.TextButton
+import com.sbro.emucorev.ui.theme.style.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState

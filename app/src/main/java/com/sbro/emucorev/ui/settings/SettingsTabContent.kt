@@ -45,17 +45,17 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.Button
+import com.sbro.emucorev.ui.theme.style.Button
 import com.sbro.emucorev.ui.common.AppAlertDialog as AlertDialog
-import androidx.compose.material3.FilterChip
+import com.sbro.emucorev.ui.theme.style.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import com.sbro.emucorev.ui.common.SyncedSlider
-import androidx.compose.material3.Surface
+import com.sbro.emucorev.ui.theme.style.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.sbro.emucorev.ui.theme.style.TextButton
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState

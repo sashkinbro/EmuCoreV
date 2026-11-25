@@ -5,14 +5,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import com.sbro.emucorev.ui.theme.neon.LocalNeonTheme
-import com.sbro.emucorev.ui.theme.neon.NeonDark
-import com.sbro.emucorev.ui.theme.neon.NeonRed
+import com.sbro.emucorev.ui.theme.LocalThemeExtras
 import com.sbro.emucorev.ui.theme.neon.neonShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import com.sbro.emucorev.ui.theme.style.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,11 +23,11 @@ import com.sbro.emucorev.R
 
 @Composable
 private fun defaultBackContainer(): Color =
-    if (LocalNeonTheme.current) NeonDark else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f)
+    if (LocalNeonTheme.current) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f)
 
 @Composable
 private fun defaultBackContent(): Color =
-    if (LocalNeonTheme.current) NeonRed else MaterialTheme.colorScheme.onSurfaceVariant
+    if (LocalNeonTheme.current) LocalThemeExtras.current.accent3 else MaterialTheme.colorScheme.onSurfaceVariant
 
 @Composable
 fun NavigationBackButton(
