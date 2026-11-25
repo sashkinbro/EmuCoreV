@@ -107,6 +107,25 @@ static bool surface_sync_needs_se5_repack(const ColorSurfaceCacheInfo &surface) 
 
 static bool protect_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
     const bool trap_reads = (info.tiling == SurfaceTiling::Linear
+// host format != guest layout for the fallback formats of the colour format model (P7), see colourmodel::Repack
+static colourmodel::Repack surface_fallback_repack(const ColorSurfaceCacheInfo &surface) {
+    const colourmodel::Repack r = colourmodel::repack_for(surface.format, surface.texture.format);
+    switch (r) {
+    case colourmodel::Repack::None:
+    case colourmodel::Repack::U4444_RGBA8:
+    case colourmodel::Repack::U2F10F10F10_F16:
+    case colourmodel::Repack::SE5M9M9M9_F16:
+        return colourmodel::Repack::None; // the dedicated paths above
+    default:
+        return r;
+    }
+}
+
+static bool surface_sync_needs_cpu_repack(const ColorSurfaceCacheInfo &surface) {
+    return surface_sync_needs_f10_repack(surface) || surface_sync_needs_se5_repack(surface)
+        || surface_fallback_repack(surface) != colourmodel::Repack::None;
+}
+
         && format_support_surface_sync(info.format));
 
     // Every surface, whatever its size, is trapped over the whole page span that covers its bytes
@@ -663,16 +682,25 @@ void VKSurfaceCache::cleanup() {
 // On real hardware the surface IS its memory: a game may freely mix CPU writes and GPU
 // rendering into the same buffer. Returns whether the upload was recorded.
 bool VKSurfaceCache::try_upload_guest_content(ColorSurfaceCacheInfo &info, MemState &mem) {
-    const bool upload_supported = state.features.enable_memory_mapping
+    // a host image that is not byte identical to guest memory (emulated or fallback formats) is converted on the CPU
+    // (colourmodel::guest_to_host), the inverse of the surface sync
+    const colourmodel::Repack repack = colourmodel::repack_for(info.format, info.texture.format);
+    const uint32_t guest_bytes_pp = static_cast<uint32_t>(gxm::bits_per_pixel(info.format) / 8);
+    const uint32_t host_bytes_pp = static_cast<uint32_t>(vk::blockSize(info.texture.format));
+    bool upload_supported = state.features.enable_memory_mapping
         && info.tiling == SurfaceTiling::Linear
         && format_support_surface_sync(info.format)
-        // guest U2F10F10F10/SE5M9M9M9 -> RGBA16F upload conversion is not implemented (sync is one-way)
-        && info.format != SCE_GXM_COLOR_BASE_FORMAT_U2F10F10F10
-        && info.format != SCE_GXM_COLOR_BASE_FORMAT_SE5M9M9M9
+        // 24 bit packed RGB is expanded to RGBA8 by the sync only
+        && info.format != SCE_GXM_COLOR_BASE_FORMAT_U8U8U8
         && info.swizzle.r == vk::ComponentSwizzle::eR
         && !info.raw_image
-        && vk::blockSize(info.texture.format) > 0
-        && (info.stride_bytes % vk::blockSize(info.texture.format)) == 0;
+        && host_bytes_pp > 0 && guest_bytes_pp > 0;
+    if (upload_supported) {
+        if (repack == colourmodel::Repack::None)
+            upload_supported = (info.stride_bytes % host_bytes_pp) == 0;
+        else
+            upload_supported = (info.stride_bytes % guest_bytes_pp) == 0;
+    }
     if (!upload_supported) {
         return false;
     }
@@ -685,9 +713,10 @@ bool VKSurfaceCache::try_upload_guest_content(ColorSurfaceCacheInfo &info, MemSt
 
     VKContext *context = reinterpret_cast<VKContext *>(state.context);
 
-    const uint32_t bytes_pp = static_cast<uint32_t>(vk::blockSize(info.texture.format));
-    const uint32_t pixel_stride = info.stride_bytes / bytes_pp;
-    const vk::DeviceSize upload_size = static_cast<vk::DeviceSize>(info.stride_bytes) * info.original_height;
+    const uint32_t pixel_stride = repack == colourmodel::Repack::None ? info.stride_bytes / host_bytes_pp : info.stride_bytes / guest_bytes_pp;
+    const vk::DeviceSize upload_size = repack == colourmodel::Repack::None
+        ? static_cast<vk::DeviceSize>(info.stride_bytes) * info.original_height
+        : static_cast<vk::DeviceSize>(pixel_stride) * host_bytes_pp * info.original_height;
 
     if (info.upload_buffer && info.upload_buffer->size < upload_size) {
         state.frame().destroy_queue.add_buffer(*info.upload_buffer);
@@ -699,7 +728,12 @@ bool VKSurfaceCache::try_upload_guest_content(ColorSurfaceCacheInfo &info, MemSt
         info.upload_buffer->size = upload_size;
         info.upload_buffer->init_buffer(vk::BufferUsageFlagBits::eTransferSrc, vkutil::vma_mapped_alloc);
     }
-    memcpy(info.upload_buffer->mapped_data, info.data.get(mem), upload_size);
+    if (repack == colourmodel::Repack::None) {
+        memcpy(info.upload_buffer->mapped_data, info.data.get(mem), upload_size);
+    } else if (!colourmodel::guest_to_host(repack, static_cast<uint8_t *>(info.upload_buffer->mapped_data), info.data.cast<uint8_t>().get(mem),
+                   pixel_stride * info.original_height, guest_bytes_pp)) {
+        return false;
+    }
 
     vk::CommandBuffer pre_cmd = context->prerender_cmd;
     const vk::BufferImageCopy upload_copy{
@@ -806,7 +840,8 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
     }
 
     const SceGxmColorBaseFormat base_format = gxm::get_base_format(color->colorFormat);
-    vk::Format vk_format = color::translate_surface_format(base_format);
+    const auto *colour_entry = state.colour_entry(base_format);
+    vk::Format vk_format = colour_entry ? colour_entry->format : color::translate_surface_format(base_format);
 
     SurfaceTiling tiling;
     if (color->surfaceType == SCE_GXM_COLOR_SURFACE_LINEAR)
@@ -816,7 +851,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
     else
         tiling = SurfaceTiling::Tiled;
 
-    const bool is_srgb = color->gamma != 0;
+    const bool is_srgb = color->gamma != 0 && colourmodel::gamma_applies(base_format);
     if (is_srgb) {
         if (vk_format == vk::Format::eR8G8B8A8Unorm) {
             vk_format = vk::Format::eR8G8B8A8Srgb;
@@ -1134,7 +1169,8 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
     }
 
     const vk::ComponentMapping swizzle = texture::translate_swizzle(gxm::get_format(texture));
-    vk::Format vk_format = color::translate_surface_format(base_format);
+    const auto *colour_entry = state.colour_entry(base_format);
+    vk::Format vk_format = colour_entry ? colour_entry->format : color::translate_surface_format(base_format);
 
     const bool is_srgb = texture.gamma_mode != 0;
     if (is_srgb) {
@@ -2634,7 +2670,7 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
         return nullptr;
 
     // repack-format surfaces (CPU-converted writeback) sync at most once per 25ms
-    if (surface_sync_needs_f10_repack(*last_written_surface) || surface_sync_needs_se5_repack(*last_written_surface)) {
+    if (surface_sync_needs_cpu_repack(*last_written_surface)) {
         const auto now = std::chrono::steady_clock::now();
         if (now - last_written_surface->last_repack_sync_time < std::chrono::milliseconds(25)) {
             return nullptr;
@@ -2666,7 +2702,7 @@ ColorSurfaceCacheInfo *VKSurfaceCache::perform_surface_sync() {
     }
 
     const uint32_t pixel_stride = (last_written_surface->stride_bytes * 8) / gxm::bits_per_pixel(last_written_surface->format);
-    const bool needs_copy_buffer = format_need_additional_memory(last_written_surface->format) || surface_sync_needs_u4u4u4u4_repack(*last_written_surface) || surface_sync_needs_f10_repack(*last_written_surface) || surface_sync_needs_se5_repack(*last_written_surface);
+    const bool needs_copy_buffer = format_need_additional_memory(last_written_surface->format) || surface_sync_needs_u4u4u4u4_repack(*last_written_surface) || surface_sync_needs_cpu_repack(*last_written_surface);
 
     // For macrotile-sync surfaces at non-integer scale factors, clamp the sync
     // to only the rendered macroblocks.
@@ -3136,6 +3172,21 @@ std::vector<uint32_t> VKSurfaceCache::dump_frame(Ptr<const void> address, uint32
 void VKSurfaceCache::ensure_reinterpret_pipeline() {
     if (reinterpret_pipeline)
         return;
+    if (const colourmodel::Repack fallback = surface_fallback_repack(*surface); fallback != colourmodel::Repack::None) {
+        const uint32_t guest_bpp = gxm::bits_per_pixel(surface->format) / 8;
+        if (colourmodel::host_to_guest_extra(fallback, pixels, static_cast<const uint8_t *>(surface->copy_buffer->mapped_data), pixel_stride * surface->original_height, guest_bpp)) {
+            // component swizzles of the plain component formats are applied on the guest data after the repack
+            const bool identity = surface->swizzle.r == vk::ComponentSwizzle::eR;
+            if (!identity && (fallback == colourmodel::Repack::Unorm16_F32 || fallback == colourmodel::Repack::Snorm16_F32))
+                swizzle_text_T<uint16_t>(reinterpret_cast<uint16_t *>(pixels), nb_pixels, surface);
+            else if (!identity && fallback == colourmodel::Repack::Snorm8_F16)
+                swizzle_text_T<uint8_t>(pixels, nb_pixels, surface);
+            else if (!identity && fallback == colourmodel::Repack::F32_F16)
+                swizzle_text_T<uint32_t>(reinterpret_cast<uint32_t *>(pixels), nb_pixels, surface);
+        }
+        return;
+    }
+
 
     const fs::path shader_path = state.static_assets / "shaders-builtin/vulkan" / "surface_cast_reinterpret.comp.spv";
     reinterpret_shader = vkutil::load_shader(state.device, shader_path);

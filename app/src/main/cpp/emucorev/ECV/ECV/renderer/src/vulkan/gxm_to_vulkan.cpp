@@ -115,11 +115,21 @@ vk::BlendFactor translate_blend_factor(const SceGxmBlendFactor blend_factor) {
     case SCE_GXM_BLEND_FACTOR_SRC_ALPHA_SATURATE:
         return vk::BlendFactor::eSrcAlphaSaturate;
     case SCE_GXM_BLEND_FACTOR_DST_ALPHA_SATURATE:
-        return vk::BlendFactor::eDstAlpha; // TODO Not supported.
+        // PROVISIONAL: the saturate factor is a min() of two alphas, which fixed-function blending cannot express for
+        // the destination variant (the source variant maps to eSrcAlphaSaturate). The colour factor is approximated by
+        // the destination alpha; the alpha channel factor is exact, see translate_blend_factor_alpha.
+        return vk::BlendFactor::eDstAlpha;
     default:
         LOG_ERROR("Unknown blend factor: {}", fmt::underlying(blend_factor));
         return vk::BlendFactor::eOne;
     }
+}
+
+vk::BlendFactor translate_blend_factor_alpha(const SceGxmBlendFactor blend_factor) {
+    // the alpha component of both saturate factors is one: (f, f, f, 1)
+    if (blend_factor == SCE_GXM_BLEND_FACTOR_DST_ALPHA_SATURATE)
+        return vk::BlendFactor::eOne;
+    return translate_blend_factor(blend_factor);
 }
 
 vk::BlendOp translate_blend_func(const SceGxmBlendFunc blend_func) {

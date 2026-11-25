@@ -202,6 +202,32 @@ bool ScreenRenderer::setup() {
         LOG_INFO("Depth/stencil class {} -> {}", i, vk::to_string(state.ds_class_format[i]));
     }
 
+    // Probe the host format of every colour surface format (attachment, sampling, blending), see colourmodel::select_host_format
+    {
+        std::array<std::pair<vk::Format, colourmodel::FormatSupport>, 24> probed{};
+        size_t probed_count = 0;
+        const auto supports = [&](const vk::Format format) {
+            for (size_t i = 0; i < probed_count; i++)
+                if (probed[i].first == format)
+                    return probed[i].second;
+            const vk::FormatFeatureFlags f = state.physical_device.getFormatProperties(format).optimalTilingFeatures;
+            colourmodel::FormatSupport s;
+            s.attach = (f & vk::FormatFeatureFlagBits::eColorAttachment) && (f & vk::FormatFeatureFlagBits::eSampledImage);
+            s.blend = s.attach && (f & vk::FormatFeatureFlagBits::eColorAttachmentBlend);
+            if (probed_count < probed.size())
+                probed[probed_count++] = { format, s };
+            return s;
+        };
+        for (size_t i = 0; i < colourmodel::fmt_count; i++) {
+            const auto entry = colourmodel::select_host_format(static_cast<colourmodel::Fmt>(i), supports);
+            state.colour_formats.entries[i] = entry;
+            const colourmodel::Chain &chain = colourmodel::chain_of(static_cast<colourmodel::Fmt>(i));
+            if (entry.format != chain.list[0].format || !entry.blend_ok || entry.forced)
+                LOG_WARN("Colour surface format {}: host {}{}{}{}", i, vk::to_string(entry.format), entry.blend_ok ? "" : ", no blending on this format",
+                    entry.lossy ? ", reduced precision" : "", entry.forced ? ", NOT supported by the device (primary format forced)" : "");
+        }
+    }
+
     // preferred order : mailbox > fifo_relaxed > fifo > whatever
     // the only drawback for mailbox is that it draws more power, so maybe on a portable device use something else
     // this one should always be available

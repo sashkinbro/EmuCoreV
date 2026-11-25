@@ -447,6 +447,7 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
     return true;
 }
 
+// Begin or end the occlusion query so that the next draw counts into the entry of the face it hits (P8). Every activation
 void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format,
     Ptr<void> indices, size_t count, uint32_t instance_count, MemState &mem, const Config &config) {
 #if ECV_ORACLE
@@ -820,6 +821,10 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         frag_ublock.res_multiplier *= 2;
     else if (!has_msaa && has_downscale)
         frag_ublock.res_multiplier /= 2;
+    frag_ublock.dither_enabled = context.record.color_surface.dither ? 1.0f : 0.0f;
+    const raster::PointUvFlip point_flip = raster::point_uv_flip(context.record.front_polygon_mode);
+    frag_ublock.point_flip_u = point_flip.flip_u ? 1.0f : 0.0f;
+    frag_ublock.point_flip_v = point_flip.flip_v ? 1.0f : 0.0f;
 
     // Cast-sampler UV re-anchor inputs
     frag_ublock.cast_sampler_mask = static_cast<float>(context.curr_frag_ublock.cast_sampler_bits);

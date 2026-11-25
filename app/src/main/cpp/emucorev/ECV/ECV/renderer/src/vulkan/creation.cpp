@@ -380,8 +380,8 @@ bool create(std::unique_ptr<FragmentProgram> &fp, VKState &state, const SceGxmPr
             .srcColorBlendFactor = color_is_blended ? translate_blend_factor(blend->colorSrc) : vk::BlendFactor::eOne,
             .dstColorBlendFactor = color_is_blended ? translate_blend_factor(blend->colorDst) : vk::BlendFactor::eZero,
             .colorBlendOp = translate_blend_func(blend->colorFunc),
-            .srcAlphaBlendFactor = alpha_is_blended ? translate_blend_factor(blend->alphaSrc) : vk::BlendFactor::eOne,
-            .dstAlphaBlendFactor = alpha_is_blended ? translate_blend_factor(blend->alphaDst) : vk::BlendFactor::eZero,
+            .srcAlphaBlendFactor = alpha_is_blended ? translate_blend_factor_alpha(blend->alphaSrc) : vk::BlendFactor::eOne,
+            .dstAlphaBlendFactor = alpha_is_blended ? translate_blend_factor_alpha(blend->alphaDst) : vk::BlendFactor::eZero,
             .alphaBlendOp = translate_blend_func(blend->alphaFunc),
             .colorWriteMask = color_mask
         };

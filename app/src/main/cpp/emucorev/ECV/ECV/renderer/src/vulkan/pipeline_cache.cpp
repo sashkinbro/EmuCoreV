@@ -1105,6 +1105,12 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
 
     vk::PipelineLayout pipeline_layout = pipeline_layouts[vertex_program.texture_count][fragment_program.texture_count];
 
+        // the host format of this surface cannot blend (probed, P7): the lossless format wins over the blend, see colourmodel
+        const auto *colour_entry = state.colour_entry(record.color_base_format);
+        if (colour_entry && !colour_entry->blend_ok && blend_attachments[0].blendEnable) {
+            LOG_WARN_ONCE("Blending on a {} surface is not supported by the device: drawn without blending", vk::to_string(colour_entry->format));
+            blend_attachments[0].blendEnable = VK_FALSE;
+        }
     // all of these can be changed at any time using the vita graphics api (like opengl)
     // Because each one can take a lot of different values, it's better to set them as dynamic
     std::vector<vk::DynamicState> dynamic_states = {

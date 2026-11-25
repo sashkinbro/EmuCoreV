@@ -329,6 +329,7 @@ struct VKContext : public renderer::Context {
 
     uint16_t last_vert_texture_count = ~0;
     vk::DescriptorSet last_vert_texture_descriptor;
+    // region clip INSIDE: the rectangles outside the region, one draw per rectangle (count 0 for the other modes)
     uint16_t last_frag_texture_count = ~0;
     vk::DescriptorSet last_frag_texture_descriptor;
 

@@ -244,7 +244,6 @@ void sync_visibility_buffer(VKContext &context, Ptr<uint32_t> buffer, uint32_t s
 
     auto ite = context.visibility_buffers.find(buffer.address());
     if (ite == context.visibility_buffers.end()) {
-        // create a new query pool
         vk::QueryPoolCreateInfo pool_info{
             .queryType = vk::QueryType::eOcclusion,
             .queryCount = static_cast<uint32_t>(stride / sizeof(uint32_t))

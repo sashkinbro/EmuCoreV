@@ -20,6 +20,7 @@
 #include <renderer/state.h>
 #include <renderer/types.h>
 
+#include <renderer/vulkan/colour_format_model.h>
 #include <renderer/vulkan/depth_stencil_model.h>
 #include <renderer/vulkan/gpu_caps.h>
 #include <renderer/vulkan/msaa.h>
@@ -94,6 +95,12 @@ struct VKState : public renderer::State {
     std::vector<vk::QueueFamilyProperties> physical_device_queue_families;
     // combined depth+stencil format for attachments with no guest surface behind them (and the fallback of everything else)
     vk::Format deep_stencil_use;
+    // host format of every GXM colour base format, probed at start up (P7); the default is the legacy mapping
+    colourmodel::SurfaceFormatTable colour_formats;
+    const colourmodel::SurfaceFormatTable::Entry *colour_entry(const SceGxmColorBaseFormat base) const {
+        const colourmodel::Fmt f = colourmodel::fmt_of(base);
+        return f == colourmodel::Fmt::Count ? nullptr : &colour_formats[f];
+    }
     // host format of each GXM depth/stencil class, chosen from the probed format features (screen_renderer.cpp setup)
     std::array<vk::Format, static_cast<size_t>(dsmodel::DsClass::Count)> ds_class_format{};
 

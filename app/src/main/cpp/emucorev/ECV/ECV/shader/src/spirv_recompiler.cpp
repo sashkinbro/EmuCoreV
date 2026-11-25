@@ -165,6 +165,57 @@ static bool is_u8_alpha_color_surface(const TranslationState &state) {
 
 static spv::Id alpha_surface_to_shader_color(spv::Builder &b, const spv::Id color) {
     // Host R8 reads (R, 0, 0, 1); GXM A8 exposes (0, 0, 0, R).
+// GXM dithers the colour written to a surface with less than 8 bits per channel when the surface's dither bit is set.
+// The exact hardware pattern is not recovered: PROVISIONAL ordered 4x4 Bayer dither of one quantisation step of the
+// channel, applied before the (host) quantisation. Formats of 8 bits and more emit no code at all.
+static spv::Id apply_surface_dither(spv::Builder &b, const TranslationState &state, const spv::Id color) {
+    float amp[4];
+    switch (gxm::get_base_format(state.hints->color_format)) {
+    case SCE_GXM_COLOR_BASE_FORMAT_U5U6U5:
+        amp[0] = 1.0f / 31.0f, amp[1] = 1.0f / 63.0f, amp[2] = 1.0f / 31.0f, amp[3] = 0.0f;
+        break;
+    case SCE_GXM_COLOR_BASE_FORMAT_U1U5U5U5:
+        amp[0] = amp[1] = amp[2] = 1.0f / 31.0f, amp[3] = 0.0f;
+        break;
+    case SCE_GXM_COLOR_BASE_FORMAT_U4U4U4U4:
+        amp[0] = amp[1] = amp[2] = amp[3] = 1.0f / 15.0f;
+        break;
+    default:
+        return color;
+    }
+    const spv::Id f32 = b.makeFloatType(32);
+    const spv::Id u32 = b.makeUintType(32);
+    const spv::Id v4 = b.makeVectorType(f32, 4);
+    const spv::Id coord = b.createLoad(state.frag_coord_id, spv::NoPrecision);
+    const auto pixel = [&](const unsigned comp) {
+        const spv::Id c = b.createCompositeExtract(coord, f32, comp);
+        const spv::Id u = b.createUnaryOp(spv::OpConvertFToU, u32, c);
+        return b.createBinOp(spv::OpBitwiseAnd, u32, u, b.makeUintConstant(3));
+    };
+    const auto bit = [&](const spv::Id value, const unsigned shift_right, const unsigned shift_left) {
+        spv::Id v = shift_right ? b.createBinOp(spv::OpShiftRightLogical, u32, value, b.makeUintConstant(shift_right)) : value;
+        v = b.createBinOp(spv::OpBitwiseAnd, u32, v, b.makeUintConstant(1));
+        return shift_left ? b.createBinOp(spv::OpShiftLeftLogical, u32, v, b.makeUintConstant(shift_left)) : v;
+    };
+    const spv::Id x = pixel(0);
+    const spv::Id y = pixel(1);
+    const spv::Id a = b.createBinOp(spv::OpBitwiseXor, u32, x, y);
+    // bit reversed interleave of (x ^ y, y): the classic 4x4 Bayer matrix 0 8 2 10 / 12 4 14 6 / 3 11 1 9 / 15 7 13 5
+    spv::Id index = bit(a, 0, 3);
+    index = b.createBinOp(spv::OpBitwiseOr, u32, index, bit(y, 0, 2));
+    index = b.createBinOp(spv::OpBitwiseOr, u32, index, bit(a, 1, 1));
+    index = b.createBinOp(spv::OpBitwiseOr, u32, index, bit(y, 1, 0));
+    spv::Id noise = b.createUnaryOp(spv::OpConvertUToF, f32, index);
+    noise = b.createBinOp(spv::OpFAdd, f32, noise, b.makeFloatConstant(0.5f));
+    noise = b.createBinOp(spv::OpFMul, f32, noise, b.makeFloatConstant(1.0f / 16.0f));
+    noise = b.createBinOp(spv::OpFSub, f32, noise, b.makeFloatConstant(0.5f));
+    const spv::Id enabled_ptr = utils::create_access_chain(b, spv::StorageClassUniform, state.render_info_id, { b.makeIntConstant(FRAG_UNIFORM_dither_enabled) });
+    noise = b.createBinOp(spv::OpFMul, f32, noise, b.createLoad(enabled_ptr, spv::NoPrecision));
+    const spv::Id noise4 = b.createCompositeConstruct(v4, { noise, noise, noise, noise });
+    const spv::Id amp4 = b.makeCompositeConstant(v4, { b.makeFloatConstant(amp[0]), b.makeFloatConstant(amp[1]), b.makeFloatConstant(amp[2]), b.makeFloatConstant(amp[3]) });
+    return b.createBinOp(spv::OpFAdd, v4, color, b.createBinOp(spv::OpFMul, v4, noise4, amp4));
+}
+
     return b.createOp(spv::OpVectorShuffle, b.getTypeId(color), { { true, color }, { true, color }, { false, 1 }, { false, 2 }, { false, 1 }, { false, 0 } });
 }
 
@@ -1334,6 +1385,9 @@ static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProg
 #define ADD_EXT_UNIFORM_MEMBER(name)                                                                                                                                                \
     spv_params.name##_id = curr_field_id;                                                                                                                                           \
     b.addMemberDecoration(render_buf_type, curr_field_id, spv::DecorationOffset, RenderFragUniformBlockExtended::get_##name##_offset(uniform_buffer_count, uniform_texture_count)); \
+        ADD_FRAG_UNIFORM_MEMBER(dither_enabled);
+        ADD_FRAG_UNIFORM_MEMBER(point_flip_u);
+        ADD_FRAG_UNIFORM_MEMBER(point_flip_v);
     b.addMemberName(render_buf_type, curr_field_id++, #name)
 
         if (uniform_buffer_count > 0) {
@@ -1768,6 +1822,8 @@ static spv::Function *make_frag_finalize_function(spv::Builder &b, const SpirvSh
 
         if (translate_state.is_vulkan) {
             spv::Id old_color = color;
+    color = apply_surface_dither(b, translate_state, color);
+
             // if (is_srgb)
             spv::Builder::If cond_builder(parameters.is_srgb_constant, spv::SelectionControlMaskNone, b);
 
@@ -2121,6 +2177,8 @@ static spv::Function *make_vert_finalize_function(spv::Builder &b, const SpirvSh
 
 static spv::Function *make_frag_initialize_function(spv::Builder &b, TranslationState &translate_state) {
     std::vector<std::vector<spv::Decoration>> decorations;
+    // A program without PSIZE gets the size of the point width register (a Vulkan point of unwritten size is undefined)
+    if (translation_state.is_vulkan && !(vertex_outputs & SCE_GXM_VERTEX_PROGRAM_OUTPUT_PSIZE)) {
 
     spv::Block *frag_init_block;
     spv::Block *last_build_point = b.getBuildPoint();

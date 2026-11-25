@@ -33,6 +33,7 @@ vk::PipelineColorBlendAttachmentState translate_alpha_surface_blend(vk::Pipeline
 
 vk::Format translate_attribute_format(SceGxmAttributeFormat format, unsigned int component_count, bool is_integer, bool is_signed);
 vk::BlendFactor translate_blend_factor(const SceGxmBlendFactor blend_factor);
+vk::BlendFactor translate_blend_factor_alpha(const SceGxmBlendFactor blend_factor);
 vk::BlendOp translate_blend_func(const SceGxmBlendFunc blend_func);
 vk::PrimitiveTopology translate_primitive(SceGxmPrimitiveType primitive);
 vk::CompareOp translate_depth_func(SceGxmDepthFunc depth_func);
