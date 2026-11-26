@@ -60,10 +60,10 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             com.sbro.emucorev.core.AgeSignalsController.publishStored(preferences)
             // Once per process, after the first frames, only while resumed (Play may show a consent prompt).
-            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-                delay(1500)
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                delay(1500.milliseconds)
                 com.sbro.emucorev.core.AgeSignalsController.run(
-                    this@MainActivity, preferences, com.sbro.emucorev.BuildConfig.DEBUG
+                    this@MainActivity, preferences, BuildConfig.DEBUG
                 )
             }
         }
@@ -136,18 +136,15 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (KeyboardMouseManager.handleKeyBindingCapture(event)) return true
-        return super.dispatchKeyEvent(event)
+        return KeyboardMouseManager.handleKeyBindingCapture(event) || super.dispatchKeyEvent(event)
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (KeyboardMouseManager.handleMouseBindingCapture(event)) return true
-        return super.dispatchGenericMotionEvent(event)
+        return KeyboardMouseManager.handleMouseBindingCapture(event) || super.dispatchGenericMotionEvent(event)
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (KeyboardMouseManager.handleMouseBindingCapture(event)) return true
-        return super.dispatchTouchEvent(event)
+        return KeyboardMouseManager.handleMouseBindingCapture(event) || super.dispatchTouchEvent(event)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
