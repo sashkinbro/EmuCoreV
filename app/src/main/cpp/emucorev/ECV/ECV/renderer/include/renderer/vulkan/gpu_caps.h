@@ -133,6 +133,8 @@ struct GpuCaps {
     bool wide_lines = false; // lines wider than one pixel; without it a wide line is a brush of shifted lines (raster_model.h)
     bool large_points = false; // point sizes above one pixel; without it the point size register is clamped to 1
     bool fill_mode_non_solid = false; // line/point polygon modes and TRIANGLE_EDGES; without it triangles are drawn filled
+    bool vertex_stores_and_atomics = false; // vertexPipelineStoresAndAtomics: vertex programs may store to guest buffers (USSE buffer stores)
+    bool fragment_stores_and_atomics = false; // fragmentStoresAndAtomics: fragment programs may store to guest buffers
     bool occlusion_query_precise = false; // visibility entries count samples instead of a flag
     float max_point_size = 1.0f;
     // --- colour surface formats (P7): host format chosen per GXM colour base format from the probed attachment/blend support ---

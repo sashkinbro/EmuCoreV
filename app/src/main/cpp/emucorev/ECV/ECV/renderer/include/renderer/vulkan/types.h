@@ -340,6 +340,9 @@ struct VKContext : public renderer::Context {
     int running_query_slot = -1;
     // resolves of the scene segments recorded but not submitted yet
     std::vector<std::shared_ptr<VisibilityResolve>> pending_visibility;
+    // DoubleBuffer: mirror -> guest forwards of colour transfers recorded since the last submit (pushed behind that submit's fence)
+    std::vector<BufferSyncRequest> pending_buffer_syncs;
+    std::optional<BufferSyncRequest> make_buffer_sync_request(const ColorSurfaceCacheInfo &info);
     std::vector<vk::QueryPool> retired_query_pools; // replaced by a bigger pool, destroyed with the context
 
     // descriptor pool for dynamic uniforms (allocated once for the whole game)

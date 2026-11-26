@@ -294,8 +294,8 @@ ColorSurfaceCacheInfo *VKSurfaceCache::find_transfer_surface(MemState &mem, Addr
 
 bool VKSurfaceCache::try_transfer_color_gpu(MemState &mem, const ColorTransferKind kind, const SceGxmTransferImage &src, const SceGxmTransferImage &dst,
     const SceGxmTransferType src_type, const SceGxmTransferType dst_type, const uint32_t fill_color) {
-    // guest memory is the buffer the surface sync writes (no mirror to forward) and the surface cache keeps it in step
-    if (!state.features.enable_memory_mapping || state.disable_surface_sync || state.mapping_method == MappingMethod::DoubleBuffer)
+    // the surface sync writes the destination back to guest memory (the DoubleBuffer mapping forwards its mirror like a scene end does)
+    if (!state.features.enable_memory_mapping || state.disable_surface_sync)
         return false;
     constexpr SceGxmTransferFormat rgba8 = SCE_GXM_TRANSFER_FORMAT_U8U8U8U8_ABGR;
     if (dst.format != rgba8 || dst_type != SCE_GXM_TRANSFER_LINEAR || (kind != ColorTransferKind::Fill && (src.format != rgba8 || src_type != SCE_GXM_TRANSFER_LINEAR)))
@@ -412,8 +412,13 @@ bool VKSurfaceCache::try_transfer_color_gpu(MemState &mem, const ColorTransferKi
         ColorSurfaceCacheInfo *prev_last_written = last_written_surface;
         *dst_info->need_surface_sync = true;
         last_written_surface = dst_info;
-        perform_surface_sync();
+        ColorSurfaceCacheInfo *synced = perform_surface_sync();
         last_written_surface = prev_last_written;
+        // DoubleBuffer: the sync wrote the mirror buffer; the forward to guest memory is queued behind the submit that carries this blit
+        if (synced != nullptr && state.mapping_method == MappingMethod::DoubleBuffer && synced->need_buffer_sync) {
+            if (const auto request = context.make_buffer_sync_request(*synced))
+                context.pending_buffer_syncs.push_back(*request);
+        }
     }
 
     LOG_INFO_ONCE("Colour transfer ({}) done on the GPU: {}x{} RGBA8", kind == ColorTransferKind::Copy ? "copy" : kind == ColorTransferKind::Downscale ? "downscale" : "fill", dst_rect->w, dst_rect->h);

@@ -38,6 +38,8 @@ GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::Extensio
         c.large_points = features.largePoints;
         c.fill_mode_non_solid = features.fillModeNonSolid;
         c.occlusion_query_precise = features.occlusionQueryPrecise;
+        c.vertex_stores_and_atomics = features.vertexPipelineStoresAndAtomics;
+        c.fragment_stores_and_atomics = features.fragmentStoresAndAtomics;
         c.max_point_size = lim.pointSizeRange[1];
     }
     c.max_per_stage_input_attachments = lim.maxPerStageDescriptorInputAttachments;

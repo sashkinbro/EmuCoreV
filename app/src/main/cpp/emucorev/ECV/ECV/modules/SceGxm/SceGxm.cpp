@@ -2806,8 +2806,7 @@ EXPORT(int, sceGxmColorSurfaceSetDitherMode, SceGxmColorSurface *surface, SceGxm
         return RET_ERROR(SCE_GXM_ERROR_INVALID_VALUE);
     }
 
-    // Recorded so that GetDitherMode answers what the game set. The host renderer does not dither: the
-    // result is only visible on low-precision (16-bit) surfaces and is a cosmetic difference.
+    // Recorded for GetDitherMode and applied by the fragment shader (apply_surface_dither) on surfaces with less than 8 bits per channel.
     surface->dither = ditherMode == SCE_GXM_COLOR_SURFACE_DITHER_ENABLED;
     return 0;
 }

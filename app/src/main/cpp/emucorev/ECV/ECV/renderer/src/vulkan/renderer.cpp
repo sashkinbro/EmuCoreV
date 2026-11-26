@@ -726,6 +726,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             .textureCompressionASTC_LDR = physical_device_features.textureCompressionASTC_LDR,
             .textureCompressionBC = physical_device_features.textureCompressionBC,
             .occlusionQueryPrecise = physical_device_features.occlusionQueryPrecise,
+            .vertexPipelineStoresAndAtomics = physical_device_features.vertexPipelineStoresAndAtomics,
             .fragmentStoresAndAtomics = physical_device_features.fragmentStoresAndAtomics,
             .shaderStorageImageExtendedFormats = physical_device_features.shaderStorageImageExtendedFormats,
             .shaderClipDistance = physical_device_features.shaderClipDistance,
@@ -919,9 +920,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             support_fsr = static_cast<bool>(props.get<vk::PhysicalDeviceShaderFloat16Int8Features>().shaderFloat16);
         }
 
-        constexpr bool force_disable_raster_order = false;
-        if (support_rasterized_order_access && (config.disable_raster_order || force_disable_raster_order)) {
-            LOG_INFO("Rasterization order attachment access disabled by {}", config.disable_raster_order ? "config" : "debug force");
+        if (support_rasterized_order_access && config.disable_raster_order) {
+            LOG_INFO("Rasterization order attachment access disabled by config");
             support_rasterized_order_access = false;
         }
         if (support_rasterized_order_access) {
@@ -978,6 +978,9 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             support_timeline = gpu_strategy.submit == SubmitTracking::TimelineSemaphore;
             support_dyn_rendering = support_local_read = gpu_strategy.render_path == RenderPath::DynamicRendering;
             use_dynamic_rendering = support_dyn_rendering;
+            // USSE buffer stores need the stage's stores-and-atomics feature (the translator drops a store the device cannot run)
+            features.support_vertex_stores = gpu_caps.vertex_stores_and_atomics;
+            features.support_fragment_stores = gpu_caps.fragment_stores_and_atomics;
             support_ext_dyn_state = gpu_strategy.extended_dynamic_state;
             use_extended_dynamic_state = support_ext_dyn_state;
             use_copy_snapshot = gpu_strategy.fbfetch == FbFetchPath::CopySnapshot;
@@ -1018,8 +1021,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             features.support_shader_interlock = support_shader_interlock;
         }
 
-        constexpr bool raw_preserve_needs_interlock = false;
-        features.preserve_f16_nan_as_u16 = static_cast<bool>(physical_device_features.independentBlend) && (!raw_preserve_needs_interlock || features.support_shader_interlock);
+        features.preserve_f16_nan_as_u16 = static_cast<bool>(physical_device_features.independentBlend);
 
         // depth clamp turns off z-clipping, so behind-the-eye primitives must be clipped in the shader instead
         features.support_clip_distance = enable_depth_clamp && static_cast<bool>(physical_device_features.depthClamp) && static_cast<bool>(physical_device_features.shaderClipDistance);
@@ -1941,6 +1943,8 @@ uint32_t VKState::get_features_mask() {
             bool use_gxm_clip_planes : 1;
             bool force_full_precision : 1;
             bool no_fp_contraction : 1;
+            bool support_vertex_stores : 1;
+            bool support_fragment_stores : 1;
         };
         uint32_t value;
     } features_mask;
@@ -1961,6 +1965,8 @@ uint32_t VKState::get_features_mask() {
     features_mask.use_gxm_clip_planes = features.support_gxm_clip_planes;
     features_mask.force_full_precision = features.force_full_precision;
     features_mask.no_fp_contraction = features.no_fp_contraction;
+    features_mask.support_vertex_stores = features.support_vertex_stores;
+    features_mask.support_fragment_stores = features.support_fragment_stores;
 
     return features_mask.value;
 }

@@ -1240,47 +1240,13 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
         pending_visibility.clear();
 
         if (state.mapping_method == MappingMethod::DoubleBuffer) {
-            // we must sync the two buffers
+            // we must sync the two buffers (the transfers recorded since the last submit first, then this scene's surface)
+            for (const BufferSyncRequest &request : pending_buffer_syncs)
+                state.request_queue.push(request);
+            pending_buffer_syncs.clear();
             if (surface_info && surface_info->need_buffer_sync) {
-                const bool partial_sync = surface_info->partial_write_back
-                    || surface_info->post_sync_x0 != 0 || surface_info->post_sync_y0 != 0
-                    || surface_info->post_sync_width < surface_info->original_width
-                    || surface_info->post_sync_height < surface_info->original_height;
-                if (partial_sync) {
-                    const uint32_t bpp = gxm::bits_per_pixel(surface_info->format) / 8;
-                    const uint32_t row_stride_bytes = surface_info->stride_bytes;
-                    const int32_t x0 = surface_info->post_sync_x0;
-                    const int32_t y0 = surface_info->post_sync_y0;
-                    const uint32_t width = surface_info->post_sync_width;
-                    const uint32_t height = surface_info->post_sync_height;
-                    const bool rect_in_bounds = bpp != 0 && x0 >= 0 && y0 >= 0
-                        && static_cast<uint32_t>(x0) <= surface_info->original_width
-                        && static_cast<uint32_t>(y0) <= surface_info->original_height
-                        && width <= surface_info->original_width - static_cast<uint32_t>(x0)
-                        && height <= surface_info->original_height - static_cast<uint32_t>(y0);
-                    const uint64_t row_bytes64 = static_cast<uint64_t>(width) * bpp;
-                    const uint64_t column_offset = static_cast<uint64_t>(x0) * bpp;
-                    const bool row_in_bounds = column_offset <= row_stride_bytes
-                        && row_bytes64 <= row_stride_bytes - column_offset;
-                    const uint64_t address_offset = static_cast<uint64_t>(y0) * row_stride_bytes + column_offset;
-                    const uint64_t address64 = static_cast<uint64_t>(surface_info->data.address()) + address_offset;
-                    const auto span = rect_in_bounds && row_in_bounds && row_bytes64 <= std::numeric_limits<uint32_t>::max()
-                        ? surface_sync_rows_span(row_stride_bytes, static_cast<size_t>(row_bytes64), height)
-                        : std::optional<size_t>{};
-                    if (span && *span > 0 && *span <= std::numeric_limits<uint32_t>::max()
-                        && address64 <= std::numeric_limits<Address>::max()) {
-                        state.request_queue.push(BufferSyncRequest{
-                            static_cast<Address>(address64),
-                            static_cast<uint32_t>(*span),
-                            row_stride_bytes,
-                            static_cast<uint32_t>(row_bytes64),
-                            height });
-                    } else {
-                        LOG_ERROR("Skipping invalid partial surface buffer sync");
-                    }
-                } else {
-                    state.request_queue.push(BufferSyncRequest{ surface_info->data.address(), static_cast<uint32_t>(surface_info->total_bytes) });
-                }
+                if (const auto request = make_buffer_sync_request(*surface_info))
+                    state.request_queue.push(*request);
             }
         }
 
@@ -1302,6 +1268,47 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
             state.request_queue.push(PostSurfaceSyncRequest{ surface_info });
         }
     }
+}
+
+std::optional<BufferSyncRequest> VKContext::make_buffer_sync_request(const ColorSurfaceCacheInfo &info) {
+    const bool partial_sync = info.partial_write_back
+        || info.post_sync_x0 != 0 || info.post_sync_y0 != 0
+        || info.post_sync_width < info.original_width
+        || info.post_sync_height < info.original_height;
+    if (partial_sync) {
+        const uint32_t bpp = gxm::bits_per_pixel(info.format) / 8;
+        const uint32_t row_stride_bytes = info.stride_bytes;
+        const int32_t x0 = info.post_sync_x0;
+        const int32_t y0 = info.post_sync_y0;
+        const uint32_t width = info.post_sync_width;
+        const uint32_t height = info.post_sync_height;
+        const bool rect_in_bounds = bpp != 0 && x0 >= 0 && y0 >= 0
+            && static_cast<uint32_t>(x0) <= info.original_width
+            && static_cast<uint32_t>(y0) <= info.original_height
+            && width <= info.original_width - static_cast<uint32_t>(x0)
+            && height <= info.original_height - static_cast<uint32_t>(y0);
+        const uint64_t row_bytes64 = static_cast<uint64_t>(width) * bpp;
+        const uint64_t column_offset = static_cast<uint64_t>(x0) * bpp;
+        const bool row_in_bounds = column_offset <= row_stride_bytes
+            && row_bytes64 <= row_stride_bytes - column_offset;
+        const uint64_t address_offset = static_cast<uint64_t>(y0) * row_stride_bytes + column_offset;
+        const uint64_t address64 = static_cast<uint64_t>(info.data.address()) + address_offset;
+        const auto span = rect_in_bounds && row_in_bounds && row_bytes64 <= std::numeric_limits<uint32_t>::max()
+            ? surface_sync_rows_span(row_stride_bytes, static_cast<size_t>(row_bytes64), height)
+            : std::optional<size_t>{};
+        if (span && *span > 0 && *span <= std::numeric_limits<uint32_t>::max()
+            && address64 <= std::numeric_limits<Address>::max()) {
+            return BufferSyncRequest{
+                static_cast<Address>(address64),
+                static_cast<uint32_t>(*span),
+                row_stride_bytes,
+                static_cast<uint32_t>(row_bytes64),
+                height };
+        }
+        LOG_ERROR("Skipping invalid partial surface buffer sync");
+        return std::nullopt;
+    }
+    return BufferSyncRequest{ info.data.address(), static_cast<uint32_t>(info.total_bytes) };
 }
 
 void VKContext::check_for_macroblock_change(bool is_draw) {

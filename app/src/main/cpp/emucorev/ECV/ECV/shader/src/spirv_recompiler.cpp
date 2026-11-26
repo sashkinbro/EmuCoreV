@@ -1172,6 +1172,7 @@ static void copy_uniform_block_to_register(spv::Builder &builder, spv::Id sa_ban
 static SpirvShaderParameters create_parameters(spv::Builder &b, const SceGxmProgram &program, utils::SpirvUtilFunctions &utils,
     const FeatureState &features, TranslationState &translation_state, SceGxmProgramType program_type, NonDependentTextureQueryCallInfos &texture_queries) {
     SpirvShaderParameters spv_params = {};
+    spv_params.buffer_stores_supported = program_type == SceGxmProgramType::Vertex ? features.support_vertex_stores : features.support_fragment_stores;
     const SceGxmProgramParameter *const gxp_parameters = program.program_parameters();
 
     // Make array type. TODO: Make length configurable

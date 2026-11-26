@@ -743,6 +743,10 @@ static spv::Function *make_store_memory_func(spv::Builder &b, const SpirvShaderP
 }
 
 void store_memory(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunctions &utils, spv::Id addr, spv::Id value, int bits) {
+    if (!params.buffer_stores_supported) {
+        LOG_WARN_ONCE("Shader stores to memory but the device has no stores and atomics in this stage: the store is dropped");
+        return;
+    }
     if (params.buffers.empty() || params.buffer_container == 0) {
         LOG_ERROR("Shader stores to memory but has no storage-buffer copy of the guest buffers");
         return;
@@ -782,6 +786,10 @@ static spv::Id make_or_get_buffer_ptr(spv::Builder &b, shader::usse::utils::Spir
 }
 
 void buffer_address_access(spv::Builder &b, const SpirvShaderParameters &params, SpirvUtilFunctions &utils, const FeatureState &features, Operand dest, int dest_offset, spv::Id addr, uint32_t component_size, uint32_t nb_components, int buffer_idx, bool is_buffer_store) {
+    if (is_buffer_store && !params.buffer_stores_supported) {
+        LOG_WARN_ONCE("Shader stores to memory but the device has no stores and atomics in this stage: the store is dropped");
+        return;
+    }
     const spv::Id i32 = b.makeIntType(32);
     const spv::Id u32 = b.makeUintType(32);
     const spv::Id zero = b.makeIntConstant(0);

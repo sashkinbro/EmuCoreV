@@ -92,6 +92,10 @@ struct SpirvShaderParameters {
     // when not using buffer device address, contains the storage buffer type
     spv::Id buffer_container;
 
+    // the device allows stores to buffers in this shader stage (vertexPipelineStoresAndAtomics / fragmentStoresAndAtomics); without it
+    // a store instruction is dropped instead of emitting SPIR-V the device cannot run
+    bool buffer_stores_supported = true;
+
     // ids for the given fields in the uniform block container
     int buffer_addresses_id;
     int viewport_ratio_id;
