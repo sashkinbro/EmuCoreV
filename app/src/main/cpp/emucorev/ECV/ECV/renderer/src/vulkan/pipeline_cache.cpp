@@ -1046,22 +1046,14 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         LOG_WARN_ONCE("Polygon mode line/point requested but the device has no fillModeNonSolid: drawing filled");
         polygon_mode = vk::PolygonMode::eFill;
     }
-<<<<<<< HEAD
-    // with extended dynamic state the cull mode is set per draw (draw_cull_mode), the pipeline does not carry it
-    const vk::CullModeFlags cull_mode = state.use_extended_dynamic_state ? vk::CullModeFlags() : draw_cull_mode(record.cull_mode, variant);
-=======
     if (type == SCE_GXM_PRIMITIVE_TRIANGLE_EDGES) {
         if (state.gpu_caps.fill_mode_non_solid)
             polygon_mode = vk::PolygonMode::eLine;
         else
             LOG_WARN_ONCE("SCE_GXM_PRIMITIVE_TRIANGLE_EDGES needs fillModeNonSolid, which the device lacks: drawing filled triangles");
     }
-    vk::CullModeFlags cull_mode = translate_cull_mode(record.cull_mode);
-    if (variant == dsmodel::PassVariant::SplitFront)
-        cull_mode |= vk::CullModeFlagBits::eBack;
-    else if (variant == dsmodel::PassVariant::SplitBack)
-        cull_mode |= vk::CullModeFlagBits::eFront;
->>>>>>> b5e7a295d (P15 rasteriser odds: region clip INSIDE (one draw per outside rectangle), point size register for programs without PSIZE, point sprite UV flips, wide-line brush without wideLines, TRIANGLE_EDGES)
+    // with extended dynamic state the cull mode is set per draw (draw_cull_mode), the pipeline does not carry it
+    const vk::CullModeFlags cull_mode = state.use_extended_dynamic_state ? vk::CullModeFlags() : draw_cull_mode(record.cull_mode, variant);
 
     const vk::PipelineRasterizationStateCreateInfo rasterizer{
         .depthClampEnable = (enable_depth_clamp && state.depth_clamp_enabled && state.physical_device_features.depthClamp) ? VK_TRUE : VK_FALSE,
