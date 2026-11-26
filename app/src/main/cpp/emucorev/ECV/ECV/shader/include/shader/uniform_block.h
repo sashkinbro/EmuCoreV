@@ -49,7 +49,10 @@ struct RenderFragUniformBlock {
     // point sprite coordinate modes of the polygon mode (1: that axis runs from 1 to 0)
     float point_flip_u = 0.0f;
     float point_flip_v = 0.0f;
+    // the extended members that follow must start 16 byte aligned (uniform buffer layout of the arrays): keep sizeof a multiple of 16
+    float reserved[2] = {};
 };
+static_assert(sizeof(RenderFragUniformBlock) % 16 == 0, "RenderFragUniformBlock must stay a multiple of 16 bytes");
 
 enum FragUniformFieldId : uint32_t {
     FRAG_UNIFORM_back_disabled,
