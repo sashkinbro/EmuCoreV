@@ -25,7 +25,7 @@ class EmuCoreVApp : Application() {
         // ProcessPhoenix restarts the app through a helper process where Firebase providers
         // are not initialized, and the Discord SDK runs in its own isolated process; neither
         // helper may build the emulator-side graph.
-        if (skipsAppStartup(Application.getProcessName())) return
+        if (skipsAppStartup(getProcessName())) return
         AppAnalytics.initialize(this)
         TrophyCloudRepository.resumePending(this)
         recoverPendingDriveRestore()
@@ -107,12 +107,13 @@ class EmuCoreVApp : Application() {
          * work, or load the emulation core.
          */
         fun skipsAppStartup(processName: String?): Boolean {
-            if (processName == null) return false
-            return processName.endsWith(PHOENIX_PROCESS_SUFFIX) ||
-                processName.endsWith(DISCORD_PROCESS_SUFFIX) ||
-                processName.endsWith(NATIVE_SHELL_PROCESS_SUFFIX) ||
-                processName.endsWith(NATIVE_LIBRARY_PROCESS_SUFFIX) ||
-                processName.endsWith(NATIVE_TROPHIES_PROCESS_SUFFIX)
+            return processName != null && (
+                processName.endsWith(PHOENIX_PROCESS_SUFFIX) ||
+                    processName.endsWith(DISCORD_PROCESS_SUFFIX) ||
+                    processName.endsWith(NATIVE_SHELL_PROCESS_SUFFIX) ||
+                    processName.endsWith(NATIVE_LIBRARY_PROCESS_SUFFIX) ||
+                    processName.endsWith(NATIVE_TROPHIES_PROCESS_SUFFIX)
+                )
         }
     }
 }

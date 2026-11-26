@@ -25,7 +25,7 @@ class EmuCoreVAppProcessGatingTest {
         val app = sequenceOf(Path.of(System.getProperty("user.dir")), Path.of(System.getProperty("user.dir"), "app"))
             .first { Files.isDirectory(it.resolve("src/main")) }
         val source = app.resolve("src/main/java/com/sbro/emucorev/EmuCoreVApp.kt").readText()
-        val gate = source.indexOf("skipsAppStartup(Application.getProcessName())")
+        val gate = source.indexOf("skipsAppStartup(getProcessName())")
         assertTrue(gate > 0)
         for (work in listOf("finishOpenSessions", "TrophyCloudRepository.resumePending", "DiscordIntegration.initialize",
             "EmulatorStorage.prepareRuntime", "NativeLibraryLoader.ensureLoaded")) {
