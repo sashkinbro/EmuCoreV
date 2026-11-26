@@ -48,6 +48,13 @@ enum class RackReleaseAction : std::uint8_t {
     DeferCallback,
 };
 
+enum class SystemReleaseAction : std::uint8_t {
+    Immediate,
+    Wait,
+    // The caller is the thread running the update (from a guest callback).
+    RejectReentrant,
+};
+
 enum class PendingType {
     ReleaseRack
     // TODO add voice operations during system lock
@@ -160,6 +167,19 @@ struct VoiceScheduler {
         if (is_update_thread(thread_id))
             return RackReleaseAction::RejectReentrant;
         return RackReleaseAction::Wait;
+    }
+
+    // Caller must hold mutex. A system release cannot be deferred past the
+    // update like a rack release with a callback: the System (mutex, voice
+    // queue) lives in the guest buffer, which the guest may reuse as soon as the
+    // call returns, while the running update still walks it. Waiting for the
+    // update from inside the update deadlocks, so the call is refused instead.
+    SystemReleaseAction system_release_action(SceUID thread_id) const {
+        if (!is_updating)
+            return SystemReleaseAction::Immediate;
+        if (is_update_thread(thread_id))
+            return SystemReleaseAction::RejectReentrant;
+        return SystemReleaseAction::Wait;
     }
 
     bool has_pending_rack_release(const Rack *rack) const {

@@ -33,6 +33,7 @@ add_executable(core_host_tests
     rtc_text_tests.cpp
     ngs_dsp_tests.cpp
     ngs_effects_tests.cpp
+    ngs_scheduler_tests.cpp
     hle_stub_batch3_tests.cpp
     hle_stub_batch4_tests.cpp
     hle_stub_wave1_tests.cpp

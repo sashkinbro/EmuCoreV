@@ -545,12 +545,20 @@ EXPORT(SceInt32, sceNgsSystemRelease, ngs::System *system) {
 
     {
         std::unique_lock<std::recursive_mutex> lock(system->voice_scheduler.mutex);
-        if (system->voice_scheduler.is_updating) {
+        const auto release_action = system->voice_scheduler.system_release_action(thread_id);
+        if (release_action == ngs::SystemReleaseAction::RejectReentrant) {
+            // Called from a guest callback running inside sceNgsSystemUpdate:
+            // waiting for the update would wait on this very callback.
+            LOG_CRITICAL("sceNgsSystemRelease rejected inside an active {} callback of its own update: system={:x} caller_thread={}; release it after sceNgsSystemUpdate returns",
+                ngs::update_callback_kind_name(system->voice_scheduler.callback_kind()), Ptr<void>(system, emuenv.mem).address(), thread_id);
+            return RET_ERROR(SCE_NGS_ERROR_INVALID_STATE);
+        }
+        if (release_action == ngs::SystemReleaseAction::Wait) {
             LOG_WARN_ONCE("sceNgsSystemRelease called during a ngs update, contact devs if your game softlocks now.");
 
             auto wait_lease = ngs::system_update_admission().track_wait(ngs::UpdateAdmission::WaitKind::SystemRelease);
             guest_sched_release_for_block();
-            system->voice_scheduler.condvar.wait(lock);
+            system->voice_scheduler.wait_for_update_to_finish(lock);
         }
     }
 
