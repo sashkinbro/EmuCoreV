@@ -1805,7 +1805,6 @@ void MainWindow::setup_status_bar() {
         desired.backend_renderer = cc.backend_renderer;
         save_config(desired);
         update_renderer_button();
-        update_accuracy_button();
         update_screen_filter_button();
     });
     connect(m_renderer_button, &QPushButton::customContextMenuRequested, this, [this](const QPoint &pos) {
@@ -1826,37 +1825,9 @@ void MainWindow::setup_status_bar() {
         desired.backend_renderer = cc.backend_renderer;
         save_config(desired);
         update_renderer_button();
-        update_accuracy_button();
         update_screen_filter_button();
     });
     sb->addWidget(m_renderer_button);
-
-    m_accuracy_button = new QPushButton(this);
-    m_accuracy_button->setObjectName(QStringLiteral("status_button"));
-    m_accuracy_button->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(m_accuracy_button, &QPushButton::clicked, this, [this] {
-        Config desired;
-        copy_config_for_edit(desired, emuenv.cfg);
-        auto &cc = desired.current_config;
-        cc.high_accuracy = !cc.high_accuracy;
-        save_config(desired);
-        update_accuracy_button();
-    });
-    connect(m_accuracy_button, &QPushButton::customContextMenuRequested, this, [this](const QPoint &pos) {
-        QMenu menu(this);
-        auto *standard_action = menu.addAction(tr("Standard"));
-        auto *high_action = menu.addAction(tr("High"));
-        QAction *chosen = menu.exec(m_accuracy_button->mapToGlobal(pos));
-        if (!chosen)
-            return;
-        Config desired;
-        copy_config_for_edit(desired, emuenv.cfg);
-        auto &cc = desired.current_config;
-        cc.high_accuracy = (chosen == high_action);
-        save_config(desired);
-        update_accuracy_button();
-    });
-    sb->addWidget(m_accuracy_button);
 
     auto get_filter_names = [this]() -> QStringList {
         if (emuenv.cfg.current_config.backend_renderer == "Vulkan")
@@ -2002,7 +1973,6 @@ void MainWindow::setup_status_bar() {
     sb->addPermanentWidget(m_update_available_button);
 
     update_renderer_button();
-    update_accuracy_button();
     update_screen_filter_button();
     update_audio_backend_button();
     update_ngs_button();
@@ -2018,19 +1988,6 @@ void MainWindow::update_renderer_button() {
     } else {
         m_renderer_button->setText(QStringLiteral("OPENGL"));
         update_status_button_accent(m_renderer_button, QStringLiteral("renderer_opengl"));
-    }
-}
-
-void MainWindow::update_accuracy_button() {
-    const bool high = emuenv.cfg.current_config.high_accuracy;
-    const bool is_vulkan = emuenv.cfg.current_config.backend_renderer == "Vulkan";
-    m_accuracy_button->setVisible(is_vulkan);
-    if (high) {
-        m_accuracy_button->setText(tr("HIGH"));
-        update_status_button_accent(m_accuracy_button, QStringLiteral("high"));
-    } else {
-        m_accuracy_button->setText(tr("STANDARD"));
-        update_status_button_accent(m_accuracy_button, QStringLiteral("standard"));
     }
 }
 
@@ -2100,14 +2057,12 @@ void MainWindow::refresh_status_bar() {
     const bool running = m_game_window != nullptr;
 
     update_renderer_button();
-    update_accuracy_button();
     update_screen_filter_button();
     update_audio_backend_button();
     update_ngs_button();
     update_volume_button();
 
     m_renderer_button->setEnabled(!running);
-    m_accuracy_button->setEnabled(!running);
     m_audio_backend_button->setEnabled(!running);
     m_ngs_button->setEnabled(!running);
     update_update_available_button();

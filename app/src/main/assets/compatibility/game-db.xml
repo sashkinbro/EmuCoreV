@@ -24,23 +24,4 @@
         <title-id>PCSE00064</title-id>
         <gpu accurate-thread-scheduling="true" eager-surface-sync="true" />
     </profile>
-    <profile id="injustice-high-accuracy">
-        <!-- PCSB00356: tested on Lenovo on 2026-10-20 after intermittent HUD
-             and texture flicker. Prefer GPU-completion synchronization for
-             this title; explicit per-game user settings still take precedence. -->
-        <title-id>PCSB00356</title-id>
-        <gpu high-accuracy="true" />
-    </profile>
-    <profile id="borderlands-2-high-accuracy">
-        <!-- PCSE00383: verified on Android on 2026-10-11. High accuracy removes
-             severe white/red posterization. Keep all other user settings. -->
-        <title-id>PCSE00383</title-id>
-        <gpu high-accuracy="true" />
-    </profile>
-    <profile id="ridge-racer-high-accuracy">
-        <!-- PCSE00001: verified on Lenovo on 2026-10-11. High GPU accuracy
-             avoids the crash entering car selection. Keep other user settings. -->
-        <title-id>PCSE00001</title-id>
-        <gpu high-accuracy="true" />
-    </profile>
 </game-db>

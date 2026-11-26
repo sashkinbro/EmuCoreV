@@ -36,9 +36,6 @@ struct SamplerSupport {
     float max_anisotropy = 1.0f;
     // limits.maxSamplerLodBias
     float max_lod_bias = 0.0f;
-    // the shader scales 2D texture coordinates per texture (texture viewport), which is how unnormalized (texel unit)
-    // coordinates are done. Without it the VkSampler unnormalizedCoordinates mode is used.
-    bool unnormalized_in_shader = false;
 };
 
 enum class AddressKind : uint8_t {

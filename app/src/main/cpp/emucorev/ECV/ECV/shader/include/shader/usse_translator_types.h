@@ -98,8 +98,6 @@ struct SpirvShaderParameters {
 
     // ids for the given fields in the uniform block container
     int buffer_addresses_id;
-    int viewport_ratio_id;
-    int viewport_offset_id;
 
     // number of entries in the buffer_addresses[] uniform array
     int buffer_count = 0;

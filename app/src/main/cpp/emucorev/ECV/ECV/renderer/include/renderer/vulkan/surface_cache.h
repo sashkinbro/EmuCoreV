@@ -39,12 +39,6 @@ struct VKState;
 struct Viewport;
 using CallbackRequestFunction = std::function<void()>;
 
-// used for in-shader texture viewport
-struct TextureViewport {
-    std::pair<float, float> ratio = { 1.0f, 1.0f };
-    std::pair<float, float> offset = { 0.0f, 0.0f };
-};
-
 enum struct SurfaceTiling {
     Linear,
     Swizzled,
@@ -397,7 +391,7 @@ public:
     SurfaceRetrieveResult retrieve_color_surface_for_framebuffer(MemState &mem, SceGxmColorSurface *color);
     // a live colour surface kept in sync with guest memory overlaps [begin, end): the GPU side writes those bytes
     bool gpu_writes_guest_range(Address begin, Address end) const;
-    std::optional<TextureLookupResult> retrieve_color_surface_as_texture(const SceGxmTexture &texture, const SceGxmColorBaseFormat base_format, TextureViewport *texture_viewport);
+    std::optional<TextureLookupResult> retrieve_color_surface_as_texture(const SceGxmTexture &texture, const SceGxmColorBaseFormat base_format);
 
     SurfaceRetrieveResult retrieve_depth_stencil_for_framebuffer(SceGxmDepthStencilSurface *depth_stencil, const uint32_t width, const uint32_t height);
 
@@ -433,7 +427,7 @@ public:
         return last_written_surface && last_written_surface->raw_image && !last_written_surface->content_is_blended;
     }
 
-    std::optional<TextureLookupResult> retrieve_depth_stencil_as_texture(const SceGxmTexture &texture, TextureViewport *texture_viewport);
+    std::optional<TextureLookupResult> retrieve_depth_stencil_as_texture(const SceGxmTexture &texture);
 
     Framebuffer &retrieve_framebuffer_handle(MemState &mem, SceGxmColorSurface *color, SceGxmDepthStencilSurface *depth_stencil,
         vk::RenderPass standard_render_pass, vk::RenderPass interlock_render_pass, vk::ImageView &color_view, vk::ImageView &ds_view);

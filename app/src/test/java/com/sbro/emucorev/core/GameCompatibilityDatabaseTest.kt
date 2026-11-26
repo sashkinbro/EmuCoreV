@@ -13,7 +13,7 @@ class GameCompatibilityDatabaseTest {
     private fun database(text: String = xml) = text.byteInputStream().use(GameCompatibilityDatabase::parse)
 
     @Test fun plantsVsZombiesStartupSchedulingInheritsOtherSettingsAndCanBeOverridden() {
-        val base = VitaCoreConfig(highAccuracy = false, memoryMapping = "page-table")
+        val base = VitaCoreConfig(memoryMapping = "page-table")
         val recommended = database().applyDefaults(base, "PCSE00064")
         assertEquals(base.copy(accurateThreadScheduling = true, eagerSurfaceSync = true), recommended)
         val disabled = database("<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu accurate-thread-scheduling=\"false\"/></profile></game-db>")
@@ -37,7 +37,7 @@ class GameCompatibilityDatabaseTest {
         val db = database()
         listOf("disabled", "double-buffer", "external-host", "page-table", "native-buffer").forEach { mapping ->
             val global = VitaCoreConfig(backendRenderer = "OpenGL", memoryMapping = mapping,
-                useAngle = true, customDriverName = "working-driver", highAccuracy = false)
+                useAngle = true, customDriverName = "working-driver")
             (ids + "UNKNOWN").forEach { id ->
                 listOf("EA SPORTS FC mod", "FIFA Football", "FIFA 13", "FIFA 14", "FIFA 15", "FIFA 26 mod").forEach { title ->
                     assertSame("$id / $title / $mapping", global, db.applyDefaults(global, id, title))
@@ -47,45 +47,19 @@ class GameCompatibilityDatabaseTest {
         assertNull(db.recommendationFor(" pcse00483 "))
     }
 
-    @Test fun highAccuracyOnlyRecommendationInheritsOtherGlobalSettings() {
-        val db = database("<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu high-accuracy=\"true\"/></profile></game-db>")
-        val global = VitaCoreConfig(backendRenderer = "OpenGL", memoryMapping = "page-table",
-            useAngle = true, customDriverName = "working-driver", audioVolume = 37, highAccuracy = false)
-        assertEquals(global.copy(highAccuracy = true), db.applyDefaults(global, "EXACT"))
-        assertFalse(global.highAccuracy)
-    }
-
-    @Test fun accuracyRecommendationsAcceptExplicitFalseAndRejectMalformedOrEmptyGpu() {
-        val global = VitaCoreConfig(highAccuracy = true)
+    @Test fun removedHighAccuracyAttributeIsIgnored() {
         val template = "<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu %s/></profile></game-db>"
-        assertFalse(database(template.format("high-accuracy=\"false\"")).applyDefaults(global, "EXACT").highAccuracy)
-        val fullValid = "backend-renderer=\"Vulkan\" memory-mapping=\"native-buffer\" use-angle=\"false\" high-accuracy=\"true\""
-        assertEquals(global.copy(backendRenderer = "Vulkan", memoryMapping = "native-buffer", useAngle = false),
-            database(template.format(fullValid)).applyDefaults(global, "EXACT"))
-        listOf("", "unknown=\"true\"", "high-accuracy=\"TRUE\"", "high-accuracy=\"\"",
-            "high-accuracy=\"enabled\"", "backend-renderer=\"Vulkan\" high-accuracy=\"true\"").forEach {
+        listOf("high-accuracy=\"true\"", "high-accuracy=\"false\"", "high-accuracy=\"invalid\"").forEach {
             assertNull(it, database(template.format(it)).recommendationFor("EXACT"))
         }
-        val full = "backend-renderer=\"Vulkan\" memory-mapping=\"native-buffer\" use-angle=\"false\" high-accuracy=\"invalid\""
-        assertNull(database(template.format(full)).recommendationFor("EXACT"))
-    }
-
-    @Test fun verifiedBorderlandsProfileChangesOnlyAccuracyAndDoesNotGuessOtherRegions() {
-        val db = database()
         val global = VitaCoreConfig(backendRenderer = "OpenGL", memoryMapping = "disabled", useAngle = true)
-        assertEquals(global.copy(highAccuracy = true), db.applyDefaults(global, " pcse00383 ", "Renamed game"))
-        assertSame(global, db.applyDefaults(global, "UNVERIFIED", "Borderlands 2"))
-        assertSame(global, db.applyDefaults(global, "", "Borderlands 2"))
-    }
-
-    @Test fun verifiedRidgeRacerStartsWithAccurateGpuWithoutChangingOtherGamesOrSettings() {
-        val db = database()
-        val global = VitaCoreConfig(highAccuracy = false, memoryMapping = "double-buffer",
-            customDriverName = "working-driver", resolutionMultiplier = 2f, audioVolume = 37)
-        assertEquals(global.copy(highAccuracy = true), db.applyDefaults(global, " pcse00001 ", "Renamed game"))
-        assertFalse(global.highAccuracy)
-        assertSame(global, db.applyDefaults(global, "UNVERIFIED", "RIDGE RACER"))
-        assertSame(global, db.applyDefaults(global, "", "RIDGE RACER"))
+        val fullValid = "backend-renderer=\"Vulkan\" memory-mapping=\"native-buffer\" use-angle=\"false\" high-accuracy=\"invalid\""
+        assertEquals(global.copy(backendRenderer = "Vulkan", memoryMapping = "native-buffer", useAngle = false),
+            database(template.format(fullValid)).applyDefaults(global, "EXACT"))
+        listOf("", "unknown=\"true\"", "backend-renderer=\"Vulkan\"").forEach {
+            assertNull(it, database(template.format(it)).recommendationFor("EXACT"))
+        }
+        listOf("PCSE00383", "PCSE00001", "PCSB00356").forEach { assertNull(it, database().recommendationFor(it)) }
     }
 
     @Test fun familyNamesAreDataDrivenAndDoNotMatchUnrelatedWords() {
@@ -101,16 +75,6 @@ class GameCompatibilityDatabaseTest {
         val changed = database(familyXml.replace("title-word=\"FIFA\"", "title-word=\"SAMPLE\""))
         assertNull(changed.recommendationFor("UNKNOWN", "FIFA 15"))
         assertNotNull(changed.recommendationFor("UNKNOWN", "SAMPLE 15"))
-    }
-
-    @Test fun injusticeUsesAccurateGpuOnlyForTheVerifiedTitleWithoutChangingGlobalSettings() {
-        val db = database()
-        val global = VitaCoreConfig(highAccuracy = false, memoryMapping = "double-buffer",
-            customDriverName = "working-driver", resolutionMultiplier = 1.5f, audioVolume = 37)
-        assertEquals(global.copy(highAccuracy = true), db.applyDefaults(global, " pcsb00356 ", "Renamed game"))
-        assertFalse(global.highAccuracy)
-        assertSame(global, db.applyDefaults(global, "UNVERIFIED", "Injustice: Gods Among Us"))
-        assertSame(global, db.applyDefaults(global, "", "Injustice: Gods Among Us"))
     }
 
     @Test fun recommendationsDoNotMutateGlobalSettingsOrSelectDrivers() {

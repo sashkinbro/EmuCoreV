@@ -1283,7 +1283,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_color_surface_for_framebuffer(Mem
     return { info_added.texture.view, &info_added.texture, info_added.raw_image.get() };
 }
 
-std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_texture(const SceGxmTexture &texture, const SceGxmColorBaseFormat base_format, TextureViewport *texture_viewport) {
+std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_texture(const SceGxmTexture &texture, const SceGxmColorBaseFormat base_format) {
     // Create the key to access the cache struct
     const uint32_t address = (texture.data_addr << 2);
 
@@ -1446,46 +1446,6 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_color_surface_as_tex
 #if ECV_ORACLE
     oracle_force_color_copy = ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_COLOR_COPY);
 #endif
-    if (state.features.use_texture_viewport && base_format == info.format && !oracle_force_color_copy) {
-        // use a texture viewport
-        *texture_viewport = {
-            .ratio = {
-                original_width / static_cast<float>(info.original_width),
-                original_height / static_cast<float>(info.original_height) },
-            .offset = { start_x / static_cast<float>(info.width), start_sourced_line / static_cast<float>(info.height) }
-        };
-
-        // sampled directly by the draws of this scene: the pass dependencies must already cover it (counted if not)
-        observe_sampled_color(info.texture);
-        // if everything matches
-        if (vk_format == info.texture.format && swizzle == info.swizzle)
-            return TextureLookupResult{
-                info.texture.view,
-                info.texture.layout,
-                info.texture.format
-            };
-
-        // use the other view with the correct swizzle / gamma correction
-        if (!info.alternate_view) {
-            vk::ComponentMapping resulting_mapping = vkutil::color_to_texture_swizzle(info.swizzle, swizzle);
-
-            vk::ImageViewCreateInfo view_info{
-                .image = info.texture.image,
-                .viewType = vk::ImageViewType::e2D,
-                .format = vk_format,
-                .components = resulting_mapping,
-                .subresourceRange = vkutil::color_subresource_range
-            };
-            info.alternate_view = state.device.createImageView(view_info);
-        }
-
-        return TextureLookupResult{
-            info.alternate_view,
-            info.texture.layout,
-            info.texture.format
-        };
-    }
-
     // At non-integer resolution multipliers, upscaled surfaces have different texel
     // boundaries than native.  Bilinear filtering at the same UV produces different blend
     // weights, corrupting data textures with discrete values (e.g. tile-index maps in LBP).
@@ -2192,7 +2152,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
     };
 }
 
-std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_texture(const SceGxmTexture &texture, TextureViewport *texture_viewport) {
+std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_texture(const SceGxmTexture &texture) {
     SceGxmTextureBaseFormat base_format = gxm::get_base_format(gxm::get_format(texture));
     bool can_be_depth = false;
     bool can_be_stencil = false;
@@ -2333,7 +2293,7 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
 #if ECV_ORACLE
     oracle_force_ds_copy = ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_DS_COPY);
 #endif
-    if (!reading_ds_attachment && !oracle_force_ds_copy && (state.features.use_texture_viewport || same_dimension)) {
+    if (!reading_ds_attachment && !oracle_force_ds_copy && same_dimension) {
         // we can just sample from the surface itself
 
         // we must create a new read-only view if it is not already present
@@ -2349,19 +2309,6 @@ std::optional<TextureLookupResult> VKSurfaceCache::retrieve_depth_stencil_as_tex
                 .subresourceRange = range
             };
             img_view = state.device.createImageView(view_info);
-        }
-
-        const float inv_surface_width = 1 / static_cast<float>(cached_info.memory_width);
-        const float inv_surface_height = 1 / static_cast<float>(cached_info.memory_height);
-        if (state.features.use_texture_viewport) {
-            texture_viewport->offset = {
-                delta_col_samples * inv_surface_width,
-                delta_row_samples * inv_surface_height
-            };
-            texture_viewport->ratio = {
-                memory_width * inv_surface_width,
-                memory_height * inv_surface_height
-            };
         }
 
         return TextureLookupResult{

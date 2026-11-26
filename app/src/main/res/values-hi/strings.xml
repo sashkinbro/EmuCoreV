@@ -151,7 +151,6 @@
     <string name="settings_frame_limit">फ़्रेम दर सीमा</string>
     <string name="settings_frame_limit_unlimited">असीमित</string>
     <string name="settings_core_vsync">वर्टिकल सिंक</string>
-    <string name="settings_core_high_accuracy">उच्च सटीकता GPU मोड</string>
     <string name="settings_core_resolution_label">रिज़ॉल्यूशन मल्टीप्लायर</string>
     <string name="settings_core_resolution_value">%1$.2fx रेंडर स्केल</string>
     <string name="settings_core_overlay_opacity_label">ओवरले अपारदर्शिता</string>
@@ -198,7 +197,6 @@
     <string name="settings_help_fps_hack">कुछ गेम्स में सामान्य फ्रेम सीमा को हटाता है। यह गति में सुधार कर सकता है, लेकिन यह टाइमिंग को तोड़ सकता है।\n\nTesting, slow sections skip करने या किसी game-specific behavior को workaround करने के लिए इस्तेमाल करें। Normal gameplay में timing, physics, cutscenes या online-style checks सही रखने हों तो avoid करें।</string>
     <string name="settings_help_frame_limit">एमुलेटेड Vita की टाइमिंग बदले बिना दिखाए जाने वाले फ़्रेम सीमित करता है। बिजली की खपत और गर्मी कम करने के लिए 30 या 45 FPS इस्तेमाल करें।</string>
     <string name="settings_help_vsync">स्क्रीन टियरिंग को कम करता है, लेकिन कुछ गेम्स में प्रदर्शन कम कर सकता है।\n\nजो गेम पहले से अच्छे चल रहे हैं उनमें image clarity, scaling या visual stability सुधारने के लिए इस्तेमाल करें। FPS गिरने, phone गरम होने या graphics unstable होने पर इसे कम करें या default रखें।</string>
-    <string name="settings_help_high_accuracy">ग्राफ़िक्स समस्याओं को ठीक कर सकता है, लेकिन आमतौर पर प्रदर्शन कम कर देता है।\n\nजो गेम पहले से अच्छे चल रहे हैं उनमें image clarity, scaling या visual stability सुधारने के लिए इस्तेमाल करें। FPS गिरने, phone गरम होने या graphics unstable होने पर इसे कम करें या default रखें।</string>
     <string name="settings_help_resolution">उच्च मान छवि को तेज बनाते हैं, लेकिन अधिक GPU पावर का उपयोग करते हैं।\n\nजो गेम पहले से अच्छे चल रहे हैं उनमें image clarity, scaling या visual stability सुधारने के लिए इस्तेमाल करें। FPS गिरने, phone गरम होने या graphics unstable होने पर इसे कम करें या default रखें।</string>
     <string name="settings_help_renderer">Vulkan आमतौर पर सबसे अच्छा विकल्प है। OpenGL कमजोर Vulkan समर्थन वाले उपकरणों पर मदद कर सकता है।\n\nSpeed और modern Android drivers के लिए Vulkan आमतौर पर सबसे अच्छा है। OpenGL तभी आजमाएँ जब Vulkan boot न करे, graphics टूटे दिखाए, या device में Vulkan support कमजोर हो।</string>
     <string name="settings_help_screen_filter">बायलिनियर छवि को चिकना करता है। निकटतम तेज किनारों को रखता है।\n\nजो गेम पहले से अच्छे चल रहे हैं उनमें image clarity, scaling या visual stability सुधारने के लिए इस्तेमाल करें। FPS गिरने, phone गरम होने या graphics unstable होने पर इसे कम करें या default रखें।</string>

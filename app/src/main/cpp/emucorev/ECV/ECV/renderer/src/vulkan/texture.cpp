@@ -193,15 +193,13 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
 
     SceGxmColorBaseFormat format_target_of_texture;
 
-    TextureViewport texture_viewport{};
-
     // surface-cache views are always 2D, so a cube texture must skip it or the shader samples a cube sampler through a 2D view
     const bool texture_is_cube = texture.texture_type() == SCE_GXM_TEXTURE_CUBE || texture.texture_type() == SCE_GXM_TEXTURE_CUBE_ARBITRARY;
 
     bool color_convertible = renderer::texture::convert_base_texture_format_to_base_color_format(base_format, format_target_of_texture);
     if (color_convertible && !texture_is_cube) {
         // try to retrieve it from the color surface cache
-        lookup_result = context.state.surface_cache.retrieve_color_surface_as_texture(texture, format_target_of_texture, &texture_viewport);
+        lookup_result = context.state.surface_cache.retrieve_color_surface_as_texture(texture, format_target_of_texture);
     }
 
 #if ECV_ORACLE
@@ -210,7 +208,7 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
     bool is_depth_surface = false;
     if (!lookup_result.has_value() && !texture_is_cube && is_depth_stencil_compatible_format(base_format, is_depth_surface)) {
         // Try to retrieve depth/stencil cache
-        lookup_result = context.state.surface_cache.retrieve_depth_stencil_as_texture(texture, &texture_viewport);
+        lookup_result = context.state.surface_cache.retrieve_depth_stencil_as_texture(texture);
     }
 
 #if ECV_ORACLE
@@ -249,23 +247,6 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
             context.last_frag_texture_count = ~0;
     }
 
-    if (context.state.features.use_texture_viewport) {
-        if (!texture.normalize_mode) {
-            // Unnormalized texture: the guest samples with texel unit coordinates, the shader turns them into
-            // normalized ones through the same scale it uses for surface views (see configure_sampler)
-            texture_viewport.ratio.first /= static_cast<float>(std::max(gxm::get_width(texture), 1U));
-            texture_viewport.ratio.second /= static_cast<float>(std::max(gxm::get_height(texture), 1U));
-        }
-
-        if (is_vertex) {
-            context.curr_vert_ublock.set_viewport_ratio(index - SCE_GXM_MAX_TEXTURE_UNITS, texture_viewport.ratio);
-            context.curr_vert_ublock.set_viewport_offset(index - SCE_GXM_MAX_TEXTURE_UNITS, texture_viewport.offset);
-        } else {
-            context.curr_frag_ublock.set_viewport_ratio(index, texture_viewport.ratio);
-            context.curr_frag_ublock.set_viewport_offset(index, texture_viewport.offset);
-        }
-    }
-
     if (!is_vertex) {
         context.curr_frag_ublock.set_cast_sampler_bit(index, lookup_result->is_typeless_cast, lookup_result->cast_phase_hi);
         context.curr_frag_ublock.set_raw_cast_bit(index, lookup_result->is_raw_bits);
@@ -273,8 +254,7 @@ void sync_texture(VKContext &context, MemState &mem, std::size_t index, SceGxmTe
 #if ECV_ORACLE
     if (ecv::oracle::gpu::enabled())
         ecv::oracle::gpu::tex_bind(static_cast<uint32_t>(index), texture, oracle_source,
-            oracle_source != 1 && context.state.features.use_texture_viewport,
-            texture_viewport.ratio.first, texture_viewport.ratio.second, texture_viewport.offset.first, texture_viewport.offset.second);
+            false, 1.0f, 1.0f, 0.0f, 0.0f);
 #endif
 }
 
@@ -809,12 +789,9 @@ void VKTextureCache::configure_sampler(size_t index, const SceGxmTexture &textur
     // Their sampler key excludes those fields, so do not interpret them as LOD state.
     const bool is_linear_strided = texture.texture_type() == SCE_GXM_TEXTURE_LINEAR_STRIDED;
 
-    // Unnormalized (texel unit) coordinates: the shader scales the coordinates when it has the texture viewport
-    // (see sync_texture), otherwise the sampler does it with unnormalizedCoordinates
-    renderer::SamplerSupport support = state.sampler_support;
-    support.unnormalized_in_shader = state.features.use_texture_viewport;
+    // Unnormalized (texel unit) coordinates: the sampler does them with unnormalizedCoordinates
+    const renderer::SamplerSupport &support = state.sampler_support;
     const bool unnormalized = !texture.normalize_mode;
-    const bool unnormalized_sampler = unnormalized && !support.unnormalized_in_shader;
 
     const SceGxmTextureAddrMode uaddr = static_cast<SceGxmTextureAddrMode>(texture.uaddr_mode);
     const SceGxmTextureAddrMode vaddr = static_cast<SceGxmTextureAddrMode>(texture.vaddr_mode);
@@ -822,7 +799,7 @@ void VKTextureCache::configure_sampler(size_t index, const SceGxmTexture &textur
     SceGxmTextureFilter mag_filter = static_cast<SceGxmTextureFilter>(texture.mag_filter);
     SceGxmTextureFilter min_filter = is_linear_strided ? mag_filter : static_cast<SceGxmTextureFilter>(texture.min_filter);
 
-    if (no_linear || unnormalized_sampler) {
+    if (no_linear || unnormalized) {
         // an unnormalizedCoordinates sampler needs the same min and mag filter
         if (no_linear) {
             min_filter = SCE_GXM_TEXTURE_FILTER_POINT;
@@ -837,7 +814,7 @@ void VKTextureCache::configure_sampler(size_t index, const SceGxmTexture &textur
 
     vk::SamplerAddressMode address_u = texture::translate_address_mode(uaddr, support.mirror_clamp_to_edge);
     vk::SamplerAddressMode address_v = texture::translate_address_mode(vaddr, support.mirror_clamp_to_edge);
-    if (unnormalized_sampler) {
+    if (unnormalized) {
         // the only address modes allowed with unnormalizedCoordinates
         const auto clamp_only = [](vk::SamplerAddressMode mode) {
             return mode == vk::SamplerAddressMode::eClampToBorder ? mode : vk::SamplerAddressMode::eClampToEdge;
@@ -862,12 +839,12 @@ void VKTextureCache::configure_sampler(size_t index, const SceGxmTexture &textur
         .maxLod = unnormalized ? 0.f : VK_LOD_CLAMP_NONE,
         // GXM has no programmable border colour: the border modes sample transparent black (see sampler_state.h)
         .borderColor = vk::BorderColor::eFloatTransparentBlack,
-        .unnormalizedCoordinates = unnormalized_sampler ? VK_TRUE : VK_FALSE,
+        .unnormalizedCoordinates = unnormalized ? VK_TRUE : VK_FALSE,
     };
 
     // when using nearest filter, disable anisotropy as the pixels can contain data other than color
     const renderer::AnisotropyPlan anisotropy = renderer::plan_anisotropy(anisotropic_filtering, support,
-        sampler_info.magFilter != vk::Filter::eNearest, sampler_info.minFilter != vk::Filter::eNearest, unnormalized_sampler);
+        sampler_info.magFilter != vk::Filter::eNearest, sampler_info.minFilter != vk::Filter::eNearest, unnormalized);
     sampler_info.anisotropyEnable = anisotropy.enable;
     sampler_info.maxAnisotropy = anisotropy.max_anisotropy;
 

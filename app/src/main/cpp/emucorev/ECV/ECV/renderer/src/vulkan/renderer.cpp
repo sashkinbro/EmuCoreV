@@ -1353,7 +1353,6 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
     ecv::oracle::gpu::g_oracle_mem = &mem;
 #endif
 
-    bool use_high_accuracy = cfg.current_config.high_accuracy;
     surface_sync_clamp_rt = cfg.surface_sync_clamp_rt;
     eager_surface_sync = cfg.current_config.eager_surface_sync;
     depth_clamp_enabled = cfg.current_config.depth_clamp;
@@ -1364,8 +1363,8 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
         features.support_shader_interlock = false;
     }
 
-    // shader interlock is more accurate but slower
-    if (features.support_shader_interlock && use_high_accuracy) {
+    // shader interlock when the device has it (the accurate framebuffer fetch), the subpass input otherwise
+    if (features.support_shader_interlock) {
         LOG_INFO("Using shader interlock for accurate framebuffer fetch emulation");
     } else {
         // We use subpass input to get something similar to direct fragcolor access (there is no difference for the shader)
@@ -1386,12 +1385,6 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
 
     // B140: multisampling is usable when the strategy's resolve path, sample rate shading and the subpass-input fetch are all there
     msaa::init(*this);
-
-    // texture viewport is faster but not entirely accurate
-    if (support_standard_layout && !use_high_accuracy) {
-        LOG_INFO("The Vulkan renderer is using texture viewport for better performance");
-        features.use_texture_viewport = true;
-    }
 
     // parse the mapping method
     auto &config_mapping = cfg.current_config.memory_mapping;
@@ -1513,8 +1506,8 @@ void VKState::log_gpu_configuration(const Config &cfg) {
     LOG_INFO("  FeatureState: use_mask_bit={} support_unknown_format={} support_rgb_attributes={} support_scaled_attribute_formats={}",
         features.use_mask_bit, features.support_unknown_format, features.support_rgb_attributes,
         features.support_scaled_attribute_formats);
-    LOG_INFO("  FeatureState: enable_memory_mapping={} use_texture_viewport={} spirv_shader={} features_mask=0x{:X}",
-        features.enable_memory_mapping, features.use_texture_viewport, features.spirv_shader, get_features_mask());
+    LOG_INFO("  FeatureState: enable_memory_mapping={} spirv_shader={} features_mask=0x{:X}",
+        features.enable_memory_mapping, features.spirv_shader, get_features_mask());
     LOG_INFO("  derived: should_use_shader_interlock={} should_use_texture_barrier={} programmable_blending={}",
         features.should_use_shader_interlock(), features.should_use_texture_barrier(),
         features.is_programmable_blending_supported());
@@ -1522,10 +1515,10 @@ void VKState::log_gpu_configuration(const Config &cfg) {
 
     const char *mapping_names[] = { "Disabled", "DoubleBuffer", "ExternalHost", "PageTable", "NativeBuffer" };
     const int mapping_idx = static_cast<int>(mapping_method);
-    LOG_INFO("  session config: mapping_method={} screen_filter={} res_multiplier={} high_accuracy={} validation_layer={}",
+    LOG_INFO("  session config: mapping_method={} screen_filter={} res_multiplier={} validation_layer={}",
         (mapping_idx >= 0 && mapping_idx <= 4) ? mapping_names[mapping_idx] : "?",
         screen_renderer.filter ? screen_renderer.filter->get_name() : "<not created yet>",
-        res_multiplier, cfg.current_config.high_accuracy, cfg.validation_layer);
+        res_multiplier, cfg.validation_layer);
     LOG_INFO("  session config: fullscreen={} stretch_display_area={} hd_res_pixel_perfect={} swapchain={}x{} is_adreno_stock={} is_adreno_turnip={}",
         fullscreen, stretch_the_display_area, fullscreen_hd_res_pixel_perfect,
         screen_renderer.extent.width, screen_renderer.extent.height, is_adreno_stock, is_adreno_turnip);
@@ -1936,7 +1929,6 @@ uint32_t VKState::get_features_mask() {
     union {
         struct {
             bool use_shader_interlock : 1;
-            bool use_texture_viewport : 1;
             bool use_memory_mapping : 1;
             bool use_rgb_attributes : 1;
             bool use_scaled_attributes : 1;
@@ -1958,7 +1950,6 @@ uint32_t VKState::get_features_mask() {
 
     features_mask.value = 0;
     features_mask.use_shader_interlock = features.support_shader_interlock;
-    features_mask.use_texture_viewport = features.use_texture_viewport;
     features_mask.use_memory_mapping = features.enable_memory_mapping;
     features_mask.use_rgb_attributes = features.support_rgb_attributes;
     features_mask.use_scaled_attributes = pipeline_cache.support_scaled_vertex_attribute;

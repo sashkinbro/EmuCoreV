@@ -303,7 +303,6 @@ bool prepare_native_library(EmuEnvState &emuenv) {
     emuenv.cfg.current_config.resolution_multiplier = 2.0f;
     // MSAA 4x for every scene of the shell, clamped by the renderer to the device's supported sample counts (4 -> 2 -> 1).
     emuenv.cfg.current_config.msaa_samples_override = 4;
-    emuenv.cfg.current_config.high_accuracy = true;
     emuenv.cfg.current_config.fps_hack = true;
     emuenv.cfg.current_config.v_sync = false;
     emuenv.cfg.current_config.export_textures = false;
@@ -327,14 +326,9 @@ bool prepare_native_library(EmuEnvState &emuenv) {
         emuenv.cfg.current_config.memory_mapping = "disabled";
     else if (shell_gpu_probe == "no-async-pipelines")
         emuenv.cfg.current_config.async_pipeline_compilation = false;
-    else if (shell_gpu_probe == "accurate-sync")
-        emuenv.cfg.current_config.high_accuracy = true;
-    else if (shell_gpu_probe == "no-fetch") {
-        emuenv.cfg.current_config.high_accuracy = true;
+    else if (shell_gpu_probe == "no-fetch")
         emuenv.cfg.disable_programmable_blending = true;
-    }
     else if (shell_gpu_probe == "dump-textures") {
-        emuenv.cfg.current_config.high_accuracy = true;
         emuenv.cfg.current_config.export_textures = true;
         emuenv.cfg.current_config.export_as_png = true;
     }
@@ -369,7 +363,6 @@ bool prepare_native_trophies(EmuEnvState &emuenv) {
     for (const auto *module : {"libpaf", "libnet", "sqlite", "bXCe", "ini_file_processor", "common_gui_dialog", "dbutil", "activity_db", "np_utility", "np_common", "np_activity", "np_trophy"})
         config.lle_modules.emplace_back(module);
     config.resolution_multiplier = 2.0f;
-    config.high_accuracy = true;
     config.export_textures = config.import_textures = false;
     emuenv.cfg.archive_log = false;
     emuenv.io.app_path = "__VITA_NATIVE_TROPHIES__";

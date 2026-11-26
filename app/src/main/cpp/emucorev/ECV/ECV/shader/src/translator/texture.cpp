@@ -187,36 +187,6 @@ spv::Id shader::usse::USSETranslatorVisitor::do_fetch_texture(const spv::Id tex,
         }
     }
 
-    // the texture viewport is only useful for surfaces and they are never cubes
-    // also for the time being ignore sampleProj ops
-    if (m_features.use_texture_viewport && dim == 2) {
-        // coord = coord * viewport_ratio + viewport_offset
-        spv::Id viewport_ratio = utils::create_access_chain(m_b, spv::StorageClassUniform, m_spirv_params.render_info_id, { m_b.makeIntConstant(m_spirv_params.viewport_ratio_id), m_b.makeIntConstant(texture_index) });
-        viewport_ratio = m_b.createLoad(viewport_ratio, spv::NoPrecision);
-        spv::Id viewport_offset = utils::create_access_chain(m_b, spv::StorageClassUniform, m_spirv_params.render_info_id, { m_b.makeIntConstant(m_spirv_params.viewport_offset_id), m_b.makeIntConstant(texture_index) });
-        viewport_offset = m_b.createLoad(viewport_offset, spv::NoPrecision);
-
-        if (extra1 != spv::NoResult || lod_mode != 4) {
-            // only keep the first two coordinates (x,y)
-            coord_id = m_b.createOp(spv::OpVectorShuffle, type_f32_v[2], { { true, coord_id }, { true, coord_id }, { false, 0 }, { false, 1 } });
-            coord_id = m_b.createBuiltinCall(m_b.getTypeId(coord_id), std_builtins, GLSLstd450Fma, { coord_id, viewport_ratio, viewport_offset });
-        } else {
-            // extract the x,y and proj coordinate
-            spv::Id coord_xy = m_b.createOp(spv::OpVectorShuffle, type_f32_v[2], { { true, coord_id }, { true, coord_id }, { false, 0 }, { false, 1 } });
-            spv::Id third_comp = m_b.createBinOp(spv::OpVectorExtractDynamic, type_f32, coord_id, m_b.makeIntConstant(2));
-            third_comp = m_b.createCompositeConstruct(type_f32_v[2], { third_comp, third_comp });
-
-            // multiply the offset by the third component
-            viewport_offset = m_b.createBinOp(spv::OpFMul, type_f32_v[2], viewport_offset, third_comp);
-
-            // do the fma
-            coord_xy = m_b.createBuiltinCall(m_b.getTypeId(coord_xy), std_builtins, GLSLstd450Fma, { coord_xy, viewport_ratio, viewport_offset });
-
-            // add back the proj component
-            coord_id = m_b.createOp(spv::OpVectorShuffle, type_f32_v[3], { { true, coord_xy }, { true, coord_id }, { false, 0 }, { false, 1 }, { false, 4 } });
-        }
-    }
-
     spv::Id image_sample = spv::NoResult;
     spv::Op op;
     std::vector<spv::Id> params = { tex, coord_id };

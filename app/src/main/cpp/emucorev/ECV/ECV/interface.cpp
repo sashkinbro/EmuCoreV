@@ -804,9 +804,9 @@ static ExitCode load_app_impl(SceUID &main_module_id, EmuEnvState &emuenv, const
         emuenv.post_app_launch_request(relaunch.value_or(AppLaunchRequest{ .reason = AppLaunchReason::ProcessExit }));
     };
     emuenv.kernel.accurate_thread_scheduling = emuenv.cfg.current_config.accurate_thread_scheduling;
-    LOG_INFO("CONFIG (applied): memory_mapping={} accurate_thread_scheduling={} high_accuracy={} res_multiplier={} guest_cores={}",
+    LOG_INFO("CONFIG (applied): memory_mapping={} accurate_thread_scheduling={} res_multiplier={} guest_cores={}",
         emuenv.cfg.current_config.memory_mapping, emuenv.cfg.current_config.accurate_thread_scheduling,
-        emuenv.cfg.current_config.high_accuracy, emuenv.cfg.current_config.resolution_multiplier, emuenv.cfg.current_config.guest_cores);
+        emuenv.cfg.current_config.resolution_multiplier, emuenv.cfg.current_config.guest_cores);
     guest_sched_set_cores(emuenv.cfg.current_config.guest_cores);
     if (emuenv.kernel.accurate_thread_scheduling)
         LOG_INFO("Accurate thread scheduling enabled: default-affinity guest threads run one at a time, by priority");

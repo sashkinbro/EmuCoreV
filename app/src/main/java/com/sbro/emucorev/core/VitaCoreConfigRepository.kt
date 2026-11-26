@@ -19,7 +19,6 @@ data class VitaCoreConfig(
     val backendRenderer: String = "Vulkan",
     val customDriverName: String = "",
     val turboMode: Boolean = false,
-    val highAccuracy: Boolean = true,
     val resolutionMultiplier: Float = 1.0f,
     val disableSurfaceSync: Boolean = false,
     val eagerSurfaceSync: Boolean = false,
@@ -185,7 +184,6 @@ class VitaCoreConfigRepository(private val context: Context) {
         "guest-cores",
         "device-vibration-fallback",
         "fullscreen_hd_res_pixel_perfect",
-        "high-accuracy",
         "http-enable",
         "import-textures",
         "log-active-shaders",
@@ -260,7 +258,6 @@ class VitaCoreConfigRepository(private val context: Context) {
                 backendRenderer = values["backend-renderer"] ?: defaults.backendRenderer,
                 customDriverName = values["custom-driver-name"].sanitizeNullableString() ?: defaults.customDriverName,
                 turboMode = values["turbo-mode"]?.toBooleanStrictOrNull() ?: defaults.turboMode,
-                highAccuracy = values["high-accuracy"]?.toBooleanStrictOrNull() ?: defaults.highAccuracy,
                 resolutionMultiplier = values["resolution-multiplier"]?.toFloatOrNull() ?: defaults.resolutionMultiplier,
                 disableSurfaceSync = values["disable-surface-sync"]?.toBooleanStrictOrNull() ?: defaults.disableSurfaceSync,
                 eagerSurfaceSync = values["eager-surface-sync"]?.toBooleanStrictOrNull() ?: defaults.eagerSurfaceSync,
@@ -404,7 +401,6 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["backend-renderer"] = config.backendRenderer
         values["custom-driver-name"] = config.customDriverName.sanitizeNullableString().orEmpty()
         values["turbo-mode"] = config.turboMode.toString()
-        values["high-accuracy"] = config.highAccuracy.toString()
         values["resolution-multiplier"] = formatFloat(config.resolutionMultiplier)
         values["disable-surface-sync"] = config.disableSurfaceSync.toString()
         values["eager-surface-sync"] = config.eagerSurfaceSync.toString()

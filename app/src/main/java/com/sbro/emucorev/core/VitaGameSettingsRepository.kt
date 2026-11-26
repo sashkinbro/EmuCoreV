@@ -234,7 +234,6 @@ class VitaGameSettingsRepository(private val context: Context) {
                 backendRenderer = gpu.stringAttr("backend-renderer", config.backendRenderer),
                 useAngle = gpu.boolAttr("use-angle", config.useAngle),
                 customDriverName = gpu.stringAttr("custom-driver-name", config.customDriverName),
-                highAccuracy = gpu.boolAttr("high-accuracy", config.highAccuracy),
                 resolutionMultiplier = gpu.floatAttr("resolution-multiplier", config.resolutionMultiplier),
                 disableSurfaceSync = gpu.boolAttr("disable-surface-sync", config.disableSurfaceSync),
                 eagerSurfaceSync = gpu.boolAttr("eager-surface-sync", config.eagerSurfaceSync),
@@ -373,7 +372,6 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("use-angle", config.useAngle.toString())
             setAttribute("gpu-idx", "0")
             setAttribute("custom-driver-name", config.customDriverName)
-            setAttribute("high-accuracy", config.highAccuracy.toString())
             setAttribute("resolution-multiplier", config.resolutionMultiplier.toString())
             setAttribute("disable-surface-sync", config.disableSurfaceSync.toString())
             setAttribute("eager-surface-sync", config.eagerSurfaceSync.toString())

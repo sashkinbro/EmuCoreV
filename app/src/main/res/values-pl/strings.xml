@@ -355,7 +355,6 @@
     <string name="settings_frame_limit">Limit klatek</string>
     <string name="settings_frame_limit_unlimited">Bez limitu</string>
     <string name="settings_core_vsync">Synchronizacja pionowa</string>
-    <string name="settings_core_high_accuracy">Tryb wysokiej dokładności GPU</string>
     <string name="settings_core_resolution_label">Mnożnik rozdzielczości</string>
     <string name="settings_core_resolution_value">Skala renderowania %1$.2fx</string>
     <string name="settings_core_overlay_opacity_label">Krycie nakładki</string>
@@ -464,7 +463,6 @@
     <string name="settings_help_fps_hack">Usuwa normalny limit klatek w niektórych grach. Może poprawić szybkość, ale może zaburzyć synchronizację czasową.\n\nUżyj tej opcji do testów, pomijania wolnych fragmentów lub obejścia zachowania konkretnej gry. Unikaj jej w normalnej rozgrywce, gdy synchronizacja czasowa, fizyka, przerywniki filmowe lub sprawdzenia w stylu online muszą pozostać dokładne.</string>
     <string name="settings_help_frame_limit">Ogranicza wyświetlane klatki bez zmiany emulowanego taktowania Vita. Użyj 30 lub 45 FPS, aby zmniejszyć zużycie energii i nagrzewanie.</string>
     <string name="settings_help_vsync">Zmniejsza rozrywanie ekranu, ale w niektórych grach może obniżyć wydajność.\n\nUżyj tej opcji, aby poprawić ostrość obrazu, skalowanie lub stabilność wizualną w grach, które już działają dobrze. Zmniejsz ją lub przywróć wartość domyślną, jeśli FPS spada, telefon się nagrzewa lub grafika staje się niestabilna.</string>
-    <string name="settings_help_high_accuracy">Może naprawić problemy graficzne, ale zwykle obniża wydajność.\n\nUżyj tej opcji, aby poprawić ostrość obrazu, skalowanie lub stabilność wizualną w grach, które już działają dobrze. Zmniejsz ją lub przywróć wartość domyślną, jeśli FPS spada, telefon się nagrzewa lub grafika staje się niestabilna.</string>
     <string name="settings_help_resolution">Wyższe wartości wyostrzają obraz, ale zużywają więcej mocy GPU.\n\nUżyj tej opcji, aby poprawić ostrość obrazu, skalowanie lub stabilność wizualną w grach, które już działają dobrze. Zmniejsz ją lub przywróć wartość domyślną, jeśli FPS spada, telefon się nagrzewa lub grafika staje się niestabilna.</string>
     <string name="settings_help_renderer">Vulkan jest zwykle najlepszym wyborem. OpenGL może pomóc na urządzeniach ze słabym wsparciem dla Vulkan.\n\nVulkan jest zwykle najlepszym wyborem pod względem szybkości i nowoczesnych sterowników Androida. Wypróbuj OpenGL tylko wtedy, gdy Vulkan nie uruchamia się, wyświetla uszkodzoną grafikę lub Twoje urządzenie ma słabe wsparcie dla Vulkan.</string>
     <string name="settings_help_screen_filter">Dwuliniowy wygładza obraz. Najbliższy zachowuje ostrzejsze krawędzie.\n\nUżyj tej opcji, aby poprawić ostrość obrazu, skalowanie lub stabilność wizualną w grach, które już działają dobrze. Zmniejsz ją lub przywróć wartość domyślną, jeśli FPS spada, telefon się nagrzewa lub grafika staje się niestabilna.</string>

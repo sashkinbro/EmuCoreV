@@ -72,7 +72,6 @@ struct Config {
 #ifdef __ANDROID__
         std::string custom_driver_name{};
 #endif
-        bool high_accuracy = true;
         float resolution_multiplier = 1.0f;
         // 0 = follow the multisample mode the game asks for, 1/2/4 = force this sample count for every scene (clamped to the device);
         // runtime only, never read from or written to the config files

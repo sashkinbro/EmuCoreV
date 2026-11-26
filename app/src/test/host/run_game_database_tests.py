@@ -17,35 +17,25 @@ cpp = r'''
 #include <vector>
 struct Settings {
  std::string backend_renderer="OpenGL", memory_mapping="page-table", driver="working-driver";
- bool high_accuracy=false, accurate_thread_scheduling=false, eager_surface_sync=false, depth_clamp=true; int audio_volume=37;
+ bool accurate_thread_scheduling=false, eager_surface_sync=false, depth_clamp=true; int audio_volume=37;
  int modules_mode=0; std::vector<std::string> lle_modules;
 };
 int main(int argc,char **argv){
  int failed=0;auto check=[&](bool ok,const char *name){
   std::printf("%s %s\n",ok?"PASS":"FAIL",name);failed+=!ok;};
- pugi::xml_document db;db.load_string(R"(<game-db version="1"><profile><title-id>EXACT</title-id><gpu high-accuracy="true"/></profile></game-db>)");
- Settings global,effective=global;
- config::game_database::apply_gpu_settings(effective,config::game_database::recommendation(db,"EXACT"));
- check(effective.high_accuracy&&!global.high_accuracy&&effective.backend_renderer=="OpenGL"
-  &&effective.memory_mapping=="page-table"&&effective.driver==global.driver&&effective.audio_volume==37,
-  "accuracy-only profile changes only accuracy");
- pugi::xml_document user;user.load_string(R"(<gpu high-accuracy="false"/>)");
- effective.high_accuracy=true;
- config::game_database::apply_gpu_settings(effective,user.child("gpu"));
- check(!effective.high_accuracy,"explicit user false overrides recommendation");
- for(const auto &attrs: {"", "unknown=\"true\"", "high-accuracy=\"TRUE\"", "high-accuracy=\"\"",
-   "high-accuracy=\"enabled\"", "backend-renderer=\"Vulkan\" high-accuracy=\"true\"",
-   "backend-renderer=\"Vulkan\" memory-mapping=\"native-buffer\" use-angle=\"false\" high-accuracy=\"invalid\""}){
+ Settings global;
+ for(const auto &attrs: {"", "unknown=\"true\"", "high-accuracy=\"true\"", "high-accuracy=\"false\"",
+   "high-accuracy=\"invalid\"", "backend-renderer=\"Vulkan\" high-accuracy=\"true\""}){
   pugi::xml_document bad;
   bad.load_string((std::string("<game-db version=\"1\"><profile><title-id>EXACT</title-id><gpu ")+attrs+"/></profile></game-db>").c_str());
-  check(!config::game_database::recommendation(bad,"EXACT"),"empty, incomplete or malformed profile ignored");
+  check(!config::game_database::recommendation(bad,"EXACT"),"empty, incomplete, malformed or removed-key profile ignored");
  }
  pugi::xml_document bundled;check(argc==2&&bundled.load_file(argv[1]),"bundled database parses");
  Settings crazy=global;crazy.lle_modules={"libngs"};
  config::game_database::apply_module_settings(crazy,config::game_database::module_recommendation(bundled," pcse00291 "));
  config::game_database::apply_module_settings(crazy,config::game_database::module_recommendation(bundled,"PCSE00291"));
  check(crazy.modules_mode==1 && crazy.lle_modules==std::vector<std::string>({"libngs","libnet","libnetctl"})
-  &&crazy.high_accuracy==global.high_accuracy&&crazy.memory_mapping==global.memory_mapping,
+  &&crazy.memory_mapping==global.memory_mapping,
   "Crazy firmware modules preserve other choices and do not duplicate");
  check(!config::game_database::module_recommendation(bundled,"PCSE00089")
   &&!config::game_database::module_recommendation(bundled,"PCSB00374")
@@ -60,7 +50,7 @@ int main(int argc,char **argv){
  Settings pvz=global;
  Settings stealth=global;
  config::game_database::apply_gpu_settings(stealth,config::game_database::recommendation(bundled,"PCSE00280"));
- check(!stealth.depth_clamp && stealth.high_accuracy==global.high_accuracy && stealth.memory_mapping==global.memory_mapping,
+ check(!stealth.depth_clamp && stealth.memory_mapping==global.memory_mapping,
   "Stealth disables depth clamp without changing unrelated GPU settings");
  Settings unrelated=global;
  config::game_database::apply_gpu_settings(unrelated,config::game_database::recommendation(bundled,"PCSE00089"));
@@ -71,23 +61,20 @@ int main(int argc,char **argv){
  pugi::xml_document invalid_depth;invalid_depth.load_string(R"(<gpu depth-clamp="invalid"/>)");
  check(!config::game_database::valid_gpu(invalid_depth.child("gpu")),"reject invalid depth-clamp policy");
  config::game_database::apply_gpu_settings(pvz,config::game_database::recommendation(bundled,"PCSE00064"));
- check(pvz.accurate_thread_scheduling&&pvz.eager_surface_sync&&!pvz.high_accuracy&&pvz.memory_mapping==global.memory_mapping,
+ check(pvz.accurate_thread_scheduling&&pvz.eager_surface_sync&&pvz.memory_mapping==global.memory_mapping,
   "PvZ startup recommendation enables scheduling and eager surface writeback");
  pugi::xml_document scheduling_user;scheduling_user.load_string(R"(<gpu accurate-thread-scheduling="false" eager-surface-sync="false"/>)");
  config::game_database::apply_gpu_settings(pvz,scheduling_user.child("gpu"));
  check(!pvz.accurate_thread_scheduling&&!pvz.eager_surface_sync,"explicit user scheduling false overrides recommendation");
- Settings recommended=global;
- config::game_database::apply_gpu_settings(recommended,config::game_database::recommendation(bundled," pcse00383 ","Renamed game"));
- check(recommended.high_accuracy&&recommended.backend_renderer==global.backend_renderer
-  &&recommended.memory_mapping==global.memory_mapping,"verified Borderlands ID recommends only accuracy");
- check(!config::game_database::recommendation(bundled,"UNVERIFIED","Borderlands 2")
-  &&!config::game_database::recommendation(bundled,"","Borderlands 2"),"no regional or global guesses");
+ check(!config::game_database::recommendation(bundled," pcse00383 ","Renamed game")
+  &&!config::game_database::recommendation(bundled,"PCSE00001")&&!config::game_database::recommendation(bundled,"PCSB00356"),
+  "former accuracy-only profiles are gone");
  const char *ids[]={"PCSB00051","PCSB00052","PCSG00039","PCSB00082","PCSB00083","PCSB00084","PCSB00085","PCSB00086","PCSE00055","PCSE00059","PCSE00060","PCSG90012","PCSB00170","PCSB00171","PCSB00174","PCSE00093","PCSE00096","PCSG00107","PCSB00339","PCSB00340","PCSE00263","PCSG00201","PCSB00603","PCSB00604","PCSB00605","PCSB00606","PCSB00607","PCSE00481","PCSE00482","PCSE00483","PCSG00404","UNKNOWN"};
  for(auto mapping:{"disabled","double-buffer","external-host","page-table","native-buffer"}){
   for(auto id:ids) for(auto title:{"EA SPORTS FC mod","FIFA Football","FIFA 13","FIFA 14","FIFA 15","FIFA 26 mod"}){
    Settings cfg=global;cfg.memory_mapping=mapping;
    config::game_database::apply_gpu_settings(cfg,config::game_database::recommendation(bundled,id,title));
-   check(cfg.backend_renderer==global.backend_renderer&&cfg.memory_mapping==mapping&&!cfg.high_accuracy
+   check(cfg.backend_renderer==global.backend_renderer&&cfg.memory_mapping==mapping
     &&cfg.driver==global.driver&&cfg.audio_volume==global.audio_volume,"FIFA regions and mods inherit all global settings");
   }
  }

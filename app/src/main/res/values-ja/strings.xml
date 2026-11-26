@@ -355,7 +355,6 @@
     <string name="settings_frame_limit">フレームレート制限</string>
     <string name="settings_frame_limit_unlimited">無制限</string>
     <string name="settings_core_vsync">垂直同期</string>
-    <string name="settings_core_high_accuracy">高精度GPUモード</string>
     <string name="settings_core_resolution_label">解像度倍率</string>
     <string name="settings_core_resolution_value">%1$.2fx レンダースケール</string>
     <string name="settings_core_overlay_opacity_label">オーバーレイの不透明度</string>
@@ -464,7 +463,6 @@
     <string name="settings_help_fps_hack">一部のゲームで通常のフレーム制限を解除します。速度は向上する場合がありますが、タイミングが崩れる可能性があります。\n\nテスト、遅い区間のスキップ、ゲーム固有の動作の回避に使用します。タイミング、物理演算、カットシーン、オンライン風のチェックの正確さが必要な通常のプレイでは避けてください。</string>
     <string name="settings_help_frame_limit">エミュレートされたVitaのタイミングを変更せずに、表示されるフレームを制限します。消費電力と発熱を抑えるには30または45 FPSを使用してください。</string>
     <string name="settings_help_vsync">画面のティアリングを軽減しますが、一部のゲームではパフォーマンスが低下する場合があります。\n\nすでに快適に動作しているゲームで、画像の鮮明さ、スケーリング、表示の安定性を改善するために使用します。FPSが低下したり、端末が発熱したり、グラフィックが不安定になった場合は、値を下げるかデフォルトに戻してください。</string>
-    <string name="settings_help_high_accuracy">グラフィックの問題を修正できる場合がありますが、通常はパフォーマンスが低下します。\n\nすでに快適に動作しているゲームで、画像の鮮明さ、スケーリング、表示の安定性を改善するために使用します。FPSが低下したり、端末が発熱したり、グラフィックが不安定になった場合は、値を下げるかデフォルトに戻してください。</string>
     <string name="settings_help_resolution">値を高くすると画像がよりシャープになりますが、GPUパワーをより多く使用します。\n\nすでに快適に動作しているゲームで、画像の鮮明さ、スケーリング、表示の安定性を改善するために使用します。FPSが低下したり、端末が発熱したり、グラフィックが不安定になった場合は、値を下げるかデフォルトに戻してください。</string>
     <string name="settings_help_renderer">通常はVulkanが最適な選択です。OpenGLはVulkanのサポートが弱いデバイスで役立つ場合があります。\n\n速度と最新のAndroidドライバーには、通常Vulkanが最適です。Vulkanで起動できない、グラフィックが壊れる、デバイスのVulkanサポートが不十分な場合にのみ、OpenGLを試してください。</string>
     <string name="settings_help_screen_filter">バイリニアは画像を滑らかにします。ニアレストはエッジをよりシャープに保ちます。\n\nすでに快適に動作しているゲームで、画像の鮮明さ、スケーリング、表示の安定性を改善するために使用します。FPSが低下したり、端末が発熱したり、グラフィックが不安定になった場合は、値を下げるかデフォルトに戻してください。</string>

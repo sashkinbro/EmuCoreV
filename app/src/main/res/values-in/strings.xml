@@ -355,7 +355,6 @@
     <string name="settings_frame_limit">Batas laju frame</string>
     <string name="settings_frame_limit_unlimited">Tanpa batas</string>
     <string name="settings_core_vsync">Sinkronisasi vertikal</string>
-    <string name="settings_core_high_accuracy">Mode GPU akurasi tinggi</string>
     <string name="settings_core_resolution_label">Pengali resolusi</string>
     <string name="settings_core_resolution_value">Skala render %1$.2fx</string>
     <string name="settings_core_overlay_opacity_label">Opasitas overlay</string>
@@ -464,7 +463,6 @@
     <string name="settings_help_fps_hack">Menghapus batas frame normal di beberapa game. Ini dapat meningkatkan kecepatan, tetapi dapat merusak pengaturan waktu.\n\nGunakan ini untuk pengujian, melewati bagian yang lambat, atau mengatasi perilaku khusus game. Hindari untuk permainan normal saat pengaturan waktu, fisika, cutscene, atau pemeriksaan bergaya online harus tetap akurat.</string>
     <string name="settings_help_frame_limit">Membatasi frame yang ditampilkan tanpa mengubah pengaturan waktu Vita yang diemulasikan. Gunakan 30 atau 45 FPS untuk mengurangi penggunaan daya dan panas.</string>
     <string name="settings_help_vsync">Mengurangi tearing layar, tetapi dapat menurunkan performa di beberapa game.\n\nGunakan ini untuk meningkatkan kejernihan gambar, penskalaan, atau stabilitas visual pada game yang sudah berjalan baik. Kurangi atau pulihkan default jika FPS turun, ponsel memanas, atau grafis menjadi tidak stabil.</string>
-    <string name="settings_help_high_accuracy">Dapat memperbaiki masalah grafis, tetapi biasanya menurunkan performa.\n\nGunakan ini untuk meningkatkan kejernihan gambar, penskalaan, atau stabilitas visual pada game yang sudah berjalan baik. Kurangi atau pulihkan default jika FPS turun, ponsel memanas, atau grafis menjadi tidak stabil.</string>
     <string name="settings_help_resolution">Nilai yang lebih tinggi membuat gambar lebih tajam, tetapi menggunakan lebih banyak daya GPU.\n\nGunakan ini untuk meningkatkan kejernihan gambar, penskalaan, atau stabilitas visual pada game yang sudah berjalan baik. Kurangi atau pulihkan default jika FPS turun, ponsel memanas, atau grafis menjadi tidak stabil.</string>
     <string name="settings_help_renderer">Vulkan biasanya pilihan terbaik. OpenGL dapat membantu pada perangkat dengan dukungan Vulkan yang lemah.\n\nVulkan biasanya pilihan terbaik untuk kecepatan dan driver Android modern. Coba OpenGL hanya saat Vulkan gagal melakukan boot, menampilkan grafis rusak, atau perangkat Anda memiliki dukungan Vulkan yang buruk.</string>
     <string name="settings_help_screen_filter">Bilinear menghaluskan gambar. Nearest mempertahankan tepi yang lebih tajam.\n\nGunakan ini untuk meningkatkan kejernihan gambar, penskalaan, atau stabilitas visual pada game yang sudah berjalan baik. Kurangi atau pulihkan default jika FPS turun, ponsel memanas, atau grafis menjadi tidak stabil.</string>

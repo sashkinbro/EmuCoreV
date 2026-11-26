@@ -176,7 +176,6 @@ static bool get_custom_config(EmuEnvState &emuenv, const std::string &app_path) 
 #ifdef __ANDROID__
                 config.custom_driver_name = gpu_child.attribute("custom-driver-name").as_string();
 #endif
-                config.high_accuracy = gpu_child.attribute("high-accuracy").as_bool();
                 config.resolution_multiplier = gpu_child.attribute("resolution-multiplier").as_float();
                 config.disable_surface_sync = gpu_child.attribute("disable-surface-sync").as_bool();
                 config.screen_filter = gpu_child.attribute("screen-filter").as_string();
@@ -259,7 +258,6 @@ void init_config(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path
 #ifdef __ANDROID__
         config.custom_driver_name = emuenv.cfg.custom_driver_name;
 #endif
-        config.high_accuracy = emuenv.cfg.high_accuracy;
         config.resolution_multiplier = emuenv.cfg.resolution_multiplier;
         config.disable_surface_sync = emuenv.cfg.disable_surface_sync;
         config.screen_filter = emuenv.cfg.screen_filter;
@@ -354,7 +352,6 @@ static void save_config(GuiState &gui, EmuEnvState &emuenv) {
 #ifdef __ANDROID__
         gpu_child.append_attribute("custom-driver-name") = config.custom_driver_name.c_str();
 #endif
-        gpu_child.append_attribute("high-accuracy") = config.high_accuracy;
         gpu_child.append_attribute("resolution-multiplier") = config.resolution_multiplier;
         gpu_child.append_attribute("disable-surface-sync") = config.disable_surface_sync;
         gpu_child.append_attribute("screen-filter") = config.screen_filter.c_str();
@@ -397,7 +394,6 @@ static void save_config(GuiState &gui, EmuEnvState &emuenv) {
 #ifdef __ANDROID__
         emuenv.cfg.custom_driver_name = config.custom_driver_name;
 #endif
-        emuenv.cfg.high_accuracy = config.high_accuracy;
         emuenv.cfg.resolution_multiplier = config.resolution_multiplier;
         emuenv.cfg.disable_surface_sync = config.disable_surface_sync;
         emuenv.cfg.screen_filter = config.screen_filter;
@@ -463,7 +459,6 @@ void set_current_config(EmuEnvState &emuenv, const std::string &app_path) {
 #ifdef __ANDROID__
         emuenv.cfg.current_config.custom_driver_name = emuenv.cfg.custom_driver_name;
 #endif
-        emuenv.cfg.current_config.high_accuracy = emuenv.cfg.high_accuracy;
         emuenv.cfg.current_config.resolution_multiplier = emuenv.cfg.resolution_multiplier;
         emuenv.cfg.current_config.disable_surface_sync = emuenv.cfg.disable_surface_sync;
         emuenv.cfg.current_config.screen_filter = emuenv.cfg.screen_filter;
@@ -728,17 +723,6 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
                 }
             }
 #endif
-
-            if (is_ingame)
-                ImGui::BeginDisabled();
-
-            const char *LIST_RENDERER_ACCURACY[] = { lang.gpu["standard"].c_str(), lang.gpu["high"].c_str() };
-            int is_high_accuracy = static_cast<int>(config.high_accuracy);
-            ImGui::Combo(lang.gpu["renderer_accuracy"].c_str(), &is_high_accuracy, LIST_RENDERER_ACCURACY, IM_ARRAYSIZE(LIST_RENDERER_ACCURACY));
-            config.high_accuracy = static_cast<bool>(is_high_accuracy);
-
-            if (is_ingame)
-                ImGui::EndDisabled();
         } else if (!is_vulkan) {
             ImGui::Checkbox(lang.gpu["v_sync"].c_str(), &config.v_sync);
             SetTooltipEx(lang.gpu["v_sync_description"].c_str());

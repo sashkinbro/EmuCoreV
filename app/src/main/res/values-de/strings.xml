@@ -151,7 +151,6 @@
     <string name="settings_frame_limit">Bildratenbegrenzung</string>
     <string name="settings_frame_limit_unlimited">Unbegrenzt</string>
     <string name="settings_core_vsync">Vertikale Synchronisation</string>
-    <string name="settings_core_high_accuracy">GPU-Modus mit hoher Genauigkeit</string>
     <string name="settings_core_resolution_label">Auflösungsmultiplikator</string>
     <string name="settings_core_resolution_value">%1$.2fx Render-Skalierung</string>
     <string name="settings_core_overlay_opacity_label">Overlay-Deckkraft</string>
@@ -198,7 +197,6 @@
     <string name="settings_help_fps_hack">Hebt das normale Frame-Limit in einigen Spielen auf. Dies kann die Geschwindigkeit verbessern, jedoch das Timing stören.\n\nNutze dies zum Testen, Überspringen langsamer Stellen oder für spielbezogene Workarounds. Vermeide es im normalen Spiel, wenn Timing, Physik, Zwischensequenzen oder Dienstprüfungen korrekt bleiben müssen.</string>
     <string name="settings_help_frame_limit">Begrenzt die dargestellten Bilder, ohne das Timing der emulierten Vita zu ändern. Verwende 30 oder 45 FPS, um Energieverbrauch und Wärmeentwicklung zu reduzieren.</string>
     <string name="settings_help_vsync">Reduziert Screen Tearing, kann aber in einigen Spielen die Leistung verringern.\n\nNutze dies für bessere Schärfe, Skalierung oder visuelle Stabilität in Spielen, die bereits gut laufen. Reduziere es oder nutze den Standard, wenn FPS fallen, das Gerät heiß wird oder die Grafik instabil wird.</string>
-    <string name="settings_help_high_accuracy">Kann Grafikprobleme beheben, verringert jedoch normalerweise die Leistung.\n\nNutze dies für bessere Schärfe, Skalierung oder visuelle Stabilität in Spielen, die bereits gut laufen. Reduziere es oder nutze den Standard, wenn FPS fallen, das Gerät heiß wird oder die Grafik instabil wird.</string>
     <string name="settings_help_resolution">Höhere Werte machen das Bild schärfer, verbrauchen aber mehr GPU-Leistung.\n\nNutze dies für bessere Schärfe, Skalierung oder visuelle Stabilität in Spielen, die bereits gut laufen. Reduziere es oder nutze den Standard, wenn FPS fallen, das Gerät heiß wird oder die Grafik instabil wird.</string>
     <string name="settings_help_renderer">Vulkan ist in der Regel die beste Wahl. OpenGL kann auf Geräten mit schwacher Vulkan-Unterstützung helfen.\n\nVulkan ist meist die beste Wahl für Geschwindigkeit und moderne Android-Treiber. Probiere OpenGL nur, wenn Vulkan nicht startet, Grafikfehler zeigt oder dein Gerät Vulkan schlecht unterstützt.</string>
     <string name="settings_help_screen_filter">Bilinear glättet das Bild. Nearest (Nächster) behält schärfere Kanten bei.\n\nNutze dies für bessere Schärfe, Skalierung oder visuelle Stabilität in Spielen, die bereits gut laufen. Reduziere es oder nutze den Standard, wenn FPS fallen, das Gerät heiß wird oder die Grafik instabil wird.</string>

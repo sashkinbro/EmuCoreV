@@ -579,33 +579,6 @@ QGroupBox[flat=&quot;true&quot;]::title {
                   </layout>
                  </widget>
                 </item>
-                <item row="1" column="1">
-                 <widget class="QGroupBox" name="gb_renderer_accuracy">
-                  <property name="title">
-                   <string>Rendering Accuracy</string>
-                  </property>
-                  <property name="flat">
-                   <bool>true</bool>
-                  </property>
-                  <layout class="QVBoxLayout" name="gb_renderer_accuracy_layout">
-                   <property name="leftMargin">
-                    <number>0</number>
-                   </property>
-                   <property name="topMargin">
-                    <number>6</number>
-                   </property>
-                   <property name="rightMargin">
-                    <number>0</number>
-                   </property>
-                   <property name="bottomMargin">
-                    <number>0</number>
-                   </property>
-                   <item>
-                    <widget class="QComboBox" name="renderer_accuracy_box"/>
-                   </item>
-                  </layout>
-                 </widget>
-                </item>
                 <item row="2" column="0">
                  <widget class="QGroupBox" name="gb_surface_sync">
                   <property name="title">

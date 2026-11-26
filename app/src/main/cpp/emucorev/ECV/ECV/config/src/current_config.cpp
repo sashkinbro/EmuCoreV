@@ -63,7 +63,6 @@ static bool get_custom_config(EmuEnvState &emuenv, const std::string &app_path) 
 #ifdef __ANDROID__
         current_config.custom_driver_name = gpu_child.attribute("custom-driver-name").as_string();
 #endif
-        current_config.high_accuracy = gpu_child.attribute("high-accuracy").as_bool();
         current_config.resolution_multiplier = gpu_child.attribute("resolution-multiplier").as_float();
         current_config.disable_surface_sync = gpu_child.attribute("disable-surface-sync").as_bool();
         current_config.screen_filter = gpu_child.attribute("screen-filter").as_string();
@@ -124,7 +123,6 @@ void set_current_config(EmuEnvState &emuenv, const std::string &app_path) {
 #ifdef __ANDROID__
         emuenv.cfg.current_config.custom_driver_name = emuenv.cfg.custom_driver_name;
 #endif
-        emuenv.cfg.current_config.high_accuracy = emuenv.cfg.high_accuracy;
         emuenv.cfg.current_config.resolution_multiplier = emuenv.cfg.resolution_multiplier;
         emuenv.cfg.current_config.disable_surface_sync = emuenv.cfg.disable_surface_sync;
         emuenv.cfg.current_config.screen_filter = emuenv.cfg.screen_filter;

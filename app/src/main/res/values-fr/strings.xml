@@ -151,7 +151,6 @@
     <string name="settings_frame_limit">Limite de fréquence d\'images</string>
     <string name="settings_frame_limit_unlimited">Illimitée</string>
     <string name="settings_core_vsync">Synchronisation verticale</string>
-    <string name="settings_core_high_accuracy">Mode GPU haute précision</string>
     <string name="settings_core_resolution_label">Multiplicateur de résolution</string>
     <string name="settings_core_resolution_value">Échelle de rendu %1$.2fx</string>
     <string name="settings_core_overlay_opacity_label">Opacité de la superposition</string>
@@ -198,7 +197,6 @@
     <string name="settings_help_fps_hack">Supprime la limite normale d\'images par seconde dans certains jeux. Cela peut améliorer la vitesse, mais peut perturber la synchronisation.\n\nUtilisez ce réglage pour tester, passer des sections lentes ou contourner un comportement propre à un jeu. Évitez-le en jeu normal lorsque le timing, la physique, les cinématiques ou les vérifications doivent rester exacts.</string>
     <string name="settings_help_frame_limit">Limite le nombre d\'images affichées sans modifier le timing de la Vita émulée. Utilisez 30 ou 45 FPS pour réduire la consommation d\'énergie et la chaleur.</string>
     <string name="settings_help_vsync">Réduit les déchirures d\'écran, mais peut diminuer les performances dans certains jeux.\n\nUtilisez ce réglage pour améliorer la netteté, la mise à l’échelle ou la stabilité visuelle dans les jeux qui tournent déjà bien. Réduisez-le ou revenez au défaut si les FPS chutent, si le téléphone chauffe ou si l’image devient instable.</string>
-    <string name="settings_help_high_accuracy">Peut corriger des problèmes graphiques, mais réduit généralement les performances.\n\nUtilisez ce réglage pour améliorer la netteté, la mise à l’échelle ou la stabilité visuelle dans les jeux qui tournent déjà bien. Réduisez-le ou revenez au défaut si les FPS chutent, si le téléphone chauffe ou si l’image devient instable.</string>
     <string name="settings_help_resolution">Des valeurs plus élevées rendent l\'image plus nette, mais utilisent plus de puissance GPU.\n\nUtilisez ce réglage pour améliorer la netteté, la mise à l’échelle ou la stabilité visuelle dans les jeux qui tournent déjà bien. Réduisez-le ou revenez au défaut si les FPS chutent, si le téléphone chauffe ou si l’image devient instable.</string>
     <string name="settings_help_renderer">Vulkan est généralement le meilleur choix. OpenGL peut aider sur les appareils avec un faible support Vulkan.\n\nVulkan est généralement le meilleur choix pour la vitesse et les pilotes Android modernes. Essayez OpenGL seulement si Vulkan ne démarre pas, affiche des graphismes cassés ou si votre appareil gère mal Vulkan.</string>
     <string name="settings_help_screen_filter">Le filtre bilinéaire adoucit l\'image. Le filtre le plus proche garde des bords plus nets.\n\nUtilisez ce réglage pour améliorer la netteté, la mise à l’échelle ou la stabilité visuelle dans les jeux qui tournent déjà bien. Réduisez-le ou revenez au défaut si les FPS chutent, si le téléphone chauffe ou si l’image devient instable.</string>

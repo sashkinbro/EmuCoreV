@@ -314,11 +314,6 @@ void SettingsDialog::load_config() {
         m_ui->gpu_device_box->setCurrentIndex(idx);
     }
 
-    m_ui->renderer_accuracy_box->clear();
-    m_ui->renderer_accuracy_box->addItem(tr("Standard"));
-    m_ui->renderer_accuracy_box->addItem(tr("High"));
-    m_ui->renderer_accuracy_box->setCurrentIndex(m_config.high_accuracy ? 1 : 0);
-
     m_ui->vsync->setChecked(m_config.v_sync);
     m_ui->disable_surface_sync->setChecked(m_config.disable_surface_sync);
     m_ui->async_pipeline_compilation->setChecked(m_config.async_pipeline_compilation);
@@ -594,7 +589,6 @@ void SettingsDialog::build_desired_config(Config &desired) const {
 
     current.cpu_opt = m_ui->cpu_opt->isChecked();
     current.backend_renderer = m_ui->backend_renderer_box->currentText().toStdString();
-    current.high_accuracy = m_ui->renderer_accuracy_box->currentIndex() == 1;
     current.v_sync = m_ui->vsync->isChecked();
     current.disable_surface_sync = m_ui->disable_surface_sync->isChecked();
     current.async_pipeline_compilation = m_ui->async_pipeline_compilation->isChecked();
@@ -1170,7 +1164,6 @@ void SettingsDialog::setup_connections() {
         { m_ui->cpu_opt, tr("Enable CPU Optimizations"), m_tooltips->cpu_opt },
         // Graphics
         { m_ui->backend_renderer_box, tr("Backend Renderer"), m_tooltips->backend_renderer },
-        { m_ui->renderer_accuracy_box, tr("Rendering Accuracy"), m_tooltips->renderer_accuracy },
         { m_ui->vsync, tr("V-Sync"), m_tooltips->vsync },
         { m_ui->disable_surface_sync, tr("Disable Surface Sync"), m_tooltips->disable_surface_sync },
         { m_ui->async_pipeline_compilation, tr("Asynchronous Pipeline Compilation"), m_tooltips->async_pipeline },
@@ -1433,7 +1426,6 @@ void SettingsDialog::update_gpu_visibility() {
 
     // Vulkan-only widgets
     m_ui->gb_gpu_device->setVisible(is_vulkan);
-    m_ui->gb_renderer_accuracy->setVisible(is_vulkan);
     m_ui->gb_vulkan_options->setVisible(is_vulkan);
     m_ui->spirv_shader->setVisible(is_vulkan);
 

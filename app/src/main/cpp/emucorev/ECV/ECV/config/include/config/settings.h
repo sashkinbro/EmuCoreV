@@ -31,7 +31,6 @@ enum class RestartRequiredSetting : uint8_t {
     BackendRenderer = 1,
     GraphicsDevice = 2,
     CustomDriver = 3,
-    HighAccuracy = 4,
     ResolutionMultiplier = 5,
     MemoryMapping = 6,
     AudioBackend = 7,

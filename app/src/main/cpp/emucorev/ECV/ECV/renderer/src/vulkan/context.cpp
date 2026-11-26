@@ -1399,15 +1399,10 @@ void VKContext::check_for_macroblock_change(bool is_draw) {
 #if ECV_ORACLE
     ecv::oracle::gpu::rp_reason("macroblock_change");
 #endif
-            if (state.features.use_texture_viewport) {
-                // no need to copy the texture after this renderpass
-                stop_render_pass();
-            } else {
-                SceGxmNotification empty_notification{};
-                stop_recording(empty_notification, empty_notification, false);
-                start_recording();
-                scene_timestamp++;
-            }
+            SceGxmNotification empty_notification{};
+            stop_recording(empty_notification, empty_notification, false);
+            start_recording();
+            scene_timestamp++;
         }
     }
 }

@@ -151,7 +151,6 @@
     <string name="settings_frame_limit">Límite de fotogramas</string>
     <string name="settings_frame_limit_unlimited">Sin límite</string>
     <string name="settings_core_vsync">Sincronización vertical</string>
-    <string name="settings_core_high_accuracy">Modo de GPU de alta precisión</string>
     <string name="settings_core_resolution_label">Multiplicador de resolución</string>
     <string name="settings_core_resolution_value">%1$.2fx escala de renderizado</string>
     <string name="settings_core_overlay_opacity_label">Opacidad de superposición</string>
@@ -198,7 +197,6 @@
     <string name="settings_help_fps_hack">Elimina el límite de fotogramas normal en algunos juegos. Puede mejorar la velocidad, pero podría romper la sincronización.\n\nÚsalo para pruebas, saltar partes lentas o rodear un comportamiento específico de un juego. Evítalo en juego normal cuando temporización, físicas, escenas o comprobaciones tipo online deban ser precisas.</string>
     <string name="settings_help_frame_limit">Limita los fotogramas mostrados sin cambiar la temporización de la Vita emulada. Usa 30 o 45 FPS para reducir el consumo de energía y el calor.</string>
     <string name="settings_help_vsync">Reduce el desgarro de pantalla (tearing), pero puede disminuir el rendimiento en algunos juegos.\n\nÚsalo para mejorar nitidez, escalado o estabilidad visual en juegos que ya funcionan bien. Redúcelo o vuelve al valor predeterminado si bajan los FPS, el teléfono se calienta o los gráficos se vuelven inestables.</string>
-    <string name="settings_help_high_accuracy">Puede arreglar problemas gráficos, pero normalmente reduce el rendimiento.\n\nÚsalo para mejorar nitidez, escalado o estabilidad visual en juegos que ya funcionan bien. Redúcelo o vuelve al valor predeterminado si bajan los FPS, el teléfono se calienta o los gráficos se vuelven inestables.</string>
     <string name="settings_help_resolution">Los valores altos hacen la imagen más nítida, pero usan más potencia de la GPU.\n\nÚsalo para mejorar nitidez, escalado o estabilidad visual en juegos que ya funcionan bien. Redúcelo o vuelve al valor predeterminado si bajan los FPS, el teléfono se calienta o los gráficos se vuelven inestables.</string>
     <string name="settings_help_renderer">Vulkan suele ser la mejor opción. OpenGL puede ayudar en dispositivos con soporte débil de Vulkan.\n\nVulkan suele ser la mejor opción para velocidad y controladores Android modernos. Prueba OpenGL solo si Vulkan no arranca, muestra gráficos rotos o tu dispositivo soporta mal Vulkan.</string>
     <string name="settings_help_screen_filter">Bilineal suaviza la imagen. Más cercano (Nearest) mantiene bordes más nítidos.\n\nÚsalo para mejorar nitidez, escalado o estabilidad visual en juegos que ya funcionan bien. Redúcelo o vuelve al valor predeterminado si bajan los FPS, el teléfono se calienta o los gráficos se vuelven inestables.</string>

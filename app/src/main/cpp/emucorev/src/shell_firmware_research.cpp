@@ -74,7 +74,7 @@ Java_com_sbro_emucorev_ShellFirmwareResearchTest_installShellProbes(JNIEnv *env,
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorev_ShellFirmwareResearchTest_prepareBoot(JNIEnv *env, jobject, jstring sandbox, jstring gpu_probe) {
     const auto probe = read_string(env, gpu_probe);
-    if (!probe.empty() && probe != "no-mapping" && probe != "no-async-pipelines" && probe != "accurate-sync" && probe != "dump-textures" && probe != "no-fetch") return JNI_FALSE;
+    if (!probe.empty() && probe != "no-mapping" && probe != "no-async-pipelines" && probe != "dump-textures" && probe != "no-fetch") return JNI_FALSE;
     return configure_native_library(read_string(env, sandbox), probe) ? JNI_TRUE : JNI_FALSE;
 }
 

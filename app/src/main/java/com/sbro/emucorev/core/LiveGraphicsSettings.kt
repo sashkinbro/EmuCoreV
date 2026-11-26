@@ -40,7 +40,6 @@ object LiveGraphicsSettings {
         BACKEND_RENDERER,
         GRAPHICS_DEVICE,
         CUSTOM_DRIVER,
-        HIGH_ACCURACY,
         MEMORY_MAPPING,
         CPU_OPT,
         AUDIO_BACKEND,

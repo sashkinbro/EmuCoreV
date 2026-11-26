@@ -32,8 +32,6 @@ QString restart_required_setting_label(config::RestartRequiredSetting setting) {
         return QCoreApplication::translate("SettingsDialogTooltips", "Graphics Device");
     case config::RestartRequiredSetting::CustomDriver:
         return QCoreApplication::translate("SettingsDialogTooltips", "Custom Driver");
-    case config::RestartRequiredSetting::HighAccuracy:
-        return QCoreApplication::translate("SettingsDialogTooltips", "Rendering Accuracy");
     case config::RestartRequiredSetting::ResolutionMultiplier:
         return QCoreApplication::translate("SettingsDialogTooltips", "Internal Resolution Upscaling");
     case config::RestartRequiredSetting::MemoryMapping:
@@ -107,7 +105,6 @@ SettingsDialogTooltips::SettingsDialogTooltips(QObject *parent)
     , modules_manual(tr("Only load the modules selected from the list. Advanced users only."))
     , cpu_opt(tr("Enable Dynarmic JIT optimizations. Improves performance."))
     , backend_renderer(tr("Select the preferred backend renderer. Vulkan is recommended for most systems."))
-    , renderer_accuracy(tr("Set the renderer accuracy level for Vulkan. High accuracy may improve visuals but reduce performance."))
     , vsync(tr("Enable V-Sync for OpenGL. Reduces screen tearing."))
     , disable_surface_sync(tr("Speed hack, disabling turns off surface syncing between CPU and GPU. Surface syncing is needed by a few games.\nGives a big performance boost if disabled (in particular when upscaling is on)."))
     , async_pipeline(tr("Allow pipelines to be compiled concurrently on multiple concurrent threads.\nThis decreases pipeline compilation stutter at the cost of temporary graphical glitches."))

@@ -32,7 +32,6 @@ struct FeatureState {
     bool support_fragment_stores = true; ///< fragmentStoresAndAtomics: same for a fragment program
     bool enable_memory_mapping = false; ///< Is the host GPU memory directly mapped with gxm memory?
     bool support_scaled_attribute_formats = true; // can we pass integer to the shader and read them as floats? This is not supported on some Android GPUs
-    bool use_texture_viewport = false; ///< Are we using texture viewports in the shader
     bool support_clip_distance = false; ///< Clip eye-plane-crossing primitives (w <= 0) via gl_ClipDistance, needed because depth clamp disables z-clipping
     bool support_gxm_clip_planes = false; ///< Route a vertex program's own CLIP0..7 outputs into gl_ClipDistance instead of dropping them
     bool force_full_precision = false; ///< Strip RelaxedPrecision so drivers that honour it (Mali = fp16) compute at fp32 instead

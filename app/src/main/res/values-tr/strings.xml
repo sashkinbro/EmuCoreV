@@ -153,7 +153,6 @@
     <string name="settings_frame_limit">Kare hızı sınırı</string>
     <string name="settings_frame_limit_unlimited">Sınırsız</string>
     <string name="settings_core_vsync">Dikey senkronizasyon</string>
-    <string name="settings_core_high_accuracy">Yüksek doğruluklu GPU modu</string>
     <string name="settings_core_resolution_label">Çözünürlük çarpanı</string>
     <string name="settings_core_resolution_value">%1$.2fx işleme ölçeği</string>
     <string name="settings_core_overlay_opacity_label">Arayüz opaklığı</string>
@@ -200,7 +199,6 @@
     <string name="settings_help_fps_hack">Bazı oyunlarda normal kare sınırını kaldırır. Hızı artırabilir, ancak zamanlamayı bozabilir.\n\nTest, yavaş bölümleri geçme veya oyuna özel davranışları aşmak için kullanın. Normal oynanışta zamanlama, fizik, ara sahneler veya kontroller doğru kalmalıysa kaçının.</string>
     <string name="settings_help_frame_limit">Taklit edilen Vita zamanlamasını değiştirmeden gösterilen kareleri sınırlar. Güç tüketimini ve ısınmayı azaltmak için 30 veya 45 FPS kullanın.</string>
     <string name="settings_help_vsync">Ekran yırtılmasını azaltır, ancak bazı oyunlarda performansı düşürebilir.\n\nZaten iyi çalışan oyunlarda görüntü netliği, ölçekleme veya görsel kararlılığı artırmak için kullanın. FPS düşerse, telefon ısınırsa veya grafikler kararsızlaşırsa azaltın ya da varsayılana dönün.</string>
-    <string name="settings_help_high_accuracy">Grafik sorunlarını çözebilir, ancak genellikle performansı düşürür.\n\nZaten iyi çalışan oyunlarda görüntü netliği, ölçekleme veya görsel kararlılığı artırmak için kullanın. FPS düşerse, telefon ısınırsa veya grafikler kararsızlaşırsa azaltın ya da varsayılana dönün.</string>
     <string name="settings_help_resolution">Daha yüksek değerler görüntüyü daha keskin yapar, ancak daha fazla GPU gücü kullanır.\n\nZaten iyi çalışan oyunlarda görüntü netliği, ölçekleme veya görsel kararlılığı artırmak için kullanın. FPS düşerse, telefon ısınırsa veya grafikler kararsızlaşırsa azaltın ya da varsayılana dönün.</string>
     <string name="settings_help_renderer">Vulkan genellikle en iyi seçimdir. OpenGL, zayıf Vulkan desteğine sahip cihazlarda yardımcı olabilir.\n\nVulkan genellikle hız ve modern Android sürücüleri için en iyi seçimdir. OpenGL’i yalnızca Vulkan açılmadığında, bozuk grafik gösterdiğinde veya cihazın Vulkan desteği zayıf olduğunda deneyin.</string>
     <string name="settings_help_screen_filter">Çift doğrusal görüntüyü yumuşatır. En yakın daha keskin kenarlar sağlar.\n\nZaten iyi çalışan oyunlarda görüntü netliği, ölçekleme veya görsel kararlılığı artırmak için kullanın. FPS düşerse, telefon ısınırsa veya grafikler kararsızlaşırsa azaltın ya da varsayılana dönün.</string>

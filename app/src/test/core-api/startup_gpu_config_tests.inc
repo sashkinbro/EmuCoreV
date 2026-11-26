@@ -21,7 +21,6 @@ protected:
         env->cfg.current_config.backend_renderer = "OpenGL";
         env->cfg.current_config.memory_mapping = "page-table";
         env->cfg.current_config.resolution_multiplier = 3;
-        env->cfg.current_config.high_accuracy = true;
         env->backend_renderer = renderer::Backend::OpenGL;
     }
     void TearDown() override { env.reset(); fs::remove_all(directory); }
@@ -69,7 +68,6 @@ TEST_F(StartupGpuConfig, SavedGpuModesOverrideOnlyEffectiveLaunchConfig) {
         EXPECT_EQ(env->cfg.current_config.resolution_multiplier, 1);
         EXPECT_EQ(env->backend_renderer, renderer::Backend::Vulkan);
         EXPECT_EQ(env->cfg.current_config.backend_renderer, "Vulkan");
-        EXPECT_TRUE(env->cfg.current_config.high_accuracy);
         EXPECT_EQ(env->cfg.backend_renderer, "OpenGL");
         EXPECT_EQ(env->cfg.memory_mapping, "disabled");
         EXPECT_EQ(env->cfg.resolution_multiplier, 2);

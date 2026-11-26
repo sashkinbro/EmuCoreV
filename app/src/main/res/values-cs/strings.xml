@@ -355,7 +355,6 @@
     <string name="settings_frame_limit">Limit snímkové frekvence</string>
     <string name="settings_frame_limit_unlimited">Neomezeně</string>
     <string name="settings_core_vsync">Vertikální synchronizace</string>
-    <string name="settings_core_high_accuracy">Režim GPU s vysokou přesností</string>
     <string name="settings_core_resolution_label">Násobitel rozlišení</string>
     <string name="settings_core_resolution_value">%1$.2fx měřítko vykreslování</string>
     <string name="settings_core_overlay_opacity_label">Průhlednost overlaye</string>
@@ -464,7 +463,6 @@
     <string name="settings_help_fps_hack">Odstraňuje v některých hrách běžný limit snímkové frekvence. Může zvýšit rychlost, ale může narušit časování.\n\nPoužijte k testování, přeskočení pomalých pasáží nebo obejití chování specifického pro hru. Pro běžné hraní se mu vyhněte, pokud musí zůstat přesné časování, fyzika, cutscény nebo kontroly v online stylu.</string>
     <string name="settings_help_frame_limit">Omezuje zobrazované snímky bez změny časování emulované konzole Vita. Použijte 30 nebo 45 FPS pro snížení spotřeby energie a tepla.</string>
     <string name="settings_help_vsync">Snižuje trhání obrazu, ale v některých hrách může snížit výkon.\n\nPoužijte pro zlepšení čistoty obrazu, škálování nebo vizuální stability u her, které již běží dobře. Snižte hodnotu nebo obnovte výchozí, pokud klesne FPS, telefon se zahřívá nebo je grafika nestabilní.</string>
-    <string name="settings_help_high_accuracy">Může opravit grafické problémy, ale obvykle snižuje výkon.\n\nPoužijte pro zlepšení čistoty obrazu, škálování nebo vizuální stability u her, které již běží dobře. Snižte hodnotu nebo obnovte výchozí, pokud klesne FPS, telefon se zahřívá nebo je grafika nestabilní.</string>
     <string name="settings_help_resolution">Vyšší hodnoty dělají obraz ostřejší, ale spotřebovávají více výkonu GPU.\n\nPoužijte pro zlepšení čistoty obrazu, škálování nebo vizuální stability u her, které již běží dobře. Snižte hodnotu nebo obnovte výchozí, pokud klesne FPS, telefon se zahřívá nebo je grafika nestabilní.</string>
     <string name="settings_help_renderer">Vulkan je obvykle nejlepší volbou. OpenGL může pomoci na zařízeních se slabou podporou Vulkanu.\n\nVulkan je obvykle nejlepší volbou pro rychlost a moderní ovladače Androidu. Zkuste OpenGL pouze tehdy, když se Vulkan nepodaří spustit, zobrazuje rozbitou grafiku nebo má vaše zařízení špatnou podporu Vulkanu.</string>
     <string name="settings_help_screen_filter">Bilineární vyhlazuje obraz. Nejbližší zachovává ostřejší hrany.\n\nPoužijte pro zlepšení čistoty obrazu, škálování nebo vizuální stability u her, které již běží dobře. Snižte hodnotu nebo obnovte výchozí, pokud klesne FPS, telefon se zahřívá nebo je grafika nestabilní.</string>

@@ -489,14 +489,10 @@ private fun GraphicsProfileSection(
     onDriverOverrideSelected: (String?) -> Unit
 ) {
     SectionCard(title = stringResource(R.string.settings_tab_graphics)) {
-        if (gameDbRecommendation != null) {
+        if (gameDbRecommendation?.backendRenderer != null && gameDbRecommendation.memoryMapping != null) {
             Text(
-                text = if (gameDbRecommendation.backendRenderer != null && gameDbRecommendation.memoryMapping != null) {
-                    stringResource(R.string.game_manager_db_recommendation,
-                        gameDbRecommendation.backendRenderer, gameDbRecommendation.memoryMapping)
-                } else {
-                    stringResource(R.string.settings_core_high_accuracy)
-                },
+                text = stringResource(R.string.game_manager_db_recommendation,
+                    gameDbRecommendation.backendRenderer, gameDbRecommendation.memoryMapping),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -540,7 +536,6 @@ private fun GraphicsProfileSection(
         ChoiceRow(stringResource(R.string.settings_memory_mapping), stringResource(R.string.settings_help_memory_mapping), config.memoryMapping, listOf("disabled", "double-buffer", "external-host", "page-table", "native-buffer"), { onUpdate { it.copy(memoryMapping = defaults.memoryMapping) } }) {
             onUpdate { cfg -> cfg.copy(memoryMapping = it) }
         }
-        ToggleRow(stringResource(R.string.settings_core_high_accuracy), config.highAccuracy, stringResource(R.string.settings_help_high_accuracy), { onUpdate { it.copy(highAccuracy = defaults.highAccuracy) } }) { onUpdate { cfg -> cfg.copy(highAccuracy = it) } }
         ToggleRow(stringResource(R.string.settings_core_vsync), config.vSync, stringResource(R.string.settings_help_vsync), { onUpdate { it.copy(vSync = defaults.vSync) } }) { onUpdate { cfg -> cfg.copy(vSync = it) } }
         ToggleRow(stringResource(R.string.settings_core_stretch_display), config.stretchDisplayArea, stringResource(R.string.settings_help_stretch_display), { onUpdate { it.copy(stretchDisplayArea = defaults.stretchDisplayArea) } }) { onUpdate { cfg -> cfg.copy(stretchDisplayArea = it) } }
         ToggleRow(stringResource(R.string.settings_core_fps_hack), config.fpsHack, stringResource(R.string.settings_help_fps_hack), { onUpdate { it.copy(fpsHack = defaults.fpsHack) } }) { onUpdate { cfg -> cfg.copy(fpsHack = it) } }

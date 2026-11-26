@@ -144,7 +144,6 @@ private:
     void setup_status_bar();
     void show_title_bars(bool show) const;
     void update_renderer_button();
-    void update_accuracy_button();
     void update_screen_filter_button();
     void update_audio_backend_button();
     void update_ngs_button();
@@ -226,7 +225,6 @@ private:
     QIcon m_icon_fullscreen_off;
 
     QPushButton *m_renderer_button = nullptr;
-    QPushButton *m_accuracy_button = nullptr;
     QPushButton *m_screen_filter_button = nullptr;
     QPushButton *m_audio_backend_button = nullptr;
     QPushButton *m_ngs_button = nullptr;

@@ -239,7 +239,6 @@ class SettingsBackupRepository(
         .put("backendRenderer", backendRenderer)
         .put("customDriverName", customDriverName)
         .put("turboMode", turboMode)
-        .put("highAccuracy", highAccuracy)
         .put("resolutionMultiplier", resolutionMultiplier.toDouble())
         .put("disableSurfaceSync", disableSurfaceSync)
         .put("screenFilter", screenFilter)
@@ -333,7 +332,6 @@ class SettingsBackupRepository(
         backendRenderer = optString("backendRenderer", defaults.backendRenderer),
         customDriverName = optString("customDriverName", defaults.customDriverName),
         turboMode = optBoolean("turboMode", defaults.turboMode),
-        highAccuracy = optBoolean("highAccuracy", defaults.highAccuracy),
         resolutionMultiplier = optFloat("resolutionMultiplier", defaults.resolutionMultiplier),
         disableSurfaceSync = optBoolean("disableSurfaceSync", defaults.disableSurfaceSync),
         screenFilter = optString("screenFilter", defaults.screenFilter),

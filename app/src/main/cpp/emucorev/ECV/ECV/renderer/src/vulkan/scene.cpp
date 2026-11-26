@@ -841,11 +841,6 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         context.curr_frag_ublock.set_buffer_count(frag_render_data->buffer_count);
     }
 
-    if (context.state.features.use_texture_viewport) {
-        context.curr_vert_ublock.set_texture_count(vert_render_data->texture_count);
-        context.curr_frag_ublock.set_texture_count(frag_render_data->texture_count);
-    }
-
     auto &vert_ublock = context.curr_vert_ublock.base_block;
     vert_ublock.viewport_flip = context.record.viewport_flip;
     vert_ublock.viewport_flag = (context.record.viewport_flat) ? 0.0f : 1.0f;

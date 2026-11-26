@@ -320,7 +320,6 @@ private fun GraphicsTab(uiState: SettingsUiState, defaults: VitaCoreConfig, view
             Text(stringResource(R.string.settings_gpu_driver_manage))
         }
         Toggle(stringResource(R.string.settings_use_angle), stringResource(R.string.settings_help_use_angle), uiState.coreConfig.useAngle, { enabled -> viewModel.updateCoreSettings { it.copy(useAngle = enabled) } }, { viewModel.updateCoreSettings { it.copy(useAngle = defaults.useAngle) } }, enabled = uiState.coreConfig.backendRenderer == "OpenGL")
-        Toggle(stringResource(R.string.settings_core_high_accuracy), stringResource(R.string.settings_help_high_accuracy), uiState.coreConfig.highAccuracy, { enabled -> viewModel.updateCoreSettings { it.copy(highAccuracy = enabled) } }, { viewModel.updateCoreSettings { it.copy(highAccuracy = defaults.highAccuracy) } })
         SliderRow(stringResource(R.string.settings_core_resolution_label), stringResource(R.string.settings_help_resolution), stringResource(R.string.settings_core_resolution_value, uiState.coreConfig.resolutionMultiplier), { viewModel.updateCoreSettings { it.copy(resolutionMultiplier = defaults.resolutionMultiplier) } }) {
             SyncedSlider(value = uiState.coreConfig.resolutionMultiplier, onValueChange = { value -> viewModel.updateCoreSettings { it.copy(resolutionMultiplier = (value * 2).roundToInt() / 2f) } }, valueRange = 0.5f..8f, steps = 14)
         }

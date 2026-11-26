@@ -42,7 +42,6 @@ void copy_global_to_current(Config::CurrentConfig &current, const Config &cfg) {
 #ifdef __ANDROID__
     current.custom_driver_name = cfg.custom_driver_name;
 #endif
-    current.high_accuracy = cfg.high_accuracy;
     current.resolution_multiplier = cfg.resolution_multiplier;
     current.disable_surface_sync = cfg.disable_surface_sync;
     current.screen_filter = cfg.screen_filter;
@@ -92,7 +91,6 @@ void copy_current_to_global(Config &cfg, const Config::CurrentConfig &current) {
 #ifdef __ANDROID__
     cfg.custom_driver_name = current.custom_driver_name;
 #endif
-    cfg.high_accuracy = current.high_accuracy;
     cfg.resolution_multiplier = current.resolution_multiplier;
     cfg.disable_surface_sync = current.disable_surface_sync;
     cfg.screen_filter = current.screen_filter;
@@ -151,7 +149,6 @@ std::vector<RestartRequiredSetting> get_restart_required_settings(
 #ifdef __ANDROID__
     append_if_changed(before.custom_driver_name != after.custom_driver_name, RestartRequiredSetting::CustomDriver);
 #endif
-    append_if_changed(before.high_accuracy != after.high_accuracy, RestartRequiredSetting::HighAccuracy);
     append_if_changed(before.resolution_multiplier != after.resolution_multiplier, RestartRequiredSetting::ResolutionMultiplier);
     append_if_changed(before.memory_mapping != after.memory_mapping, RestartRequiredSetting::MemoryMapping);
     append_if_changed(before.audio_backend != after.audio_backend, RestartRequiredSetting::AudioBackend);
@@ -201,7 +198,6 @@ bool load_custom_config(Config::CurrentConfig &out, const fs::path &config_path,
 #ifdef __ANDROID__
         out.custom_driver_name = gpu.attribute("custom-driver-name").as_string();
 #endif
-        out.high_accuracy = gpu.attribute("high-accuracy").as_bool();
         out.resolution_multiplier = gpu.attribute("resolution-multiplier").as_float();
         out.disable_surface_sync = gpu.attribute("disable-surface-sync").as_bool();
         out.screen_filter = gpu.attribute("screen-filter").as_string();
@@ -293,7 +289,6 @@ bool save_custom_config(const Config::CurrentConfig &cc, const fs::path &config_
 #ifdef __ANDROID__
     gpu_child.append_attribute("custom-driver-name") = cc.custom_driver_name.c_str();
 #endif
-    gpu_child.append_attribute("high-accuracy") = cc.high_accuracy;
     gpu_child.append_attribute("resolution-multiplier") = cc.resolution_multiplier;
     gpu_child.append_attribute("disable-surface-sync") = cc.disable_surface_sync;
     gpu_child.append_attribute("screen-filter") = cc.screen_filter.c_str();

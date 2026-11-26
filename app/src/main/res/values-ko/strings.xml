@@ -355,7 +355,6 @@
     <string name="settings_frame_limit">프레임 속도 제한</string>
     <string name="settings_frame_limit_unlimited">무제한</string>
     <string name="settings_core_vsync">수직 동기화</string>
-    <string name="settings_core_high_accuracy">고정밀 GPU 모드</string>
     <string name="settings_core_resolution_label">해상도 배율</string>
     <string name="settings_core_resolution_value">%1$.2fx 렌더 스케일</string>
     <string name="settings_core_overlay_opacity_label">오버레이 불투명도</string>
@@ -464,7 +463,6 @@
     <string name="settings_help_fps_hack">일부 게임에서 일반 프레임 제한을 해제합니다. 속도가 빨라질 수 있지만 타이밍이 깨질 수도 있습니다.\n\n테스트, 느린 구간 건너뛰기, 게임별 동작 우회에 사용하세요. 타이밍, 물리, 컷신, 온라인 방식 검사가 정확해야 하는 일반 플레이에서는 사용하지 마세요.</string>
     <string name="settings_help_frame_limit">에뮬레이트된 Vita 타이밍을 변경하지 않고 표시되는 프레임을 제한합니다. 전력 사용과 발열을 줄이려면 30 또는 45 FPS를 사용하세요.</string>
     <string name="settings_help_vsync">화면 찢김을 줄이지만 일부 게임에서는 성능이 떨어질 수 있습니다.\n\n이미 잘 실행되는 게임에서 이미지 선명도, 스케일링, 시각적 안정성을 개선할 때 사용하세요. FPS가 떨어지거나 기기가 뜨거워지거나 그래픽이 불안정해지면 값을 낮추거나 기본값으로 되돌리세요.</string>
-    <string name="settings_help_high_accuracy">그래픽 문제를 해결할 수 있지만 보통 성능이 떨어집니다.\n\n이미 잘 실행되는 게임에서 이미지 선명도, 스케일링, 시각적 안정성을 개선할 때 사용하세요. FPS가 떨어지거나 기기가 뜨거워지거나 그래픽이 불안정해지면 값을 낮추거나 기본값으로 되돌리세요.</string>
     <string name="settings_help_resolution">값이 높을수록 이미지가 더 선명해지지만 GPU 전력을 더 많이 사용합니다.\n\n이미 잘 실행되는 게임에서 이미지 선명도, 스케일링, 시각적 안정성을 개선할 때 사용하세요. FPS가 떨어지거나 기기가 뜨거워지거나 그래픽이 불안정해지면 값을 낮추거나 기본값으로 되돌리세요.</string>
     <string name="settings_help_renderer">보통 Vulkan이 가장 좋은 선택입니다. Vulkan 지원이 약한 기기에서는 OpenGL이 도움이 될 수 있습니다.\n\n속도와 최신 Android 드라이버를 위해 보통 Vulkan이 가장 좋은 선택입니다. Vulkan이 부팅되지 않거나 그래픽이 깨지거나 기기의 Vulkan 지원이 부족할 때만 OpenGL을 사용해 보세요.</string>
     <string name="settings_help_screen_filter">이중선형은 이미지를 부드럽게 만들고, 최근접은 가장자리를 더 선명하게 유지합니다.\n\n이미 잘 실행되는 게임에서 이미지 선명도, 스케일링, 시각적 안정성을 개선할 때 사용하세요. FPS가 떨어지거나 기기가 뜨거워지거나 그래픽이 불안정해지면 값을 낮추거나 기본값으로 되돌리세요.</string>

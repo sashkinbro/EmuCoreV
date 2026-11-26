@@ -243,9 +243,6 @@ static Config::CurrentConfig get_runtime_current_config_after_save(
             runtime_current.custom_driver_name = previous_current.custom_driver_name;
             break;
 #endif
-        case config::RestartRequiredSetting::HighAccuracy:
-            runtime_current.high_accuracy = previous_current.high_accuracy;
-            break;
         case config::RestartRequiredSetting::ResolutionMultiplier:
             runtime_current.resolution_multiplier = previous_current.resolution_multiplier;
             break;

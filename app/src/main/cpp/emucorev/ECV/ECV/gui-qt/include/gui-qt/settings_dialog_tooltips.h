@@ -43,7 +43,6 @@ public:
     QString modules_manual;
     QString cpu_opt;
     QString backend_renderer;
-    QString renderer_accuracy;
     QString vsync;
     QString disable_surface_sync;
     QString async_pipeline;

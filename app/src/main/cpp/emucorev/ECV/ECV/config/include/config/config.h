@@ -129,7 +129,6 @@ using PhysicalKeyCode = input::PhysicalKeyCode;
     code(std::string, "custom-driver-name", "", custom_driver_name)                                     \
     code(bool, "turbo-mode", false, turbo_mode)                                                         \
     code(int, "gpu-idx", 0, gpu_idx)                                                                    \
-    code(bool, "high-accuracy", true, high_accuracy)                                                   \
     code(std::string, "tu-debug", "", tu_debug)                                                        \
     code(bool, "disable-raster-order", false, disable_raster_order)                                    \
     code(bool, "disable-programmable-blending", false, disable_programmable_blending)                   \
