@@ -266,8 +266,6 @@
     <string name="settings_cpu_pool_size">CPU havuz boyutu</string>
     <string name="settings_help_cpu_pool_size">Emülatörün kaç işlem parçacığı kullanacağını ayarlar.\n\nOyun yavaşsa, takılıyorsa veya cihazda CPU/GPU payı varsa kullanın. Çökme, ses çıtırtısı, ısınma, pil tüketimi veya bozuk zamanlama görürseniz kapatın ya da azaltın.</string>
     <string name="settings_cpu_pool_size_value">%1$d çalışan</string>
-    <string name="settings_hashless_texture_cache">Hash\'siz doku önbelleği</string>
-    <string name="settings_help_hashless_texture_cache">Daha agresif bir doku önbellek modu kullanır.\n\nİlk çalıştırmadan sonra shader veya texture takılmalarını azaltmak için kullanın. Bozuk dokular, siyah ekran veya cache sonrası tekrarlanabilir çökmeler olursa kapatın.</string>
     <string name="settings_shader_cache">Gölgelendirici önbelleği</string>
     <string name="settings_help_shader_cache">Takılmaları azaltmak için derlenmiş gölgelendiricileri çalıştırmalar arasında tutar.\n\nİlk çalıştırmadan sonra shader veya texture takılmalarını azaltmak için kullanın. Bozuk dokular, siyah ekran veya cache sonrası tekrarlanabilir çökmeler olursa kapatın.</string>
     <string name="settings_pixel_perfect_fullscreen">Mükemmel pikselli tam ekran</string>

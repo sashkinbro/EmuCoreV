@@ -550,8 +550,6 @@
     <string name="settings_cpu_pool_size">Ukuran pool CPU</string>
     <string name="settings_help_cpu_pool_size">Mengatur berapa banyak thread pekerja yang digunakan emulator.\n\nGunakan ini saat game lambat, tersendat, atau perangkat Anda memiliki sisa CPU/GPU yang cukup untuk mencoba jalur yang lebih cepat. Matikan kembali atau turunkan jika Anda melihat crash, suara pecah, panas berlebih, baterai boros, atau timing rusak.</string>
     <string name="settings_cpu_pool_size_value">%1$d pekerja</string>
-    <string name="settings_hashless_texture_cache">Cache tekstur tanpa hash</string>
-    <string name="settings_help_hashless_texture_cache">Menggunakan mode cache tekstur yang lebih agresif.\n\nGunakan ini untuk mengurangi stutter shader atau tekstur setelah pertama kali dijalankan. Nonaktifkan hanya jika game menampilkan tekstur rusak, layar hitam, atau crash yang berulang setelah caching.</string>
     <string name="settings_shader_cache">Cache shader</string>
     <string name="settings_help_shader_cache">Menyimpan shader yang telah dikompilasi antar sesi untuk mengurangi stutter.\n\nGunakan ini untuk mengurangi stutter shader atau tekstur setelah pertama kali dijalankan. Nonaktifkan hanya jika game menampilkan tekstur rusak, layar hitam, atau crash yang berulang setelah caching.</string>
     <string name="settings_pixel_perfect_fullscreen">Layar penuh pixel perfect</string>

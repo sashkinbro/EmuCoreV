@@ -295,8 +295,8 @@ uint16_t get_upload_mip(const uint16_t true_mip, const uint16_t width, const uin
 
 using namespace texture;
 
-bool TextureCache::init([[maybe_unused]] const bool hashless_texture_cache, const fs::path &texture_folder, std::string_view game_id, const size_t sampler_cache_size) {
-    // write-trap tracking is always on: the "hashless" setting no longer selects a different cache
+bool TextureCache::init(const fs::path &texture_folder, std::string_view game_id, const size_t sampler_cache_size) {
+    // write-trap tracking is always on
     // initialize the texture queue
     texture_queue.init(TextureCacheSize);
     // set the proper index of each entry

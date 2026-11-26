@@ -149,7 +149,6 @@ using PhysicalKeyCode = input::PhysicalKeyCode;
     code(int, "guest-cores", 1, guest_cores)                                                            \
     code(bool, "show-compile-shaders", false, show_compile_shaders)                                     \
     code(bool, "show-shader-cache-warn", true, show_shader_cache_warn)                                  \
-    code(bool, "hashless-texture-cache", false, hashless_texture_cache)                                 \
     code(bool, "import-textures", false, import_textures)                                               \
     code(bool, "export-textures", false, export_textures)                                               \
     code(bool, "export-as-png", true, export_as_png)                                                    \

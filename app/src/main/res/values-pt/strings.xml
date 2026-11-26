@@ -257,8 +257,6 @@
     <string name="settings_cpu_pool_size">Tamanho do pool da CPU</string>
     <string name="settings_help_cpu_pool_size">Define quantos threads de trabalho o emulador usará.\n\nUse isto quando um jogo estiver lento, travando ou quando o dispositivo tiver folga de CPU/GPU. Desative ou reduza se houver crashes, estalos no áudio, aquecimento, alto consumo de bateria ou timing quebrado.</string>
     <string name="settings_cpu_pool_size_value">%1$d threads</string>
-    <string name="settings_hashless_texture_cache">Cache de textura sem hash</string>
-    <string name="settings_help_hashless_texture_cache">Usa um modo de cache de textura mais agressivo.\n\nUse isto para reduzir travadas de shaders ou texturas depois da primeira execução. Desative apenas se o jogo mostrar texturas corrompidas, tela preta ou crashes repetíveis após o cache.</string>
     <string name="settings_shader_cache">Cache de shader</string>
     <string name="settings_help_shader_cache">Mantém os shaders compilados entre as execuções para reduzir travamentos.\n\nUse isto para reduzir travadas de shaders ou texturas depois da primeira execução. Desative apenas se o jogo mostrar texturas corrompidas, tela preta ou crashes repetíveis após o cache.</string>
     <string name="settings_pixel_perfect_fullscreen">Tela cheia pixel perfect</string>

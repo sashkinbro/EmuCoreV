@@ -257,8 +257,6 @@
     <string name="settings_cpu_pool_size">CPU 池大小</string>
     <string name="settings_help_cpu_pool_size">設定模擬器使用的執行緒數量。\n\n当游戏变慢、卡顿，或设备还有足够 CPU/GPU 余量时使用。若出现崩溃、音频爆音、发热、耗电增加或时序异常，请关闭或降低。</string>
     <string name="settings_cpu_pool_size_value">%1$d 個執行緒</string>
-    <string name="settings_hashless_texture_cache">無雜湊紋理快取 (Hashless texture cache)</string>
-    <string name="settings_help_hashless_texture_cache">使用更積極的紋理快取模式。\n\n用于减少首次运行后着色器或纹理造成的卡顿。只有在出现纹理损坏、黑屏或缓存后稳定复现崩溃时才关闭。</string>
     <string name="settings_shader_cache">著色器快取</string>
     <string name="settings_help_shader_cache">跨執行緒保留已編譯的著色器以減少卡頓。\n\n用于减少首次运行后着色器或纹理造成的卡顿。只有在出现纹理损坏、黑屏或缓存后稳定复现崩溃时才关闭。</string>
     <string name="settings_pixel_perfect_fullscreen">像素完美全螢幕</string>

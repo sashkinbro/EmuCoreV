@@ -173,7 +173,7 @@ public:
     // Disarms the write traps of an entry that is dropped or reused (the callbacks keep their own state alive).
     static void reset_tracking(TextureCacheInfo &info);
 
-    bool init(const bool hashless_texture_cache, const fs::path &texture_folder, const std::string_view game_id, const size_t sampler_cache_size = 0);
+    bool init(const fs::path &texture_folder, const std::string_view game_id, const size_t sampler_cache_size = 0);
     void set_replacement_state(bool import_textures, bool export_textures, bool export_as_png);
 
     virtual void select(size_t index, const SceGxmTexture &texture) = 0;

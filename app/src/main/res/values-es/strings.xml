@@ -257,8 +257,6 @@
     <string name="settings_cpu_pool_size">Tamaño del grupo de CPU</string>
     <string name="settings_help_cpu_pool_size">Establece cuántos hilos de trabajo usa el emulador.\n\nÚsalo cuando un juego vaya lento, tenga tirones o tu dispositivo tenga margen de CPU/GPU. Desactívalo o bájalo si aparecen cierres, chasquidos de audio, calor, consumo alto de batería o temporización rota.</string>
     <string name="settings_cpu_pool_size_value">%1$d hilos de trabajo</string>
-    <string name="settings_hashless_texture_cache">Caché de texturas sin hash</string>
-    <string name="settings_help_hashless_texture_cache">Usa un modo de caché de texturas más agresivo.\n\nÚsalo para reducir tirones de shaders o texturas después del primer arranque. Desactívalo solo si el juego muestra texturas dañadas, pantalla negra o cierres repetibles tras crear caché.</string>
     <string name="settings_shader_cache">Caché de shaders</string>
     <string name="settings_help_shader_cache">Mantiene los shaders compilados entre ejecuciones para reducir los tirones.\n\nÚsalo para reducir tirones de shaders o texturas después del primer arranque. Desactívalo solo si el juego muestra texturas dañadas, pantalla negra o cierres repetibles tras crear caché.</string>
     <string name="settings_pixel_perfect_fullscreen">Pantalla completa píxel perfecto</string>

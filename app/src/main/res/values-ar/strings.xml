@@ -430,8 +430,6 @@
     <string name="settings_cpu_pool_size">حجم تجمع وحدة المعالجة المركزية (CPU pool)</string>
     <string name="settings_help_cpu_pool_size">يحدد عدد سلاسل العمل التي يستخدمها المحاكي.\n\nاستخدم هذا عندما تكون اللعبة بطيئة، أو متقطعة، أو عندما يحتوي جهازك على مساحة كافية في CPU/GPU لتجربة مسار أسرع. أوقفه أو خفضه إذا رأيت أعطالاً، طقطقة في الصوت، ارتفاع حرارة، استنزاف بطارية، أو توقيت مكسور.</string>
     <string name="settings_cpu_pool_size_value">%1$d عمال</string>
-    <string name="settings_hashless_texture_cache">ذاكرة التخزين المؤقت للأنسجة بدون Hash</string>
-    <string name="settings_help_hashless_texture_cache">يستخدم وضعاً أكثر قوة لذاكرة التخزين المؤقت للأنسجة.\n\nاستخدم هذا لتقليل تقطيع التظليل أو الأنسجة بعد التشغيل الأول. قم بتعطيله فقط عندما تظهر اللعبة أنسجة تالفة، شاشات سوداء، أو أعطال متكررة بعد التخزين المؤقت.</string>
     <string name="settings_shader_cache">ذاكرة التظليل المؤقتة</string>
     <string name="settings_help_shader_cache">يحتفظ بالمظلات المجمعة بين عمليات التشغيل لتقليل التقطيع.\n\nاستخدم هذا لتقليل تقطيع التظليل أو الأنسجة بعد التشغيل الأول. قم بتعطيله فقط عندما تظهر اللعبة أنسجة تالفة، شاشات سوداء، أو أعطال متكررة بعد التخزين المؤقت.</string>
     <string name="settings_pixel_perfect_fullscreen">ملء الشاشة مثالي البكسل (Pixel perfect)</string>

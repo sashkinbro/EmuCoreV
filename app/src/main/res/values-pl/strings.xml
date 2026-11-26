@@ -550,8 +550,6 @@
     <string name="settings_cpu_pool_size">Rozmiar puli CPU</string>
     <string name="settings_help_cpu_pool_size">Ustawia liczbę wątków roboczych używanych przez emulator.\n\nUżyj tej opcji, gdy gra działa wolno, zacina się lub Twoje urządzenie ma wystarczający zapas CPU/GPU, aby spróbować szybszej ścieżki. Wyłącz ją lub obniż, jeśli pojawiają się awarie, trzaski w dźwięku, przegrzewanie, szybkie zużycie baterii lub zaburzenia synchronizacji.</string>
     <string name="settings_cpu_pool_size_value">%1$d wątków</string>
-    <string name="settings_hashless_texture_cache">Pamięć podręczna tekstur bez haszy</string>
-    <string name="settings_help_hashless_texture_cache">Używa bardziej agresywnego trybu pamięci podręcznej tekstur.\n\nUżyj tej opcji, aby ograniczyć zacinanie shaderów lub tekstur po pierwszym uruchomieniu. Wyłącz ją tylko wtedy, gdy gra wyświetla uszkodzone tekstury, czarne ekrany lub powtarzalne awarie po zapisaniu w pamięci podręcznej.</string>
     <string name="settings_shader_cache">Pamięć podręczna shaderów</string>
     <string name="settings_help_shader_cache">Zachowuje skompilowane shadery między uruchomieniami, aby ograniczyć zacinanie.\n\nUżyj tej opcji, aby ograniczyć zacinanie shaderów lub tekstur po pierwszym uruchomieniu. Wyłącz ją tylko wtedy, gdy gra wyświetla uszkodzone tekstury, czarne ekrany lub powtarzalne awarie po zapisaniu w pamięci podręcznej.</string>
     <string name="settings_pixel_perfect_fullscreen">Pełny ekran piksel w piksel</string>

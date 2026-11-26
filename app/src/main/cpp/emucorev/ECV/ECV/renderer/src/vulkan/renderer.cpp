@@ -1437,7 +1437,7 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
     if (features.direct_fragcolor)
         select_fbfetch_split(*this);
 
-    texture_cache.init(true, texture_folder(), game_id); // Nick - Turning off hashless texture cache can be useful for debugging
+    texture_cache.init(texture_folder(), game_id);
 
 #ifndef NDEBUG
     log_gpu_configuration(cfg);

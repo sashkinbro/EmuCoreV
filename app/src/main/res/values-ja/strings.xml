@@ -550,8 +550,6 @@
     <string name="settings_cpu_pool_size">CPUプールサイズ</string>
     <string name="settings_help_cpu_pool_size">エミュレーターが使用するワーカースレッド数を設定します。\n\nゲームが遅い、スタッターする、またはデバイスに高速な経路を試すだけのCPU/GPUの余裕がある場合に使用します。クラッシュ、音の割れ、過熱、バッテリー消費、タイミングの崩れが見られる場合は、オフに戻すか値を下げてください。</string>
     <string name="settings_cpu_pool_size_value">%1$dワーカー</string>
-    <string name="settings_hashless_texture_cache">ハッシュレステクスチャキャッシュ</string>
-    <string name="settings_help_hashless_texture_cache">より積極的なテクスチャキャッシュモードを使用します。\n\n初回実行後のシェーダーやテクスチャのスタッターを減らすために使用します。ゲームでテクスチャの破損、ブラックスクリーン、キャッシュ後の再現性のあるクラッシュが発生する場合にのみ無効にしてください。</string>
     <string name="settings_shader_cache">シェーダーキャッシュ</string>
     <string name="settings_help_shader_cache">コンパイル済みシェーダーを実行間で保持し、スタッターを減らします。\n\n初回実行後のシェーダーやテクスチャのスタッターを減らすために使用します。ゲームでテクスチャの破損、ブラックスクリーン、キャッシュ後の再現性のあるクラッシュが発生する場合にのみ無効にしてください。</string>
     <string name="settings_pixel_perfect_fullscreen">ピクセルパーフェクト全画面</string>

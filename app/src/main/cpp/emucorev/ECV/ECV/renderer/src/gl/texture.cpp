@@ -51,8 +51,8 @@ static void apply_sampler_state(const SceGxmTexture &gxm_texture, const GLenum t
         glTexParameterf(texture_bind_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, static_cast<float>(anisotropic_filtering));
 }
 
-bool GLTextureCache::init(const bool hashless_texture_cache, const fs::path &texture_folder, const std::string_view game_id) {
-    TextureCache::init(hashless_texture_cache, texture_folder, game_id);
+bool GLTextureCache::init(const fs::path &texture_folder, const std::string_view game_id) {
+    TextureCache::init(texture_folder, game_id);
     backend = Backend::OpenGL;
 
     // check for dxt support

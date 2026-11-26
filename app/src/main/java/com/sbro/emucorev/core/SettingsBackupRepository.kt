@@ -250,7 +250,6 @@ class SettingsBackupRepository(
         .put("eagerSurfaceSync", eagerSurfaceSync)
         .put("guestCores", guestCores)
         .put("showCompileShaders", showCompileShaders)
-        .put("hashlessTextureCache", hashlessTextureCache)
         .put("importTextures", importTextures)
         .put("exportTextures", exportTextures)
         .put("exportAsPng", exportAsPng)
@@ -345,7 +344,6 @@ class SettingsBackupRepository(
         eagerSurfaceSync = optBoolean("eagerSurfaceSync", defaults.eagerSurfaceSync),
         guestCores = optInt("guestCores", defaults.guestCores).coerceIn(1, 4),
         showCompileShaders = optBoolean("showCompileShaders", defaults.showCompileShaders),
-        hashlessTextureCache = optBoolean("hashlessTextureCache", defaults.hashlessTextureCache),
         importTextures = optBoolean("importTextures", defaults.importTextures),
         exportTextures = optBoolean("exportTextures", defaults.exportTextures),
         exportAsPng = optBoolean("exportAsPng", defaults.exportAsPng),

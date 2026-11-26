@@ -30,7 +30,6 @@ data class VitaCoreConfig(
     val accurateThreadScheduling: Boolean = false,
     val guestCores: Int = 1,
     val showCompileShaders: Boolean = false,
-    val hashlessTextureCache: Boolean = false,
     val importTextures: Boolean = false,
     val exportTextures: Boolean = false,
     val exportAsPng: Boolean = true,
@@ -186,7 +185,6 @@ class VitaCoreConfigRepository(private val context: Context) {
         "guest-cores",
         "device-vibration-fallback",
         "fullscreen_hd_res_pixel_perfect",
-        "hashless-texture-cache",
         "high-accuracy",
         "http-enable",
         "import-textures",
@@ -273,7 +271,6 @@ class VitaCoreConfigRepository(private val context: Context) {
                 accurateThreadScheduling = values["accurate-thread-scheduling"]?.toBooleanStrictOrNull() ?: defaults.accurateThreadScheduling,
                 guestCores = values["guest-cores"]?.toIntOrNull() ?: defaults.guestCores,
                 showCompileShaders = values["show-compile-shaders"]?.toBooleanStrictOrNull() ?: defaults.showCompileShaders,
-                hashlessTextureCache = values["hashless-texture-cache"]?.toBooleanStrictOrNull() ?: defaults.hashlessTextureCache,
                 importTextures = values["import-textures"]?.toBooleanStrictOrNull() ?: defaults.importTextures,
                 exportTextures = values["export-textures"]?.toBooleanStrictOrNull() ?: defaults.exportTextures,
                 exportAsPng = values["export-as-png"]?.toBooleanStrictOrNull() ?: defaults.exportAsPng,
@@ -418,7 +415,6 @@ class VitaCoreConfigRepository(private val context: Context) {
         values["accurate-thread-scheduling"] = config.accurateThreadScheduling.toString()
         values["guest-cores"] = config.guestCores.toString()
         values["show-compile-shaders"] = config.showCompileShaders.toString()
-        values["hashless-texture-cache"] = config.hashlessTextureCache.toString()
         values["import-textures"] = config.importTextures.toString()
         values["export-textures"] = config.exportTextures.toString()
         values["export-as-png"] = config.exportAsPng.toString()

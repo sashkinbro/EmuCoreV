@@ -257,8 +257,6 @@
     <string name="settings_cpu_pool_size">Dimensione del pool CPU</string>
     <string name="settings_help_cpu_pool_size">Imposta quanti thread di lavoro utilizza l\'emulatore.\n\nUsalo quando un gioco è lento, scatta o il dispositivo ha margine CPU/GPU. Disattivalo o riducilo se compaiono crash, crepitii audio, surriscaldamento, consumo batteria alto o timing errato.</string>
     <string name="settings_cpu_pool_size_value">%1$d worker</string>
-    <string name="settings_hashless_texture_cache">Cache texture senza hash</string>
-    <string name="settings_help_hashless_texture_cache">Usa una modalità cache delle texture più aggressiva.\n\nUsalo per ridurre scatti di shader o texture dopo il primo avvio. Disattivalo solo se il gioco mostra texture corrotte, schermo nero o crash ripetibili dopo la cache.</string>
     <string name="settings_shader_cache">Cache shader</string>
     <string name="settings_help_shader_cache">Mantiene gli shader compilati tra un\'esecuzione e l\'altra per ridurre i rallentamenti.\n\nUsalo per ridurre scatti di shader o texture dopo il primo avvio. Disattivalo solo se il gioco mostra texture corrotte, schermo nero o crash ripetibili dopo la cache.</string>
     <string name="settings_pixel_perfect_fullscreen">Schermo intero pixel perfect</string>

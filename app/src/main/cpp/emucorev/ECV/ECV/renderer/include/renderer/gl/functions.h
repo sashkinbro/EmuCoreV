@@ -93,7 +93,7 @@ GLenum get_gl_texture_type(const SceGxmTexture &gxm_texture);
 size_t bits_per_pixel(SceGxmTextureBaseFormat base_format);
 
 // Texture cache.
-bool init(GLTextureCacheState &cache, const bool hashless_texture_cache);
+bool init(GLTextureCacheState &cache);
 
 } // namespace texture
 

@@ -550,8 +550,6 @@
     <string name="settings_cpu_pool_size">Velikost CPU poolu</string>
     <string name="settings_help_cpu_pool_size">Nastaví, kolik pracovních vláken emulátor používá.\n\nPoužijte jej, když je hra pomalá, škubá, nebo má zařízení dostatek výkonu CPU/GPU na vyzkoušení rychlejší cesty. Vypněte jej nebo snižte, pokud se objevují pády, praskání zvuku, přehřívání, vybíjení baterie nebo rozbité časování.</string>
     <string name="settings_cpu_pool_size_value">%1$d pracovních vláken</string>
-    <string name="settings_hashless_texture_cache">Cache textur bez hashů</string>
-    <string name="settings_help_hashless_texture_cache">Používá agresivnější režim cache textur.\n\nPoužijte jej ke snížení škubání shaderů nebo textur po prvním spuštění. Vypněte jej jen tehdy, když hra zobrazuje poškozené textury, černé obrazovky nebo opakované pády po ukládání do cache.</string>
     <string name="settings_shader_cache">Cache shaderů</string>
     <string name="settings_help_shader_cache">Uchovává zkompilované shadery mezi spuštěními, aby se snížilo škubání.\n\nPoužijte jej ke snížení škubání shaderů nebo textur po prvním spuštění. Vypněte jej jen tehdy, když hra zobrazuje poškozené textury, černé obrazovky nebo opakované pády po ukládání do cache.</string>
     <string name="settings_pixel_perfect_fullscreen">Pixel perfect celá obrazovka</string>

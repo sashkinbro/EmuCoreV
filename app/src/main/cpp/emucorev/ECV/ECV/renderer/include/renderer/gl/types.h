@@ -52,7 +52,7 @@ class GLTextureCache : public TextureCache {
 public:
     GLObjectArray<TextureCacheSize> textures;
 
-    bool init(const bool hashless_texture_cache, const fs::path &texture_folder, const std::string_view game_id);
+    bool init(const fs::path &texture_folder, const std::string_view game_id);
     void cleanup();
     void select(size_t index, const SceGxmTexture &texture) override;
     void configure_texture(const SceGxmTexture &texture) override;

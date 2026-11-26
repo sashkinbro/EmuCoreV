@@ -550,8 +550,6 @@
     <string name="settings_cpu_pool_size">CPU 풀 크기</string>
     <string name="settings_help_cpu_pool_size">에뮬레이터가 사용하는 워커 스레드 수를 설정합니다.\n\n게임이 느리거나 끊기거나, 기기에 더 빠른 경로를 시도할 만큼 CPU/GPU 여유가 있을 때 사용하세요. 충돌, 오디오 잡음, 과열, 배터리 소모 또는 타이밍 오류가 나타나면 끄거나 낮추세요.</string>
     <string name="settings_cpu_pool_size_value">워커 %1$d개</string>
-    <string name="settings_hashless_texture_cache">해시리스 텍스처 캐시</string>
-    <string name="settings_help_hashless_texture_cache">더 적극적인 텍스처 캐시 모드를 사용합니다.\n\n첫 실행 후 셰이더나 텍스처 끊김을 줄일 때 사용하세요. 캐싱 후 게임에 텍스처 손상, 검은 화면 또는 반복되는 충돌이 나타날 때만 비활성화하세요.</string>
     <string name="settings_shader_cache">셰이더 캐시</string>
     <string name="settings_help_shader_cache">컴파일된 셰이더를 실행 간에 유지하여 끊김을 줄입니다.\n\n첫 실행 후 셰이더나 텍스처 끊김을 줄일 때 사용하세요. 캐싱 후 게임에 텍스처 손상, 검은 화면 또는 반복되는 충돌이 나타날 때만 비활성화하세요.</string>
     <string name="settings_pixel_perfect_fullscreen">픽셀 퍼펙트 전체 화면</string>

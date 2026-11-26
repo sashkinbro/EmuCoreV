@@ -257,8 +257,6 @@
     <string name="settings_cpu_pool_size">CPU पूल का आकार</string>
     <string name="settings_help_cpu_pool_size">सेट करता है कि एमुलेटर कितने वर्कर थ्रेड का उपयोग करता है।\n\nजब गेम slow हो, stutter करे, या device में CPU/GPU headroom हो तब इस्तेमाल करें। Crashes, audio crackle, overheating, battery drain या broken timing दिखे तो इसे वापस बंद या कम करें।</string>
     <string name="settings_cpu_pool_size_value">%1$d वर्कर</string>
-    <string name="settings_hashless_texture_cache">हैशलेस टेक्सचर कैश</string>
-    <string name="settings_help_hashless_texture_cache">अधिक आक्रामक टेक्सचर कैश मोड का उपयोग करता है।\n\nपहली run के बाद shader या texture stutter कम करने के लिए इस्तेमाल करें। Corrupted textures, black screen या caching के बाद repeat crashes हों तभी बंद करें।</string>
     <string name="settings_shader_cache">शेडर कैश</string>
     <string name="settings_help_shader_cache">स्टटरिंग कम करने के लिए रन के बीच संकलित शेडर रखता है।\n\nपहली run के बाद shader या texture stutter कम करने के लिए इस्तेमाल करें। Corrupted textures, black screen या caching के बाद repeat crashes हों तभी बंद करें।</string>
     <string name="settings_pixel_perfect_fullscreen">पिक्सेल परफेक्ट फुलस्क्रीन</string>
