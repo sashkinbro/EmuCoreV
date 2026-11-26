@@ -43,6 +43,10 @@ struct Hints {
     // The F16 raw alias is input attachment1 on Vulkan subpass fetch.
     bool raw_color_attachment_input = false;
 
+    // B140: the colour attachment is multisampled and the fetching shader runs once per sample: the input attachments are multisampled and
+    // read at gl_SampleID (Vulkan subpass fetch only)
+    bool ms_color_input = false;
+
     // Vulkan must not statically declare inputs absent from the paired vertex
     // shader, even when a runtime iterator mask selects their fallback value.
     uint32_t vertex_output_mask = 0xFFFFFFFFu;

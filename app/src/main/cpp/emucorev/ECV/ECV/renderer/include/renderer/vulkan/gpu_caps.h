@@ -120,6 +120,7 @@ struct GpuCaps {
     uint32_t ds_resolve_stencil_modes = 0;
     bool ds_resolve_independent = false;
     bool ds_resolve_independent_none = false;
+    bool sample_rate_shading = false; // feature sampleRateShading (per-sample framebuffer fetch of a multisampled colour attachment)
     uint32_t framebuffer_color_sample_counts = 1; // bitmask of VkSampleCountFlagBits
     uint32_t framebuffer_depth_sample_counts = 1;
     uint32_t framebuffer_stencil_sample_counts = 1;

@@ -392,6 +392,12 @@ public:
 
     SurfaceRetrieveResult retrieve_depth_stencil_for_framebuffer(SceGxmDepthStencilSurface *depth_stencil, const uint32_t width, const uint32_t height);
 
+    // B140 (MSAA, src/vulkan/msaa.cpp): read-only lookup of the cached entry of a depth/stencil surface; would_remake tells
+    // whether retrieve_depth_stencil_for_framebuffer would throw the cached image away for this size
+    DepthStencilSurfaceCacheInfo *find_depth_stencil_entry(const SceGxmDepthStencilSurface &depth_stencil, uint32_t width, uint32_t height, bool &would_remake) const;
+    // B140: the next retrieve_depth_stencil_for_framebuffer must not build the sample rate copy (the scene is multisampled)
+    bool msaa_skip_ds_resample = false;
+
     bool begin_ds_scene_depth_check(const SceGxmDepthStencilSurface &depth_stencil, bool this_scene_stores, Address scene_color_addr);
     void resolve_ds_scene_end(bool scene_wrote_depth);
 

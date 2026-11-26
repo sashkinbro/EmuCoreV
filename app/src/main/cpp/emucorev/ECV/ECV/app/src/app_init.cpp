@@ -669,6 +669,7 @@ void apply_renderer_config(EmuEnvState &emuenv) {
     const auto &cc = emuenv.cfg.current_config;
 
     r.res_multiplier = cc.resolution_multiplier;
+    r.msaa_samples_override = cc.msaa_samples_override;
     r.set_vsync_state(cc.v_sync);
     r.set_surface_sync_state(cc.disable_surface_sync);
     r.set_screen_filter(cc.screen_filter);

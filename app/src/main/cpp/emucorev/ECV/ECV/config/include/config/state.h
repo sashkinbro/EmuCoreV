@@ -74,6 +74,9 @@ struct Config {
 #endif
         bool high_accuracy = true;
         float resolution_multiplier = 1.0f;
+        // 0 = follow the multisample mode the game asks for, 1/2/4 = force this sample count for every scene (clamped to the device);
+        // runtime only, never read from or written to the config files
+        int msaa_samples_override = 0;
         bool disable_surface_sync = false;
         std::string screen_filter = "Bilinear";
         std::string memory_mapping = "double-buffer";

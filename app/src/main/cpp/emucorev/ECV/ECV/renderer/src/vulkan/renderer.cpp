@@ -712,6 +712,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         // use these features (because they are used by the vita GPU) if they are available
         vk::PhysicalDeviceFeatures enabled_features{
             .independentBlend = physical_device_features.independentBlend,
+            // per-sample framebuffer fetch of multisampled scenes (B140)
+            .sampleRateShading = physical_device_features.sampleRateShading,
             .depthClamp = enable_depth_clamp ? physical_device_features.depthClamp : VK_FALSE,
             // P1: features the code relies on (BCn/ASTC/ETC2 texture formats, depth bias clamp) are enabled whenever the driver has them;
             // formats are still gated per-format by vkGetPhysicalDeviceFormatProperties
@@ -974,11 +976,14 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             use_dynamic_rendering = support_dyn_rendering;
             use_copy_snapshot = gpu_strategy.fbfetch == FbFetchPath::CopySnapshot;
             // the optional-extension map enables everything the driver lists; extensions of paths that were not selected stay off
+            // multisampled GXM scenes (B140, msaa.cpp) need render pass 2 + depth/stencil resolve on the VkRenderPass path
+            const bool msaa_wanted = gpu_caps.render_pass2 && gpu_strategy.msaa_resolve == MsaaResolvePath::ResolveAttachment && !use_dynamic_rendering;
             std::erase_if(device_extensions, [&](const char *e) {
                 const std::string_view n(e);
-                if (!use_dynamic_rendering
-                    && (n == VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME || n == VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME
-                        || n == VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME || n == VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME
+                if (!use_dynamic_rendering && (n == VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME || n == VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME))
+                    return true;
+                if (!use_dynamic_rendering && !msaa_wanted
+                    && (n == VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME || n == VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME
                         || n == VK_KHR_MULTIVIEW_EXTENSION_NAME || n == VK_KHR_MAINTENANCE_2_EXTENSION_NAME))
                     return true;
                 return !support_timeline && n == VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME;
@@ -1358,6 +1363,9 @@ void VKState::late_init(const Config &cfg, const std::string_view game_id, MemSt
         features.direct_fragcolor = false;
     }
 
+    // B140: multisampling is usable when the strategy's resolve path, sample rate shading and the subpass-input fetch are all there
+    msaa::init(*this);
+
     // texture viewport is faster but not entirely accurate
     if (support_standard_layout && !use_high_accuracy) {
         LOG_INFO("The Vulkan renderer is using texture viewport for better performance");
@@ -1589,6 +1597,8 @@ void VKState::cleanup() {
             release_descriptor_sets(descriptor);
         release_descriptor_sets(frames[i].color_descriptor);
     }
+
+    msaa::cleanup(*this);
 
     pipeline_cache.cleanup();
 

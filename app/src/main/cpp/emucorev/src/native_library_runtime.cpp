@@ -300,7 +300,9 @@ bool prepare_native_library(EmuEnvState &emuenv) {
     app::set_current_config(emuenv, "");
     // The library has its own presentation profile; never persist these values
     // into the normal game's configuration.
-    emuenv.cfg.current_config.resolution_multiplier = 1.0f;
+    emuenv.cfg.current_config.resolution_multiplier = 2.0f;
+    // MSAA 4x for every scene of the shell, clamped by the renderer to the device's supported sample counts (4 -> 2 -> 1).
+    emuenv.cfg.current_config.msaa_samples_override = 4;
     emuenv.cfg.current_config.high_accuracy = true;
     emuenv.cfg.current_config.fps_hack = true;
     emuenv.cfg.current_config.v_sync = false;

@@ -898,7 +898,17 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
             // The GPU supports gl_LastFragData.
             // On Vulkan this is a subpass input, it is similar to gl_LastFragData (and should have the same speed on integrated GPUs)
             // This is not supported on OpenGL with SpirV
-            const spv::Id image_type = b.makeImageType(f32, spv::DimSubpassData, false, false, false, 2, spv::ImageFormatUnknown);
+            // B140: a multisampled colour attachment is read per sample (SampleId turns the shader into a per-sample one)
+            const bool ms_input = translation_state.is_vulkan && translation_state.hints->ms_color_input;
+            spv::Id sample_id = spv::NoResult;
+            if (ms_input) {
+                b.addCapability(spv::CapabilitySampleRateShading);
+                sample_id = b.createVariable(spv::NoPrecision, spv::StorageClassInput, b.makeIntType(32), "gl_SampleID");
+                b.addDecoration(sample_id, spv::DecorationBuiltIn, spv::BuiltInSampleId);
+                translation_state.interfaces.push_back(sample_id);
+                sample_id = b.createLoad(sample_id, spv::NoPrecision);
+            }
+            const spv::Id image_type = b.makeImageType(f32, spv::DimSubpassData, false, false, ms_input, 2, spv::ImageFormatUnknown);
             const spv::Id last_frag_data = b.createVariable(precision, spv::StorageClassUniformConstant, image_type, "last_frag_data");
             b.addDecoration(last_frag_data, spv::DecorationInputAttachmentIndex, 0);
             if (translation_state.is_vulkan) {
@@ -910,9 +920,16 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
             spv::Id coord_0 = b.makeIntConstant(0);
             const spv::Id ivec2 = b.makeVectorType(b.makeIntType(32), 2);
             coord_0 = b.makeCompositeConstant(ivec2, { coord_0, coord_0 });
+            const auto read_subpass = [&](spv::Id result_type, spv::Id image_var) {
+                if (!ms_input)
+                    return b.createOp(spv::OpImageRead, result_type, { b.createLoad(image_var, spv::NoPrecision), coord_0 });
+                const std::vector<spv::IdImmediate> operands = { { true, b.createLoad(image_var, spv::NoPrecision) }, { true, coord_0 },
+                    { false, spv::ImageOperandsSampleMask }, { true, sample_id } };
+                return b.createOp(spv::OpImageRead, result_type, operands);
+            };
             if (translation_state.is_vulkan && translation_state.hints->raw_color_attachment_input) {
                 const spv::Id raw_component_type = b.makeUintType(32);
-                const spv::Id raw_image_type = b.makeImageType(raw_component_type, spv::DimSubpassData, false, false, false, 2, spv::ImageFormatUnknown);
+                const spv::Id raw_image_type = b.makeImageType(raw_component_type, spv::DimSubpassData, false, false, ms_input, 2, spv::ImageFormatUnknown);
                 const spv::Id last_frag_data_raw = b.createVariable(spv::NoPrecision, spv::StorageClassUniformConstant, raw_image_type, "last_frag_data_rawUI");
                 b.addDecoration(last_frag_data_raw, spv::DecorationInputAttachmentIndex, 1);
                 b.addDecoration(last_frag_data_raw, spv::DecorationBinding, 2);
@@ -922,19 +939,19 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
                 const spv::Id read_float_input = b.createBinOp(spv::OpFOrdLessThan, b.makeBoolType(), b.createLoad(use_raw_ptr, spv::NoPrecision), b.makeFloatConstant(0.5f));
                 spv::Builder::If raw_cond_builder(read_float_input, spv::SelectionControlMaskNone, b);
 
-                source = b.createOp(spv::OpImageRead, v4, { b.createLoad(last_frag_data, spv::NoPrecision), coord_0 });
+                source = read_subpass(v4, last_frag_data);
                 b.setPrecision(source, precision);
                 store_source_result();
 
                 raw_cond_builder.makeBeginElse();
-                source = b.createOp(spv::OpImageRead, b.makeVectorType(raw_component_type, 4), { b.createLoad(last_frag_data_raw, spv::NoPrecision), coord_0 });
+                source = read_subpass(b.makeVectorType(raw_component_type, 4), last_frag_data_raw);
                 target_to_store.type = DataType::UINT16;
                 store_source_result(true);
                 raw_cond_builder.makeEndIf();
 
                 source = spv::NoResult;
             } else {
-                source = b.createOp(spv::OpImageRead, v4, { b.createLoad(last_frag_data, spv::NoPrecision), coord_0 });
+                source = read_subpass(v4, last_frag_data);
                 b.setPrecision(source, precision);
             }
 

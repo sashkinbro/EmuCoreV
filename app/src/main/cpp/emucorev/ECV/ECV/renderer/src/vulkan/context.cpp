@@ -412,6 +412,15 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     context.dyn_pass.stencil_load = stencil_load;
     context.dyn_pass.guest_store = ds_surface_fin != nullptr && context.record.depth_stencil_surface.force_store;
     context.interlock_pass_active = false;
+    // B140: decide whether the scene is rasterised with real multisampling before the framebuffer is built
+    MsaaPlan msaa_plan;
+    context.ms_scene = MsaaScene{};
+    if (!restoring) {
+        msaa_plan = msaa::plan(context, *rt, restoring, color_surface_fin != nullptr, vk_format, color_has_raw, msaa_expanded,
+            ds_surface_fin, depth_load, context.record.depth_stencil_surface.force_load, context.record.depth_stencil_surface.force_store);
+        // a multisampled scene never reads the sample rate copy of the depth/stencil surface
+        state.surface_cache.msaa_skip_ds_resample = msaa_plan.use;
+    }
     // the pass pipelines and secondary command buffers are created against (any compatible variant)
     context.current_render_pass = state.use_dynamic_rendering ? vk::RenderPass{}
         : context.state.pipeline_cache.retrieve_render_pass(vk_format, true, true, true, color_surface_fin == nullptr, false, color_has_raw, context.ds_host_format);
@@ -443,6 +452,11 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
     context.current_color_raw_view = framebuffer.raw_image ? framebuffer.raw_image->view : state.default_raw_image.view;
     context.current_color_raw_image = framebuffer.raw_image;
     context.shell_fetch_snapshot = framebuffer.shell_fetch_snapshot.get();
+    state.surface_cache.msaa_skip_ds_resample = false;
+    if (msaa_plan.use)
+        msaa::activate(context, msaa_plan, context.current_color_view, context.current_ds_view, framebuffer.width, framebuffer.height);
+    else if (!restoring)
+        msaa::note_single_sample_scene(context, ds_surface_fin);
 
     // make sure we are not keeping any texture from the previous pass
     // (textures can be still bound even though they are not used)
@@ -690,10 +704,11 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
     // update descriptor set for the whole scene with the color attachment
     vk::DescriptorImageInfo descr_color_info{
         .sampler = nullptr,
-        .imageView = current_color_view,
+        .imageView = msaa::fetch_color_view(*this),
         .imageLayout = vk::ImageLayout::eGeneral,
     };
-    if (shell_fetch_snapshot)
+    // the SceShell glow reads a snapshot of a single sample attachment; a multisampled scene reads its multisampled attachment per sample
+    if (shell_fetch_snapshot && !ms_scene.active)
         descr_color_info.imageView = shell_fetch_snapshot->view;
 
     const vk::DescriptorType input_type = state.features.support_shader_interlock ? vk::DescriptorType::eStorageImage : vk::DescriptorType::eInputAttachment;
@@ -708,7 +723,7 @@ void VKContext::start_render_pass(bool create_descriptor_set) {
     if (state.features.preserve_f16_nan_as_u16) {
         vk::DescriptorImageInfo descr_raw_info{
             .sampler = nullptr,
-            .imageView = current_color_raw_view ? current_color_raw_view : state.default_raw_image.view,
+            .imageView = msaa::fetch_raw_view(*this) ? msaa::fetch_raw_view(*this) : state.default_raw_image.view,
             .imageLayout = vk::ImageLayout::eGeneral,
         };
         vk::WriteDescriptorSet write_raw_descr{
@@ -754,13 +769,14 @@ void VKContext::begin_deferred_pass() {
         inherit_rendering.pColorAttachmentFormats = color_formats.data();
         inherit_rendering.depthAttachmentFormat = vkutil::format_has_depth(ds_format) ? ds_format : vk::Format::eUndefined;
         inherit_rendering.stencilAttachmentFormat = vkutil::format_has_stencil(ds_format) ? ds_format : vk::Format::eUndefined;
-        inherit_rendering.rasterizationSamples = vk::SampleCountFlagBits::e1;
+        inherit_rendering.rasterizationSamples = ms_scene.active ? ms_scene.samples : vk::SampleCountFlagBits::e1;
         inherit.pNext = &inherit_rendering;
     } else {
         // any compatible pass: load/store ops and layouts do not take part in render pass compatibility
         inherit.renderPass = interlock_pass_active ? current_shader_interlock_pass : current_render_pass;
         inherit.subpass = 0;
-        inherit.framebuffer = interlock_pass_active ? current_shader_interlock_framebuffer : current_framebuffer;
+        // a multisampled instance creates its framebuffer when it is emitted (its depth/stencil image is chosen then)
+        inherit.framebuffer = ms_scene.active ? vk::Framebuffer{} : (interlock_pass_active ? current_shader_interlock_framebuffer : current_framebuffer);
     }
     const vk::CommandBufferBeginInfo begin_info{
         .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit | vk::CommandBufferUsageFlagBits::eRenderPassContinue,
@@ -786,10 +802,15 @@ void VKContext::begin_deferred_pass() {
     refresh_pipeline = true;
     current_pipeline = nullptr;
     split_pipeline = nullptr;
+    // B140: the first draw of a multisampled instance copies the surface into every sample
+    msaa::begin_instance(*this);
 }
 
 void VKContext::emit_pass(bool scene_end) {
     namespace sync = vkutil::sync;
+    // B140: the surface the instance's seed samples is copied just before the instance (outside a render pass)
+    if (ms_scene.active)
+        msaa::record_copies(*this);
     // ---- the final ops of this instance ----
     const bool store = derive_depth_store({ inst_pass.guest_store, !scene_depth_unbacked, !scene_end });
     if (!store)
@@ -816,7 +837,8 @@ void VKContext::emit_pass(bool scene_end) {
     if (ds_choice == sync::LoadChoice::Clear)
         ds_clear = vk::ClearDepthStencilValue{ ds_cleared.depth, ds_cleared.stencil };
     const bool ds_discard = ds_choice == sync::LoadChoice::DontCare;
-    const bool ds_loaded = (depth_load || stencil_load) && ds_choice == sync::LoadChoice::Load;
+    // a multisampled instance resolves into the single sample depth/stencil (content outside the render area survives): tracked as kept
+    const bool ds_loaded = ms_scene.active || ((depth_load || stencil_load) && ds_choice == sync::LoadChoice::Load);
     if (ds_choice != sync::LoadChoice::Load)
         depth_load = stencil_load = false; // CLEAR (VkRenderPass: the variant that clears) / DONT_CARE (dynamic rendering, below)
 
@@ -867,14 +889,18 @@ void VKContext::emit_pass(bool scene_end) {
             vkutil::aspect_clamped_range(current_ds_image ? current_ds_image->format : vk::Format::eUndefined, vkutil::ds_subresource_range));
         pass_batch.flush(render_cmd);
 
-        std::array<vk::ClearValue, 3> clear_values{};
-        clear_values[1].depthStencil = ds_clear;
-        clear_values[2].depthStencil = ds_clear;
-        vk::RenderPassBeginInfo info{ .renderPass = pass, .framebuffer = framebuffer, .renderArea = pass_area };
-        info.setClearValues(clear_values);
-        render_cmd.beginRenderPass(info, vk::SubpassContents::eSecondaryCommandBuffers);
-        render_cmd.executeCommands(pass_secondary);
-        render_cmd.endRenderPass();
+        if (ms_scene.active) {
+            msaa::record_render_pass(*this, MsaaInstance{ !scene_end, inst_pass.guest_store, ds_clear, pass_area });
+        } else {
+            std::array<vk::ClearValue, 3> clear_values{};
+            clear_values[1].depthStencil = ds_clear;
+            clear_values[2].depthStencil = ds_clear;
+            vk::RenderPassBeginInfo info{ .renderPass = pass, .framebuffer = framebuffer, .renderArea = pass_area };
+            info.setClearValues(clear_values);
+            render_cmd.beginRenderPass(info, vk::SubpassContents::eSecondaryCommandBuffers);
+            render_cmd.executeCommands(pass_secondary);
+            render_cmd.endRenderPass();
+        }
 
         // sync tracker: what the pass wrote and what its outgoing dependency made visible
         if (current_color_base_image && current_color_base_image->image)
@@ -914,9 +940,9 @@ void VKContext::emit_pass(bool scene_end) {
         }
         batch.use_image(img->sync, img->image, range, stages, access, layout, !loaded);
     };
-    prepare(current_color_base_image, color_stages, color_access, vk::ImageLayout::eGeneral, color_choice == sync::LoadChoice::Load, vkutil::color_subresource_range);
+    prepare(current_color_base_image, color_stages, color_access, vk::ImageLayout::eGeneral, ms_scene.active || color_choice == sync::LoadChoice::Load, vkutil::color_subresource_range);
     if (inst_pass.has_raw)
-        prepare(current_color_raw_image, color_stages, color_access, vk::ImageLayout::eGeneral, raw_choice == sync::LoadChoice::Load, vkutil::color_subresource_range);
+        prepare(current_color_raw_image, color_stages, color_access, vk::ImageLayout::eGeneral, ms_scene.active || raw_choice == sync::LoadChoice::Load, vkutil::color_subresource_range);
     const vk::Format ds_format = current_ds_image ? current_ds_image->format : vk::Format::eUndefined;
     const bool ds_has_stencil = vkutil::format_has_stencil(ds_format);
     const bool ds_has_depth = vkutil::format_has_depth(ds_format);
@@ -972,9 +998,13 @@ void VKContext::emit_pass(bool scene_end) {
         .pDepthAttachment = ds_has_depth ? &depth : nullptr,
         .pStencilAttachment = ds_has_stencil ? &stencil : nullptr,
     };
-    render_cmd.beginRenderingKHR(rendering);
-    render_cmd.executeCommands(pass_secondary);
-    render_cmd.endRenderingKHR();
+    if (ms_scene.active) {
+        msaa::record_rendering(*this, MsaaInstance{ !scene_end, inst_pass.guest_store, ds_clear, pass_area });
+    } else {
+        render_cmd.beginRenderingKHR(rendering);
+        render_cmd.executeCommands(pass_secondary);
+        render_cmd.endRenderingKHR();
+    }
 
     const sync::Stage sampled = sync::S::eVertexShader | sync::S::eFragmentShader | sync::S::eTransfer;
     const sync::Access readable = sync::A::eShaderRead | sync::A::eTransferRead | sync::A::eInputAttachmentRead;
@@ -1361,6 +1391,7 @@ void new_frame(VKContext &context) {
         frame.frag_descriptors[i].descriptors_idx = 0;
     }
     frame.color_descriptor.descriptors_idx = 0;
+    msaa::begin_frame(context.state, static_cast<int>(&frame - context.state.frames.data()));
 
     // deferred destruction of the objects
     frame.destroy_queue.destroy_objects();

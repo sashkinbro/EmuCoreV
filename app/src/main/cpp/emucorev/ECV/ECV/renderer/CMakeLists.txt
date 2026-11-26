@@ -22,6 +22,7 @@ add_library(
 	src/vulkan/creation.cpp
 	src/vulkan/gpu_caps.cpp
 	src/vulkan/gxm_to_vulkan.cpp
+	src/vulkan/msaa.cpp
 	src/vulkan/pipeline_cache.cpp
 	src/vulkan/renderer.cpp
 	src/vulkan/scene.cpp

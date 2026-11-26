@@ -86,6 +86,8 @@ struct State {
     Backend current_backend;
     FeatureState features;
     float res_multiplier;
+    // see CurrentConfig::msaa_samples_override
+    int msaa_samples_override = 0;
     bool disable_surface_sync;
     bool stretch_the_display_area;
     bool fullscreen_hd_res_pixel_perfect;

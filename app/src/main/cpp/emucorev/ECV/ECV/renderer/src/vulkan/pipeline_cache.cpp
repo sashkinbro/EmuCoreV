@@ -89,6 +89,8 @@ struct CompileRequest {
     shader::Hints hints;
     PipelineDsInfo ds;
     dsmodel::PassVariant variant;
+    // sample count of the render pass the pipeline is built for (B140)
+    vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1;
 
     // Compilation also reads color_surface beyond the hashed fixed-state prefix.
     // Own the full value while the rendering thread advances its live record.
@@ -959,7 +961,7 @@ void PipelineCache::compiler_thread(MemState &mem) {
             // use this as an instruction to stop the thread
             break;
 
-        vk::Pipeline pipeline = compile_pipeline(request->type, request->render_pass, *request->vertex_program_gxm, *request->fragment_program_gxm, request->vertex_source, request->fragment_source, *request->get_record(), request->hints, mem, request->ds, request->variant);
+        vk::Pipeline pipeline = compile_pipeline(request->type, request->render_pass, *request->vertex_program_gxm, *request->fragment_program_gxm, request->vertex_source, request->fragment_source, *request->get_record(), request->hints, mem, request->ds, request->variant, request->samples);
         // mark a refused pipeline as failed rather than leaving it null, which would make every
         // later draw queue the same doomed compilation again
         *request->pipeline = pipeline ? pipeline : kPipelineFailed;
@@ -986,7 +988,7 @@ static vk::StencilOpState convert_op_state(const GxmStencilStateOp &state) {
     };
 }
 
-vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem, const PipelineDsInfo &ds, dsmodel::PassVariant variant) {
+vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem, const PipelineDsInfo &ds, dsmodel::PassVariant variant, vk::SampleCountFlagBits samples) {
     const VertexProgram &vertex_program = *vertex_program_gxm.renderer_data;
     const SceGxmProgram *gxm_fragment_shader = fragment_source.get();
     const VKFragmentProgram &fragment_program = *reinterpret_cast<VKFragmentProgram *>(
@@ -1003,6 +1005,9 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
     // draw() computes this from the paired GXP before queuing a pipeline.
     // Include it in both shader cache identities so async and disk caches agree.
     fragment_hints.vertex_output_mask = vertex_program.varying_location_mask;
+    // B140: a fetching shader of a multisampled scene reads its (multisampled) input attachment at gl_SampleID
+    const bool multisampled = samples != vk::SampleCountFlagBits::e1;
+    fragment_hints.ms_color_input = multisampled && state.features.direct_fragcolor && gxm_fragment_shader->is_frag_color_used();
 
     const vk::PipelineShaderStageCreateInfo vertex_shader = retrieve_shader(vertex_source.get(), vertex_program.hash, true, fragment_program_gxm.is_maskupdate, mem, hints);
     const vk::PipelineShaderStageCreateInfo fragment_shader = retrieve_shader(gxm_fragment_shader, fragment_program.hash, false, fragment_program_gxm.is_maskupdate, mem, fragment_hints, record.is_gamma_corrected);
@@ -1047,8 +1052,11 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         .depthBiasEnable = VK_TRUE,
         .lineWidth = 1.0f
     };
+    // a fetching shader of a multisampled scene runs once per sample (it reads the multisampled input attachment at gl_SampleID)
     const vk::PipelineMultisampleStateCreateInfo multisampling{
-        .rasterizationSamples = vk::SampleCountFlagBits::e1
+        .rasterizationSamples = samples,
+        .sampleShadingEnable = fragment_hints.ms_color_input ? VK_TRUE : VK_FALSE,
+        .minSampleShading = fragment_hints.ms_color_input ? 1.0f : 0.0f
     };
     // depth and stencil tests are always enabled on the ps vita as there is almost no cost in doing so
     // on a tiled renderer. The tests are only off when the host format has no such aspect (device without a stencil format).
@@ -1203,6 +1211,10 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
     const PipelineDsInfo ds_info{ context.ds_host_format, context.ds_depth_test, context.ds_stencil_test };
     key ^= (static_cast<uint64_t>(ds_info.format) * 0x9E3779B97F4A7C15ull) ^ (static_cast<uint64_t>(ds_info.depth_test) << 1) ^ (static_cast<uint64_t>(ds_info.stencil_test) << 2)
         ^ (static_cast<uint64_t>(variant) * 0xC2B2AE3D27D4EB4Full);
+    // B140: the sample count of the render pass the pipeline is used in
+    const vk::SampleCountFlagBits samples = context.ms_scene.active ? context.ms_scene.samples : vk::SampleCountFlagBits::e1;
+    if (samples != vk::SampleCountFlagBits::e1)
+        key ^= 0x9E3779B97F4A7C15ull * static_cast<uint64_t>(samples);
 
     // if the pipeline is in the pipeline cache, we can expect its creation time to be almost instantaneous
     bool already_in_cache = false;
@@ -1258,6 +1270,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
             .hints = context.shader_hints,
             .ds = ds_info,
             .variant = variant,
+            .samples = samples,
             .record = record
         };
         it->second = kPipelineCompiling;
@@ -1271,7 +1284,7 @@ vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiv
         return nullptr;
     } else {
         // can't wait, compile it right now
-        vk::Pipeline result = compile_pipeline(type, render_pass, vertex_program_gxm, fragment_program_gxm, vertex_source, fragment_source, record, context.shader_hints, mem, ds_info, variant);
+        vk::Pipeline result = compile_pipeline(type, render_pass, vertex_program_gxm, fragment_program_gxm, vertex_source, fragment_source, record, context.shader_hints, mem, ds_info, variant, samples);
 
         const auto time_s = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         next_pipeline_cache_save = time_s + pipeline_cache_save_delay;

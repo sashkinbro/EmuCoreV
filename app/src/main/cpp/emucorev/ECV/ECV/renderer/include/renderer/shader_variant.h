@@ -87,6 +87,9 @@ inline std::vector<uint8_t> vulkan_shader_variant_key_bytes(bool is_vertex, cons
         put(static_cast<uint32_t>(hints.color_format), 4);
         put(hints.raw_color_attachment_input ? 1 : 0, 1);
         put(hints.vertex_output_mask, 4);
+        // only a multisampled fetch variant carries this byte: the identity of every other shader module is unchanged
+        if (hints.ms_color_input)
+            put(0x4D, 1);
     }
     return bytes;
 }

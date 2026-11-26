@@ -532,6 +532,15 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
 
     context.check_for_macroblock_change(true);
 
+    // B140 test hook (debug builds): end the multisampled pass instance before its 4th draw so the restart path runs
+    if (context.in_renderpass && msaa::debug_force_restart(context)) {
+        const auto scene_dyn_pass = context.dyn_pass;
+        context.dyn_pass.depth_load = context.dyn_pass.stencil_load = true;
+        context.stop_render_pass();
+        context.start_render_pass();
+        context.dyn_pass = scene_dyn_pass;
+    }
+
     if (!context.in_renderpass)
         context.start_render_pass();
 
@@ -557,7 +566,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
             return;
     }
 #endif
-    if (context.shell_fetch_snapshot && fragment_program_gxp.is_frag_color_used()) {
+    if (context.shell_fetch_snapshot && !context.ms_scene.active && fragment_program_gxp.is_frag_color_used()) {
 #if ECV_ORACLE
     ecv::oracle::gpu::rp_reason("shell_fetch_snapshot");
 #endif
@@ -625,9 +634,10 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
                 sync::A::eInputAttachmentRead, vk::ImageLayout::eGeneral, vk::ImageLayout::eGeneral, true };
             sync::Batch batch;
             batch.set_by_region(true);
-            batch.explicit_image(context.current_color_base_image->image, vkutil::color_subresource_range, self_dep);
-            if (context.current_color_raw_image)
-                batch.explicit_image(context.current_color_raw_image->image, vkutil::color_subresource_range, self_dep);
+            const bool ms = context.ms_scene.active;
+            batch.explicit_image(ms ? context.ms_scene.color_ms->image : context.current_color_base_image->image, vkutil::color_subresource_range, self_dep);
+            if (ms ? context.ms_scene.raw_ms != nullptr : context.current_color_raw_image != nullptr)
+                batch.explicit_image(ms ? context.ms_scene.raw_ms->image : context.current_color_raw_image->image, vkutil::color_subresource_range, self_dep);
 #if ECV_ORACLE
             if (ecv::oracle::gpu::dbg(ecv::oracle::gpu::DBG_FB_NOBARRIER)) {
                 // debug A/B: no barrier at all (batch dropped)

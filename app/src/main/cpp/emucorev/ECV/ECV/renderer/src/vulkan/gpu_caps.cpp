@@ -27,6 +27,7 @@ GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::Extensio
     c.identity.vendor_id = props.vendorID;
     c.identity.driver_version = props.driverVersion;
     const auto &lim = props.limits;
+    c.sample_rate_shading = static_cast<bool>(device.getFeatures().sampleRateShading);
     c.framebuffer_color_sample_counts = static_cast<uint32_t>(static_cast<VkSampleCountFlags>(lim.framebufferColorSampleCounts));
     c.framebuffer_depth_sample_counts = static_cast<uint32_t>(static_cast<VkSampleCountFlags>(lim.framebufferDepthSampleCounts));
     c.framebuffer_stencil_sample_counts = static_cast<uint32_t>(static_cast<VkSampleCountFlags>(lim.framebufferStencilSampleCounts));

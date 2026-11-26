@@ -22,6 +22,7 @@
 
 #include <renderer/vulkan/depth_stencil_model.h>
 #include <renderer/vulkan/gpu_caps.h>
+#include <renderer/vulkan/msaa.h>
 #include <renderer/vulkan/overlay_renderer.h>
 #include <renderer/vulkan/pipeline_cache.h>
 #include <renderer/vulkan/sampler_support.h>
@@ -62,6 +63,7 @@ struct VKState : public renderer::State {
     int gpu_idx;
 
     VKSurfaceCache surface_cache;
+    MsaaState msaa_state;
     PipelineCache pipeline_cache;
     VKTextureCache texture_cache;
 

@@ -18,6 +18,7 @@
 #pragma once
 
 #include <renderer/texture_cache.h>
+#include <renderer/vulkan/msaa.h>
 
 #include <renderer/types.h>
 #include <renderer/vulkan/depth_stencil_model.h>
@@ -337,6 +338,8 @@ struct VKContext : public renderer::Context {
     SceGxmPrimitiveType last_primitive;
 
     vk::RenderPass current_render_pass;
+    // multisampling of the current scene (B140)
+    MsaaScene ms_scene;
     vk::RenderPass current_shader_interlock_pass = nullptr;
     vk::Pipeline current_pipeline;
     // second pipeline of a draw split by facing (see dsmodel::FacePlan), null when the draw is a single pass

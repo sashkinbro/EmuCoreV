@@ -1771,6 +1771,28 @@ void VKSurfaceCache::resolve_ds_scene_end(bool scene_wrote_depth) {
     pending_ds_scene_stores = false;
 }
 
+DepthStencilSurfaceCacheInfo *VKSurfaceCache::find_depth_stencil_entry(const SceGxmDepthStencilSurface &depth_stencil, uint32_t width, uint32_t height, bool &would_remake) const {
+    would_remake = false;
+    DepthStencilSurfaceCacheInfo *cached_info = nullptr;
+    if (depth_stencil.depth_data) {
+        auto it = depth_address_lookup.find(depth_stencil.depth_data.address());
+        if (it != depth_address_lookup.end())
+            cached_info = it->second;
+    } else if (depth_stencil.stencil_data) {
+        auto it = stencil_address_lookup.find(depth_stencil.stencil_data.address());
+        if (it != stencil_address_lookup.end())
+            cached_info = it->second;
+    }
+    if (cached_info == nullptr)
+        return nullptr;
+
+    // same test as retrieve_depth_stencil_for_framebuffer
+    const SurfaceTiling tiling = (depth_stencil.get_type() == SCE_GXM_DEPTH_STENCIL_SURFACE_LINEAR) ? SurfaceTiling::Linear : SurfaceTiling::Tiled;
+    would_remake = cached_info->texture.width < width || cached_info->texture.height < height
+        || cached_info->stride_samples != depth_stencil.get_stride() || cached_info->tiling != tiling;
+    return cached_info;
+}
+
 SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(SceGxmDepthStencilSurface *depth_stencil, const uint32_t width, const uint32_t height) {
     // when writing we use the render target size which is already upscaled
     int32_t memory_width = static_cast<int32_t>(width / state.res_multiplier);
@@ -1817,7 +1839,7 @@ SurfaceRetrieveResult VKSurfaceCache::retrieve_depth_stencil_for_framebuffer(Sce
 
             VKContext *ctx = reinterpret_cast<VKContext *>(state.context);
             uint32_t sx = 1, sy = 1;
-            if (!disable_ds_resample
+            if (!disable_ds_resample && !msaa_skip_ds_resample
                 && target->multisample_mode != SCE_GXM_MULTISAMPLE_NONE && ctx && ctx->record.color_surface.downscale
                 && !depth_stencil->force_store) {
                 sy = 2;
