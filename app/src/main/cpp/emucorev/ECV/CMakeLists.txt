@@ -120,6 +120,8 @@ if (NOT (USE_LTO STREQUAL "NEVER"))
 			set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 		elseif (USE_LTO STREQUAL "RELEASE_ONLY")
 			set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+			# The Android release ships as RelWithDebInfo (symbols for Play): give it LTO too.
+			set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 		endif()
 	else()
 		message(STATUS "IPO / LTO not supported: <${ipo_supported_error}>")
