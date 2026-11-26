@@ -19,6 +19,7 @@
 #include <renderer/vulkan/functions.h>
 
 #include <algorithm>
+#include <xxhash.h>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -350,6 +351,7 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
 
     int max_stream_idx = -1;
     std::array<std::vector<VertexAttributeRange>, SCE_GXM_MAX_VERTEX_STREAMS> stream_attribute_ranges;
+    std::array<std::vector<VertexFetchAttribute>, SCE_GXM_MAX_VERTEX_STREAMS> fetch_attributes;
 
     for (const SceGxmVertexAttribute &attribute : vertex_program.attributes) {
         if (!vkvert->attribute_infos.contains(attribute.regIndex))
@@ -358,8 +360,13 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
         stream_attribute_ranges[attribute.streamIndex].push_back({
             attribute.offset,
             gxm::attribute_format_size(static_cast<SceGxmAttributeFormat>(attribute.format)) * attribute.componentCount });
+        const uint32_t component_size = gxm::attribute_format_size(static_cast<SceGxmAttributeFormat>(attribute.format));
+        fetch_attributes[attribute.streamIndex].push_back({ attribute.offset, component_size * attribute.componentCount, component_size });
     }
     max_stream_idx++;
+    std::array<RealignedVertexLayout, SCE_GXM_MAX_VERTEX_STREAMS> realigned;
+    for (int i = 0; i < max_stream_idx; i++)
+        realigned[i] = make_realigned_vertex_layout(vertex_program.streams[i].stride, fetch_attributes[i]);
 
     if (context.state.mapping_method == MappingMethod::DoubleBuffer) {
         for (int i = 0; i < max_stream_idx; i++)
@@ -405,18 +412,23 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
     std::array<size_t, SCE_GXM_MAX_VERTEX_STREAMS> batch_stream_sizes{};
     size_t batch_stream_count = 0;
     for (int i = 0; i < max_stream_idx; i++) {
-        if (!state.vertex_streams[i].data || mapped)
+        if (!state.vertex_streams[i].data || (mapped && !realigned[i].needed))
             continue;
 
         const uint32_t stride = vertex_program.streams[i].stride;
-        restride_streams[i] = should_restride_vertex_stream(mapped, stride, stream_attribute_ranges[i]);
-        const size_t upload_size = restride_streams[i]
+        restride_streams[i] = !realigned[i].needed && should_restride_vertex_stream(mapped, stride, stream_attribute_ranges[i]);
+        const size_t upload_size = realigned[i].needed
+            ? realigned_vertex_stream_size(state.vertex_streams[i].size, stride, realigned[i])
+            : restride_streams[i]
             ? restrided_vertex_stream_size(state.vertex_streams[i].size, stride)
             : state.vertex_streams[i].size;
         batch_stream_sizes[batch_stream_count++] = upload_size;
     }
 
-    if (!mapped && !vertex_stream_batch_fits(
+    // memory mapping normally uploads no vertex data: create the ring on the first stream that has to be repacked
+    if (batch_stream_count > 0 && !context.vertex_stream_ring_buffer.handle())
+        context.vertex_stream_ring_buffer.create();
+    if (batch_stream_count > 0 && !vertex_stream_batch_fits(
                        context.vertex_stream_ring_buffer.cursor_bytes(),
                        context.vertex_stream_ring_buffer.capacity_bytes(),
                        context.vertex_stream_ring_buffer.alignment,
@@ -428,11 +440,34 @@ static bool bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
     for (int i = 0; i < max_stream_idx; i++) {
         if (state.vertex_streams[i].data) {
             const uint32_t stride = vertex_program.streams[i].stride;
-            if (mapped) {
+            if (mapped && !realigned[i].needed) {
                 auto [buffer, offset] = context.state.get_matching_mapping(state.vertex_streams[i].data.cast<void>());
 
                 context.vertex_stream_offsets[i] = offset;
                 context.vertex_stream_buffers[i] = buffer;
+            } else if (realigned[i].needed) {
+                // repack to an aligned layout (see vertex_stream.h); unchanged streams reuse the copy already in the ring
+                const uint8_t *source = state.vertex_streams[i].data.get(mem);
+                const uint32_t source_size = static_cast<uint32_t>(state.vertex_streams[i].size);
+                const uint32_t packed_size = static_cast<uint32_t>(realigned_vertex_stream_size(source_size, stride, realigned[i]));
+                struct { uint32_t stride, new_stride; } layout_header{ stride, realigned[i].stride };
+                const uint64_t layout_id = XXH3_64bits(fetch_attributes[i].data(), fetch_attributes[i].size() * sizeof(VertexFetchAttribute))
+                    ^ XXH3_64bits(&layout_header, sizeof(layout_header));
+                const uint32_t guest_address = state.vertex_streams[i].data.address();
+                RealignedStreamCache::Entry &entry = context.realigned_stream_cache.entries[RealignedStreamCache::slot(guest_address, source_size, layout_id)];
+                const uint64_t hash = XXH3_64bits(source, source_size);
+                auto &ring = context.vertex_stream_ring_buffer;
+                if (entry.valid && entry.guest_address == guest_address && entry.size == source_size && entry.layout_id == layout_id && entry.hash == hash
+                    && RealignedStreamCache::ring_intact(entry, packed_size, ring.wrap_count(), ring.cursor_bytes())) {
+                    context.vertex_stream_offsets[i] = entry.ring_offset;
+                } else {
+                    ring.allocate(packed_size);
+                    realign_vertex_stream_into(std::span<const uint8_t>(source, source_size), stride, fetch_attributes[i], realigned[i], ring.write_ptr());
+                    ring.flush_written(packed_size);
+                    entry = { true, guest_address, source_size, layout_id, hash, ring.wrap_count(), ring.data_offset };
+                    context.vertex_stream_offsets[i] = ring.data_offset;
+                }
+                context.vertex_stream_buffers[i] = ring.handle();
             } else {
                 const uint8_t *stream = state.vertex_streams[i].data.get(mem);
                 uint32_t stream_size = state.vertex_streams[i].size;

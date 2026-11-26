@@ -6,6 +6,7 @@
 #include <renderer/vulkan/vertex_stream.h>
 
 #include <array>
+#include <span>
 #include <cstddef>
 #include <cstring>
 #include <vector>
@@ -110,6 +111,111 @@ TEST(GxmVertexStream, AllStreamsInOneDrawMustNotWrapOverEarlierStreams) {
     EXPECT_FALSE(renderer::vulkan::vertex_stream_batch_fits(0, ring_capacity, alignment, two_40_mib_streams));
     EXPECT_FALSE(renderer::vulkan::vertex_stream_batch_fits(ring_capacity - 16, ring_capacity, alignment, wrap_and_overlap));
     EXPECT_TRUE(renderer::vulkan::vertex_stream_batch_fits(0, ring_capacity, alignment, std::span<const size_t>(two_40_mib_streams).first(1)));
+}
+
+// Vulkan wants every attribute address (stride * vertex + attribute offset) aligned to its component size. Vita streams are not
+// (stride 19/31/35 with F16 at odd offsets); Mali-G57 then fetches garbage, so such streams are repacked.
+namespace {
+using renderer::vulkan::RealignedStreamCache;
+using renderer::vulkan::VertexFetchAttribute;
+using renderer::vulkan::make_realigned_vertex_layout;
+} // namespace
+
+TEST(GxmVertexRealign, GodOfWarStrideNineteenMovesTheOddF16Attributes) {
+    // stream 1 of the GoW title background: F16x4 @3, F16x2 @11, U8x4 @15, stride 19
+    const std::array<VertexFetchAttribute, 3> attributes = { VertexFetchAttribute{ 3, 8, 2 }, VertexFetchAttribute{ 11, 4, 2 }, VertexFetchAttribute{ 15, 4, 1 } };
+    const auto layout = make_realigned_vertex_layout(19, attributes);
+
+    ASSERT_TRUE(layout.needed);
+    EXPECT_EQ(layout.stride, 32u);
+    EXPECT_EQ(layout.offsets, (std::vector<uint32_t>{ 20, 28, 15 }));
+}
+
+TEST(GxmVertexRealign, DeadOrAliveStrideThirtyFiveSkinnedMesh) {
+    // F32x3 @0, F16x4 @23, F16x2 @31, S8Nx3 @12, U8Nx4 @15, U8x4 @19, stride 35
+    const std::array<VertexFetchAttribute, 6> attributes = {
+        VertexFetchAttribute{ 0, 12, 4 }, VertexFetchAttribute{ 23, 8, 2 }, VertexFetchAttribute{ 31, 4, 2 },
+        VertexFetchAttribute{ 12, 3, 1 }, VertexFetchAttribute{ 15, 4, 1 }, VertexFetchAttribute{ 19, 4, 1 }
+    };
+    const auto layout = make_realigned_vertex_layout(35, attributes);
+
+    ASSERT_TRUE(layout.needed);
+    // the vertex is padded to 36; the F32 position (stride is the problem, not its offset) and the byte attributes stay put
+    EXPECT_EQ(layout.stride, 48u);
+    EXPECT_EQ(layout.offsets, (std::vector<uint32_t>{ 0, 36, 44, 12, 15, 19 }));
+}
+
+TEST(GxmVertexRealign, StrideThirtyOneWithF16AndBytes) {
+    const std::array<VertexFetchAttribute, 3> attributes = { VertexFetchAttribute{ 3, 8, 2 }, VertexFetchAttribute{ 27, 4, 1 }, VertexFetchAttribute{ 19, 4, 2 } };
+    const auto layout = make_realigned_vertex_layout(31, attributes);
+
+    ASSERT_TRUE(layout.needed);
+    EXPECT_EQ(layout.stride, 44u);
+    EXPECT_EQ(layout.offsets, (std::vector<uint32_t>{ 32, 27, 40 }));
+}
+
+TEST(GxmVertexRealign, AlignedStreamsAreLeftAlone) {
+    // F32x4 @0 + F16x2 @12, stride 16; U16x3 @0 stride 6; U8 only at any stride; empty/zero stride
+    EXPECT_FALSE(make_realigned_vertex_layout(16, std::array<VertexFetchAttribute, 2>{ VertexFetchAttribute{ 0, 16, 4 }, VertexFetchAttribute{ 12, 4, 2 } }).needed);
+    EXPECT_FALSE(make_realigned_vertex_layout(6, std::array<VertexFetchAttribute, 1>{ VertexFetchAttribute{ 0, 6, 2 } }).needed);
+    EXPECT_FALSE(make_realigned_vertex_layout(31, std::array<VertexFetchAttribute, 2>{ VertexFetchAttribute{ 0, 4, 1 }, VertexFetchAttribute{ 27, 4, 1 } }).needed);
+    EXPECT_FALSE(make_realigned_vertex_layout(0, std::array<VertexFetchAttribute, 1>{ VertexFetchAttribute{ 1, 4, 4 } }).needed);
+    EXPECT_FALSE(make_realigned_vertex_layout(20, std::span<const VertexFetchAttribute>{}).needed);
+}
+
+TEST(GxmVertexRealign, EveryComponentSizeTriggersOnlyWhenMisaligned) {
+    // component size 2: odd stride or odd offset; 4: stride or offset not a multiple of 4
+    EXPECT_TRUE(make_realigned_vertex_layout(7, std::array<VertexFetchAttribute, 1>{ VertexFetchAttribute{ 0, 2, 2 } }).needed);
+    EXPECT_TRUE(make_realigned_vertex_layout(8, std::array<VertexFetchAttribute, 1>{ VertexFetchAttribute{ 1, 2, 2 } }).needed);
+    EXPECT_FALSE(make_realigned_vertex_layout(8, std::array<VertexFetchAttribute, 1>{ VertexFetchAttribute{ 2, 2, 2 } }).needed);
+    EXPECT_TRUE(make_realigned_vertex_layout(10, std::array<VertexFetchAttribute, 1>{ VertexFetchAttribute{ 0, 4, 4 } }).needed);
+    EXPECT_TRUE(make_realigned_vertex_layout(12, std::array<VertexFetchAttribute, 1>{ VertexFetchAttribute{ 2, 4, 4 } }).needed);
+    EXPECT_FALSE(make_realigned_vertex_layout(12, std::array<VertexFetchAttribute, 1>{ VertexFetchAttribute{ 4, 4, 4 } }).needed);
+}
+
+TEST(GxmVertexRealign, MatrixAttributeKeepsItsWholeSpan) {
+    // a 4x4 F32 matrix attribute (64 bytes) at offset 2 of a 66 byte vertex is moved as one block
+    const std::array<VertexFetchAttribute, 1> attributes = { VertexFetchAttribute{ 2, 64, 4 } };
+    const auto layout = make_realigned_vertex_layout(66, attributes);
+
+    ASSERT_TRUE(layout.needed);
+    EXPECT_EQ(layout.offsets, (std::vector<uint32_t>{ 68 }));
+    EXPECT_EQ(layout.stride, 132u);
+}
+
+TEST(GxmVertexRealign, RepackedBytesMatchTheLayoutIncludingAPartialLastVertex) {
+    // stride 7: one U8 byte, then F16 @1 (4 bytes) and a U8 @5; 2 full vertices + a 3 byte tail
+    const std::array<VertexFetchAttribute, 2> attributes = { VertexFetchAttribute{ 1, 4, 2 }, VertexFetchAttribute{ 5, 2, 1 } };
+    const auto layout = make_realigned_vertex_layout(7, attributes);
+    ASSERT_TRUE(layout.needed);
+    ASSERT_EQ(layout.stride, 12u); // 8 (padded vertex) + 4 (the F16 pair)
+    EXPECT_EQ(layout.offsets, (std::vector<uint32_t>{ 8, 5 }));
+
+    std::vector<uint8_t> stream(7 * 2 + 3);
+    for (size_t i = 0; i < stream.size(); i++)
+        stream[i] = static_cast<uint8_t>(i + 1);
+    const std::vector<uint8_t> repacked = renderer::vulkan::realign_vertex_stream(stream, 7, attributes, layout);
+
+    ASSERT_EQ(repacked.size(), 3u * 12u);
+    ASSERT_EQ(repacked.size(), renderer::vulkan::realigned_vertex_stream_size(stream.size(), 7, layout));
+    // vertex 0: original 7 bytes, padding, F16 pair copied from bytes 1..4
+    EXPECT_EQ((std::vector<uint8_t>(repacked.begin(), repacked.begin() + 12)), (std::vector<uint8_t>{ 1, 2, 3, 4, 5, 6, 7, 0, 2, 3, 4, 5 }));
+    // vertex 1 starts at source byte 7
+    EXPECT_EQ((std::vector<uint8_t>(repacked.begin() + 12, repacked.begin() + 24)), (std::vector<uint8_t>{ 8, 9, 10, 11, 12, 13, 14, 0, 9, 10, 11, 12 }));
+    // the 3 byte tail: only the bytes that exist are copied, the rest is zero
+    EXPECT_EQ((std::vector<uint8_t>(repacked.begin() + 24, repacked.end())), (std::vector<uint8_t>{ 15, 16, 17, 0, 0, 0, 0, 0, 16, 17, 0, 0 }));
+}
+
+TEST(GxmVertexRealign, CachedCopyIsReusedOnlyWhileTheRingKeepsIt) {
+    RealignedStreamCache::Entry entry;
+    entry.valid = true;
+    entry.wrap_count = 3;
+    entry.ring_offset = 1000;
+
+    EXPECT_TRUE(RealignedStreamCache::ring_intact(entry, 500, 3, 2000)); // same lap
+    EXPECT_TRUE(RealignedStreamCache::ring_intact(entry, 500, 4, 900)); // wrapped, new data stops before the copy
+    EXPECT_FALSE(RealignedStreamCache::ring_intact(entry, 500, 4, 1200)); // the new lap reached the copy
+    EXPECT_FALSE(RealignedStreamCache::ring_intact(entry, 500, 5, 0)); // two laps later
 }
 
 TEST(GxmSurfaceSync, PartialWritebackIntersectsCurrentSceneWithBoundedSyncRect) {

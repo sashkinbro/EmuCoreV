@@ -28,6 +28,7 @@
 #include <shader/uniform_block.h>
 #include <renderer/vulkan/frame_command_buffer_cursor.h>
 #include <renderer/vulkan/yuv_convert.h>
+#include <renderer/vulkan/vertex_stream.h>
 #include <unordered_map>
 #include <vkutil/objects.h>
 
@@ -302,6 +303,8 @@ struct VKContext : public renderer::Context {
     vkutil::Image *shell_fetch_snapshot = nullptr;
 
     vkutil::HostRingBuffer vertex_stream_ring_buffer;
+    // repacked (realigned) vertex streams that are still intact in the ring, see vertex_stream.h
+    RealignedStreamCache realigned_stream_cache;
     vkutil::HostRingBuffer index_stream_ring_buffer;
     vkutil::HostRingBuffer vertex_uniform_stream_ring_buffer;
     vkutil::HostRingBuffer fragment_uniform_stream_ring_buffer;

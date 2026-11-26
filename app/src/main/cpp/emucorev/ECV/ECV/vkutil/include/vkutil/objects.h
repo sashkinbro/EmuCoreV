@@ -192,6 +192,12 @@ public:
 
     // reads `size` bytes at an absolute buffer offset (what a shader wrote there); only valid once the GPU work that wrote them has completed
     void read_back(const uint32_t absolute_offset, const uint32_t size, void *dst);
+
+    // write straight into the last allocation (no intermediate copy), then call flush_written
+    uint8_t *write_ptr() const {
+        return static_cast<uint8_t *>(buffer.mapped_data) + data_offset;
+    }
+    void flush_written(const uint32_t size);
 };
 
 // Queue that contains GPU objects that are planned to be destroyed (deferred destruction)

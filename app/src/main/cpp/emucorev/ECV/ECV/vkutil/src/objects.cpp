@@ -331,6 +331,11 @@ void HostRingBuffer::read_back(const uint32_t absolute_offset, const uint32_t si
     memcpy(dst, static_cast<const uint8_t *>(buffer.mapped_data) + absolute_offset, size);
 }
 
+void HostRingBuffer::flush_written(const uint32_t size) {
+    if (!is_coherent)
+        allocator.flushAllocation(buffer.allocation, data_offset, size);
+}
+
 void LocalRingBuffer::create() {
     // the auto_alloc default behavior should give us memory on the gpu
     // UpdateBuffer needs the buffer to have TransferDst specified

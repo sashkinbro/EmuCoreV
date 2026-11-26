@@ -848,9 +848,25 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
 
     uint32_t used_streams = 0;
 
+    std::array<std::vector<VertexFetchAttribute>, SCE_GXM_MAX_VERTEX_STREAMS> fetch_attributes;
     for (const SceGxmVertexAttribute &attribute : vertex_program.attributes) {
         if (!vkvert->attribute_infos.contains(attribute.regIndex))
             continue;
+        const uint32_t component_size = gxm::attribute_format_size(static_cast<SceGxmAttributeFormat>(attribute.format));
+        fetch_attributes[attribute.streamIndex].push_back({ attribute.offset, component_size * attribute.componentCount, component_size });
+    }
+    std::array<RealignedVertexLayout, SCE_GXM_MAX_VERTEX_STREAMS> realigned;
+    std::array<uint32_t, SCE_GXM_MAX_VERTEX_STREAMS> realigned_attr_index{};
+    for (unsigned int i = 0; i < SCE_GXM_MAX_VERTEX_STREAMS; i++)
+        realigned[i] = make_realigned_vertex_layout(vertex_program.streams[i].stride, fetch_attributes[i]);
+
+    for (const SceGxmVertexAttribute &attribute : vertex_program.attributes) {
+        if (!vkvert->attribute_infos.contains(attribute.regIndex))
+            continue;
+
+        const RealignedVertexLayout &stream_layout = realigned[attribute.streamIndex];
+        const uint32_t attribute_offset = stream_layout.needed ? stream_layout.offsets[realigned_attr_index[attribute.streamIndex]] : attribute.offset;
+        realigned_attr_index[attribute.streamIndex]++;
 
         used_streams |= (1 << attribute.streamIndex);
         stream_attribute_ranges[attribute.streamIndex].push_back({
@@ -924,7 +940,7 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
                 .location = info.location + i,
                 .binding = attribute.streamIndex,
                 .format = format,
-                .offset = attribute.offset + i * array_element_size });
+                .offset = attribute_offset + i * array_element_size });
         }
     }
 
@@ -938,7 +954,7 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
 
         const bool restride = should_restride_vertex_stream(
             state.features.enable_memory_mapping, stream.stride, stream_attribute_ranges[stream_index]);
-        const uint32_t stride = restride ? align(stream.stride, 4) : stream.stride;
+        const uint32_t stride = realigned[stream_index].needed ? realigned[stream_index].stride : (restride ? align(stream.stride, 4) : stream.stride);
         binding_descr.push_back(vk::VertexInputBindingDescription{
             .binding = stream_index,
             .stride = stride,
