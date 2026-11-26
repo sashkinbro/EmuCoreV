@@ -83,18 +83,47 @@ bool param_lock_release(ParamLockState &state, Cv &cv, const int32_t /*thread_id
     return true;
 }
 
-// The returned reference stays valid until system_param_lock_erase(system).
-inline ParamLockState &system_param_lock(const void *system) {
-    static std::mutex table_mutex;
-    static std::unordered_map<const void *, ParamLockState> table;
-    const std::lock_guard<std::mutex> guard(table_mutex);
-    return table[system];
+struct ParamLockTable {
+    std::mutex mutex;
+    std::unordered_map<const void *, ParamLockState> states;
+};
+
+inline ParamLockTable &system_param_lock_table() {
+    static ParamLockTable table;
+    return table;
 }
 
+// The returned reference stays valid until system_param_lock_clear_all().
+inline ParamLockState &system_param_lock(const void *system) {
+    auto &table = system_param_lock_table();
+    const std::lock_guard<std::mutex> guard(table.mutex);
+    return table.states[system];
+}
+
+// The entry is reset, not removed: a thread still returning from a wait on this
+// system may hold the reference.
 inline void system_param_lock_erase(const void *system) {
-    // same table as system_param_lock(); implemented through it to share the statics
     ParamLockState &state = system_param_lock(system);
     state = ParamLockState();
+}
+
+// Session teardown (ngs::deinit, no guest thread left): the next guest process maps
+// its systems at the same host addresses and must not inherit a held lock (B151).
+// Returns how many systems were still locked.
+inline std::size_t system_param_lock_clear_all() {
+    auto &table = system_param_lock_table();
+    const std::lock_guard<std::mutex> guard(table.mutex);
+    std::size_t held = 0;
+    for (const auto &[_, state] : table.states)
+        held += state.depth != 0;
+    table.states.clear();
+    return held;
+}
+
+inline std::size_t system_param_lock_entry_count() {
+    auto &table = system_param_lock_table();
+    const std::lock_guard<std::mutex> guard(table.mutex);
+    return table.states.size();
 }
 
 } // namespace ngs

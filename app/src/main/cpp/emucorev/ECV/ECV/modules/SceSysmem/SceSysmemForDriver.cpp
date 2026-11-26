@@ -257,7 +257,7 @@ EXPORT(int, ksceKernelFreeHeapMemoryFromGlobalHeap) {
 
 EXPORT(int, ksceKernelFreeMemBlock, SceUID uid) {
     // If a GPU unmap is still deferred, complete it before we decommit this block's pages
-    if (emuenv.renderer && renderer::has_pending_deferred_unmap())
+    if (emuenv.renderer && renderer::has_pending_deferred_unmap(*emuenv.renderer))
         renderer::send_single_command(*emuenv.renderer, nullptr, renderer::CommandOpcode::MemoryUnmapFlush, true, static_cast<uint32_t>(thread_id));
 
     const auto state = emuenv.kernel.obj_store.get<SysmemState>();

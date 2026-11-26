@@ -43,12 +43,14 @@ add_executable(core_host_tests
     surface_policy_tests.cpp
     texture_policy_tests.cpp
     camera_mic_tests.cpp
-    shader_cache_file_tests.cpp)
+    shader_cache_file_tests.cpp
+    session_lifecycle_tests.cpp)
 # xxhash.c is compiled in; shader_cache_file.h only needs its declarations
 target_sources(core_host_tests PRIVATE "${ECV_ROOT}/external/xxHash/xxhash.c")
 target_include_directories(core_host_tests PRIVATE "${ECV_ROOT}/external/xxHash")
 target_include_directories(core_host_tests PRIVATE
     "${CORE_ROOT}/kernel/include"
+    "${CORE_ROOT}/cpu/include"
     "${CORE_ROOT}/ngs/include"
     "${CORE_ROOT}/io/include"
     "${CORE_ROOT}/dialog/include"

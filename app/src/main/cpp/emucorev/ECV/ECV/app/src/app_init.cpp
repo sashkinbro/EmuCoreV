@@ -542,6 +542,8 @@ void shutdown_app_runtime(EmuEnvState &state) {
 
     state.audio.deinit();
 
+    if (renderer::has_pending_deferred_unmap(*state.renderer))
+        LOG_WARN("Session teardown: a deferred GPU unmap was pending; it dies with this renderer");
     state.renderer->preclose_action();
     renderer::stop_render_thread(*state.renderer);
     gxm::destroy_all_contexts(state, true);

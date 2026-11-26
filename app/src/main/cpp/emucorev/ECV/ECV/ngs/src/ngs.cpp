@@ -24,6 +24,7 @@
 #include <ngs/modules/envelope.h>
 #include <ngs/modules/logical_state_io.h>
 #include <ngs/modules/player.h>
+#include <ngs/param_lock.h>
 #include <ngs/state.h>
 #include <ngs/system.h>
 #include <util/lock_and_find.h>
@@ -439,6 +440,10 @@ void deinit(State &ngs, MemState &mem) {
     }
 
     Atrac9Module::free_swr_contexts();
+    // No guest thread is left; a lock held when the session stopped must not
+    // block the next process's systems at the same host addresses (B151).
+    if (const auto held = system_param_lock_clear_all())
+        LOG_WARN("Session teardown: {} NGS system lock(s) still held; cleared", held);
 
     ngs.system_infos.clear();
     {

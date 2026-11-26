@@ -147,6 +147,8 @@ struct GxmState {
 
         memory_mapped_regions.clear();
         display_queue.reset();
+        // A restore that never restarted the queue must not replay into the next process (B151).
+        restored_display_queue.clear();
         pending_display_submissions.clear();
         display_snapshot_gate.reset();
         params = {};

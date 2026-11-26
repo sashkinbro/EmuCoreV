@@ -124,6 +124,17 @@ struct State {
 
     std::atomic<uint64_t> progress_counter{ 0 };
     std::atomic<int64_t> last_mem_transition_epoch_ms{ 0 };
+    // Identical-remap deferral (creation.cpp): the last unmap of this renderer's
+    // mapped memory, applied lazily. Per renderer so a new session never flushes
+    // an address of the previous session's device (B151). Render thread only,
+    // except the flag, which guest threads read.
+    Address deferred_unmap_addr = 0;
+    std::atomic<bool> pending_deferred_unmap{ false };
+    // Distinct for every renderer this process creates; a later session's device and
+    // objects can reuse the previous session's handle values and addresses, so a
+    // process-lifetime cache keyed by this never outlives its session (B151).
+    inline static std::atomic<uint64_t> next_identity{ 1 };
+    const uint64_t identity = next_identity.fetch_add(1, std::memory_order_relaxed);
 
     bool should_display;
 

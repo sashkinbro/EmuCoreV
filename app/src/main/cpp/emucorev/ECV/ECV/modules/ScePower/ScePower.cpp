@@ -237,7 +237,8 @@ EXPORT(int, scePowerRegisterCallback, SceUID cbid) {
         return RET_ERROR(SCE_POWER_ERROR_INVALID_VALUE);
 
     const std::lock_guard<std::mutex> lock(g_power_callbacks_mutex);
-    // forget callbacks that were deleted since (also covers a restarted emulation)
+    g_power_callbacks.bind_process(emuenv.kernel.sync_cache_generation.load(std::memory_order_acquire));
+    // forget callbacks that were deleted since
     g_power_callbacks.prune([&](std::int32_t id) { return lock_and_find(id, emuenv.kernel.callbacks, emuenv.kernel.mutex) != nullptr; });
     if (g_power_callbacks.add(cbid) == power_battery::CallbackRegistry::AlreadyRegistered)
         return RET_ERROR(SCE_POWER_ERROR_ALREADY_REGISTERED);
@@ -325,6 +326,7 @@ EXPORT(int, scePowerSetUsingWireless, SceBool enabled) {
 EXPORT(int, scePowerUnregisterCallback, SceUID cbid) {
     TRACY_FUNC(scePowerUnregisterCallback, cbid);
     const std::lock_guard<std::mutex> lock(g_power_callbacks_mutex);
+    g_power_callbacks.bind_process(emuenv.kernel.sync_cache_generation.load(std::memory_order_acquire));
     if (g_power_callbacks.remove(cbid) == power_battery::CallbackRegistry::NotRegistered)
         return RET_ERROR(SCE_POWER_ERROR_CALLBACK_NOT_REGISTERED);
     return 0;

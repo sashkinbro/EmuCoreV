@@ -112,8 +112,16 @@ void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *
             static vkutil::Buffer *oracle_ring = nullptr;
             static uint64_t oracle_ring_addr = 0;
             static uint32_t oracle_cursor = 0;
+            static uint64_t oracle_renderer = 0;
             constexpr uint32_t oracle_cap = 96u * 1024 * 1024;
+            if (oracle_ring && oracle_renderer != context.state.identity) {
+                // A later session in this process has a new device; the old ring died with
+                // the old allocator (its wrapper is dropped, never freed through it) (B151).
+                oracle_ring = nullptr;
+                oracle_cursor = 0;
+            }
             if (!oracle_ring) {
+                oracle_renderer = context.state.identity;
                 oracle_ring = new vkutil::Buffer(oracle_cap + 64 * 1024);
                 constexpr vma::AllocationCreateInfo oracle_alloc = {
                     .flags = vma::AllocationCreateFlagBits::eHostAccessRandom | vma::AllocationCreateFlagBits::eMapped,

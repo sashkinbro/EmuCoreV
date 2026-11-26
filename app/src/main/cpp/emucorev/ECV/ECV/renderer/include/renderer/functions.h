@@ -43,7 +43,7 @@ void create(SceGxmSyncObject *sync, State &state);
 void destroy(SceGxmSyncObject *sync, State &state, std::function<void()> dealloc = nullptr);
 void finish(State &state, Context *context);
 
-bool has_pending_deferred_unmap();
+bool has_pending_deferred_unmap(const State &state);
 
 // Write a notification value into guest memory if the address is a mapped, 4 byte word.
 // The caller must hold State::notification_mutex. Returns false (and writes nothing) otherwise.

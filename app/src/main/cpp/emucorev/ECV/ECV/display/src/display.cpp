@@ -63,6 +63,23 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
         emuenv.kernel.invalidate_jit_cache(address, size);
     };
 
+    // Hang-watchdog bookkeeping. It belongs to this vblank thread, which lives exactly
+    // one session (start_sync_thread / DisplayState::deinit), so every session starts
+    // it fresh instead of inheriting the previous session's stall state (B151).
+    struct HangWatchdog {
+        uint64_t next_forced_dump_vblank = 0;
+        uint64_t last_dumped_setframe = ~0ull;
+        uint64_t last_break_vblanks = 0;
+        uint64_t last_provable_break_setframe = ~0ull;
+        uint64_t last_progress_value = 0;
+        uint64_t last_progress_change_vblank = 0;
+        std::vector<SceUID> nudged_this_stall;
+        uint64_t last_wake_value = 0;
+        uint64_t last_wake_change_vblank = 0;
+        bool never_flip_redumped = false;
+        uint64_t last_seen_vblanks = 0;
+    } watchdog;
+
     while (!display.abort.load()) {
         struct ProducerIteration {
             DisplayState &display;
@@ -111,7 +128,7 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
 #ifndef NDEBUG
         // Periodic thread dump for diagnosing partial hangs
         if (emuenv.cfg.hang_dump_seconds > 0) {
-            static uint64_t next_forced_dump_vblank = 0;
+            uint64_t &next_forced_dump_vblank = watchdog.next_forced_dump_vblank;
             const uint64_t vblanks_now = emuenv.display.vblank_count.load();
             const uint64_t period = static_cast<uint64_t>(emuenv.cfg.hang_dump_seconds) * 60;
             if (period > 0 && vblanks_now >= next_forced_dump_vblank && !emuenv.kernel.is_threads_paused()) {
@@ -124,39 +141,23 @@ static void vblank_sync_thread(EmuEnvState &emuenv) {
 #endif
         // Hang watchdog - if there's no framebuffer flip for ~10s (600 vblanks) while unpaused then dump guest threads
         {
-#ifndef NDEBUG
-            static uint64_t last_dumped_setframe = ~0ull;
-#endif
-            static uint64_t last_break_vblanks = 0;
-            static uint64_t last_provable_break_setframe = ~0ull;
-            static uint64_t last_progress_value = 0;
-            static uint64_t last_progress_change_vblank = 0;
-            static std::vector<SceUID> nudged_this_stall;
-            static uint64_t last_wake_value = 0;
-            static uint64_t last_wake_change_vblank = 0;
-#ifndef NDEBUG
-            static bool never_flip_redumped = false;
-#endif
-            static uint64_t last_seen_vblanks = 0;
             const uint64_t setframe = emuenv.display.last_setframe_vblank_count.load();
             const uint64_t vblanks = emuenv.display.vblank_count.load();
-            // vblank_count restarts at 0 each game session (DisplayState::deinit); these statics outlive it, so reset them with it
-            if (vblanks < last_seen_vblanks) {
+            // A save-state load rewinds vblank_count within the session: start the bookkeeping over with it
+            if (vblanks < watchdog.last_seen_vblanks)
+                watchdog = HangWatchdog{};
+            watchdog.last_seen_vblanks = vblanks;
 #ifndef NDEBUG
-                last_dumped_setframe = ~0ull;
+            uint64_t &last_dumped_setframe = watchdog.last_dumped_setframe;
+            bool &never_flip_redumped = watchdog.never_flip_redumped;
 #endif
-                last_break_vblanks = 0;
-                last_provable_break_setframe = ~0ull;
-                last_progress_value = 0;
-                last_progress_change_vblank = 0;
-                last_wake_value = 0;
-                last_wake_change_vblank = 0;
-                nudged_this_stall.clear();
-#ifndef NDEBUG
-                never_flip_redumped = false;
-#endif
-            }
-            last_seen_vblanks = vblanks;
+            uint64_t &last_break_vblanks = watchdog.last_break_vblanks;
+            uint64_t &last_provable_break_setframe = watchdog.last_provable_break_setframe;
+            uint64_t &last_progress_value = watchdog.last_progress_value;
+            uint64_t &last_progress_change_vblank = watchdog.last_progress_change_vblank;
+            std::vector<SceUID> &nudged_this_stall = watchdog.nudged_this_stall;
+            uint64_t &last_wake_value = watchdog.last_wake_value;
+            uint64_t &last_wake_change_vblank = watchdog.last_wake_change_vblank;
             const bool unpaused = !emuenv.kernel.is_threads_paused();
             const bool never_flipped = (setframe == 0);
             const uint64_t stall_vblanks = (vblanks > setframe) ? (vblanks - setframe) : 0;

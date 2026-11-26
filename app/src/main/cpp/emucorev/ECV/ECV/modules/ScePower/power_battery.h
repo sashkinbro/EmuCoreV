@@ -72,11 +72,20 @@ public:
     void prune(Pred is_alive) {
         ids_.erase(std::remove_if(ids_.begin(), ids_.end(), [&](std::int32_t id) { return !is_alive(id); }), ids_.end());
     }
+    // Registrations belong to one guest process. The registry is process-wide on the
+    // host, so a new guest process (UIDs restart at 1) starts empty (B151).
+    void bind_process(std::uint64_t process_epoch) {
+        if (process_epoch != process_epoch_) {
+            ids_.clear();
+            process_epoch_ = process_epoch;
+        }
+    }
     std::size_t size() const { return ids_.size(); }
     bool contains(std::int32_t id) const { return std::find(ids_.begin(), ids_.end(), id) != ids_.end(); }
 
 private:
     std::vector<std::int32_t> ids_;
+    std::uint64_t process_epoch_ = 0;
 };
 
 } // namespace power_battery

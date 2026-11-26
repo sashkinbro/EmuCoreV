@@ -61,6 +61,9 @@ uint32_t stack_alloc(CPUState &state, size_t size);
 uint32_t stack_free(CPUState &state, size_t size);
 
 void clear_exclusive(CPUState &state);
+// Drops every core's reservation; called when a guest process ends, so a thread torn
+// down between LDREX and STREX cannot leave one for the next process (B151).
+void reset_process_exclusive_monitor();
 
 // Debugging helpers
 std::string disassemble(CPUState &state, uint64_t at, bool thumb, uint16_t *insn_size = nullptr);

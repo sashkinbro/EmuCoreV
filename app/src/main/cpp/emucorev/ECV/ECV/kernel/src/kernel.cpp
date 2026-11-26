@@ -116,6 +116,8 @@ bool KernelState::init(MemState &mem, const CallImportFunc &call_import, bool cp
 
     start_tick = rtc_get_ticks(rtc_base_ticks());
     base_tick = { rtc_base_ticks() };
+    // Every guest process starts with a running, unpaused clock (B151).
+    process_clock_pause.reset();
     this->call_import = call_import;
     this->cpu_opt = cpu_opt;
 
@@ -625,6 +627,21 @@ void KernelState::deinit(MemState &mem) {
 
     paused_threads_status.clear();
     session_pause_active.store(false, std::memory_order_release);
+
+    // Per-process state that the next guest process must not inherit (B151).
+    if (process_clock_pause.paused())
+        LOG_WARN("Session teardown: the process clock was paused at stop; the next process starts it running");
+    process_clock_pause.reset();
+    clear_eventflag_setter_history();
+    reset_process_exclusive_monitor();
+    guest_sched_reset_process();
+    for (auto &handler : exception_handlers)
+        handler.store(0);
+    // Handlers capture subsystem objects of this session (the renderer is destroyed
+    // after this); each session registers its own before any guest thread waits.
+    wait_resume_handlers.clear();
+    callback_resume_handlers.clear();
+    snapshot_callbacks.clear();
 }
 
 SceKernelModuleInfo *KernelState::find_module_by_addr(Address address) {

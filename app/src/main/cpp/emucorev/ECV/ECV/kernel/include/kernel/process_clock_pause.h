@@ -31,6 +31,19 @@ public:
         return start_tick + paused_duration(now);
     }
 
+    // A new guest process starts with a running clock. A session stopped while the
+    // host menu paused it must not hand that pause to the next process: the old
+    // pause_start would freeze process time there (B151).
+    void reset() {
+        const std::lock_guard lock(mutex);
+        pause_start.reset();
+    }
+
+    bool paused() {
+        const std::lock_guard lock(mutex);
+        return pause_start.has_value();
+    }
+
     // A loaded clock has already been rebased to 'now'. Only future paused
     // time belongs to the new clock, even if the menu stayed open while loading.
     void rebase(uint64_t now, uint64_t value, uint64_t &start_tick) {

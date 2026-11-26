@@ -78,6 +78,13 @@ thread_local std::array<MutexCacheEntry, 8> g_mutex_cache;
 thread_local uint32_t g_mutex_cache_next = 0;
 } // namespace
 
+void clear_eventflag_setter_history() {
+    // UIDs restart at 1 in the next guest process; its hang breaker must not reason
+    // with this process's setters (B151).
+    const std::lock_guard<std::mutex> lock(evf_setters_mutex);
+    evf_setters.clear();
+}
+
 void clear_sync_primitive_thread_cache() {
     g_mutex_cache = {};
     g_mutex_cache_next = 0;

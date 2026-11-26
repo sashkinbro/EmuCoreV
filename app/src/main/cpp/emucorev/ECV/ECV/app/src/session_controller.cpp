@@ -18,7 +18,9 @@
 #include <app/functions.h>
 #include <app/session_controller.h>
 
+#include <audio/in_settings.h>
 #include <audio/state.h>
+#include <camera/camera.h>
 #include <ctrl/state.h>
 #include <display/functions.h>
 #include <display/state.h>
@@ -244,6 +246,12 @@ void AppSessionController::stop(const AppSessionStopReason reason) {
         active_frame_host->get().destroy_render_context();
 
     emuenv.motion.clear_device_motion_support();
+
+    // Host peripheral suspension (menu pause / background) belongs to the stopped
+    // session: a game quit from the pause menu left the camera and microphone
+    // suspended for the next one (B151). The next activity re-asserts its own state.
+    ecv_camera_set_host_suspended(false);
+    ecv_audio_in::settings().suspended.store(false);
 
     {
         std::lock_guard<std::mutex> lock(mutex);

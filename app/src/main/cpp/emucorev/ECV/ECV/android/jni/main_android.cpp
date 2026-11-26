@@ -425,6 +425,9 @@ SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]) {
                 window = nullptr;
             }
 
+            // SDL_Quit closes every gamepad; no handle may outlive it into the next
+            // launch, also when this launch failed before the runtime existed (B151).
+            emuenv->ctrl.reset_runtime();
             SDL_Quit();
         };
 

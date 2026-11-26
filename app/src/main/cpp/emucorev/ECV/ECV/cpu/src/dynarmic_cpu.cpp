@@ -17,6 +17,7 @@
 
 #include "cpu/common.h"
 #include <cpu/impl/dynarmic_cpu.h>
+#include <cpu/owner_lock.h>
 #include <cpu/state.h>
 #include <util/log.h>
 
@@ -237,7 +238,14 @@ public:
         : parent(&parent)
         , cpu(&cpu) {}
 
-    ~ArmDynarmicCallback() override = default;
+    ~ArmDynarmicCallback() override {
+        // A thread torn down inside mono_loader_lock (process exit, exec switch)
+        // must not leave the process-wide lock held for the next session (B151).
+        if (loader_lock_held > 0) {
+            LOG_WARN("Guest CPU destroyed inside mono_loader_lock (depth {}); released", loader_lock_held);
+            loader_lock.release_all(this);
+        }
+    }
 
     void log_no_execute_diagnostics(uint32_t pc) {
 #ifndef NDEBUG
@@ -362,7 +370,7 @@ public:
 #endif
     }
 
-    inline static std::recursive_timed_mutex loader_lock_mutex;
+    inline static OwnerLock loader_lock;
 #ifndef NDEBUG
     inline static std::atomic<int> loader_lock_timeouts{ 0 };
 #endif
@@ -374,7 +382,7 @@ public:
             ++self.loader_lock_held;
             return;
         }
-        if (!loader_lock_mutex.try_lock_for(std::chrono::seconds(5))) {
+        if (!self.loader_lock.acquire(&self, std::chrono::seconds(5))) {
 #ifndef NDEBUG
             if (spdlog::default_logger_raw()->should_log(spdlog::level::warn) && loader_lock_timeouts.fetch_add(1) < 20)
                 LOG_WARN("Timed out waiting for the emulated mono loader lock on thread {}, proceeding unserialised", self.parent->thread_id);
@@ -389,7 +397,7 @@ public:
         if (self.loader_lock_held == 0)
             return;
         if (--self.loader_lock_held == 0)
-            loader_lock_mutex.unlock();
+            loader_lock.release(&self);
     }
 
     enum class MonoLoaderOp {
@@ -701,6 +709,10 @@ public:
 };
 
 Dynarmic::ExclusiveMonitor DynarmicCPU::shared_monitor(MAX_CORE_COUNT);
+
+void reset_process_exclusive_monitor() {
+    DynarmicCPU::shared_monitor.Clear();
+}
 
 std::unique_ptr<Dynarmic::A32::Jit> DynarmicCPU::make_jit() {
     Dynarmic::A32::UserConfig config{};

@@ -49,11 +49,21 @@
 #include <SDL3/SDL_vulkan.h>
 #include <jni.h>
 
-static std::atomic<bool> has_surface{ false };
+// Number of live EmuSurface surfaces. A process hosts one Emulator activity at a
+// time, but when a game is closed and the next one opened the old activity's
+// surfaceDestroyed can arrive after the new one's surfaceCreated; a single bool
+// then said "no surface" for the whole next session and it never presented (B151).
+static std::atomic<int> live_surfaces{ 0 };
 
 extern "C" JNIEXPORT void JNICALL
 ECV_NativeBridge_EmuSurface_setSurfaceStatus(JNIEnv *, jobject, jboolean surface_present) {
-    has_surface.store(surface_present, std::memory_order_release);
+    if (surface_present) {
+        live_surfaces.fetch_add(1, std::memory_order_acq_rel);
+        return;
+    }
+    int current = live_surfaces.load(std::memory_order_acquire);
+    while (current > 0 && !live_surfaces.compare_exchange_weak(current, current - 1, std::memory_order_acq_rel)) {
+    }
 }
 #endif
 
@@ -70,7 +80,7 @@ bool window_has_drawable_size(const VKState &state) {
 
 #ifdef __ANDROID__
 bool has_android_surface() {
-    return has_surface.load(std::memory_order_acquire);
+    return live_surfaces.load(std::memory_order_acquire) > 0;
 }
 #endif
 

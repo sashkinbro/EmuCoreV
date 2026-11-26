@@ -314,6 +314,23 @@ void guest_sched_set_cores(int cores) {
     LOG_INFO("[GUEST-SCHED] gate will run at most {} guest thread(s) at a time", g_sched_cores);
 }
 
+void guest_sched_reset_process() {
+    // Called once every guest thread of the process has been joined. A slot or
+    // waiter count leaked by a thread torn down mid-acquire would otherwise gate
+    // the next process's first thread forever (B151).
+    {
+        const std::lock_guard<std::mutex> lock(g_sched_mutex);
+        if (g_sched_running != 0 || g_sched_waiters_total != 0)
+            LOG_WARN("Session teardown: guest scheduler left {} running / {} waiting; cleared", g_sched_running, g_sched_waiters_total);
+        g_sched_running = 0;
+        g_sched_holders = {};
+        g_sched_waiter_counts = {};
+        g_sched_waiters_total = 0;
+        g_sched_best_waiter.store(256, std::memory_order_relaxed);
+    }
+    g_sched_cv.notify_all();
+}
+
 void guest_sched_release_for_block() {
     if (tls_holds_token) {
         sched_release_internal(tls_token_cpu);
