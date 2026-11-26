@@ -40,6 +40,7 @@ add_executable(core_host_tests
     save_data_write_tests.cpp
     fragment_output_tests.cpp
     surface_policy_tests.cpp
+    texture_policy_tests.cpp
     camera_mic_tests.cpp
     shader_cache_file_tests.cpp)
 # xxhash.c is compiled in; shader_cache_file.h only needs its declarations

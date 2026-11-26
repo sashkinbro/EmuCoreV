@@ -220,6 +220,15 @@ void VKSurfaceCache::refresh_guest_trap(MemState &mem, ColorSurfaceCacheInfo &in
     arm_guest_trap(mem, info);
 }
 
+bool VKSurfaceCache::gpu_writes_guest_range(Address begin, Address end) const {
+    for (const auto &[address, surface] : color_address_lookup) {
+        if (surface && surface->need_surface_sync && *surface->need_surface_sync
+            && address < end && begin < static_cast<uint64_t>(address) + surface->total_bytes)
+            return true;
+    }
+    return false;
+}
+
 bool VKSurfaceCache::protect_cached_surface(MemState &mem, ColorSurfaceCacheInfo &info) {
     return arm_guest_trap(mem, info);
 }

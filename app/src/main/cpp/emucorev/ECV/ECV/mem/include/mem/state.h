@@ -21,6 +21,8 @@
 #include <mem/functions.h>
 #include <mem/util.h>
 
+#include <array>
+#include <atomic>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -74,6 +76,12 @@ struct MemState {
     AllocPageTable alloc_table;
     BitmapAllocator allocator;
     ProtectSegmentTrees protect_tree;
+
+    // Release tracking for caches that trust write traps (a trap cannot see its memory being freed and
+    // reallocated): free() stamps the 64 KiB granules of the released region with a new epoch.
+    static constexpr uint32_t release_granule_shift = 16;
+    std::atomic<uint64_t> release_epoch{ 0 };
+    std::array<std::atomic<uint64_t>, (1ull << 32 >> release_granule_shift)> release_stamp{};
 
     PageNameMap page_name_map;
 

@@ -773,6 +773,13 @@ void free(MemState &state, Address address) {
     const Address region_start = page_num * STANDARD_PAGE_SIZE;
     const Address region_end = region_start + page.size * STANDARD_PAGE_SIZE;
 
+    {
+        const uint64_t epoch = state.release_epoch.fetch_add(1) + 1;
+        const uint64_t last_granule = (static_cast<uint64_t>(region_end) - 1) >> MemState::release_granule_shift;
+        for (uint64_t granule = region_start >> MemState::release_granule_shift; granule <= last_granule && granule < state.release_stamp.size(); granule++)
+            state.release_stamp[granule].store(epoch);
+    }
+
     if (!state.preserve_freed_pages) {
         Address host_page = align_down(region_start, state.host_page_size);
         Address batch_start = 0;
@@ -816,6 +823,21 @@ void free(MemState &state, Address address) {
 #endif
         }
     }
+}
+
+uint64_t release_epoch_now(const MemState &state) {
+    return state.release_epoch.load();
+}
+
+bool released_since(const MemState &state, Address begin, Address end, uint64_t epoch) {
+    if (end <= begin)
+        return false;
+    const uint64_t last_granule = (static_cast<uint64_t>(end) - 1) >> MemState::release_granule_shift;
+    for (uint64_t granule = begin >> MemState::release_granule_shift; granule <= last_granule && granule < state.release_stamp.size(); granule++) {
+        if (state.release_stamp[granule].load() > epoch)
+            return true;
+    }
+    return false;
 }
 
 uint32_t mem_available(MemState &state) {

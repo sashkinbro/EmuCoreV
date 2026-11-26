@@ -97,6 +97,8 @@ struct VKTextureCache : public TextureCache {
     void configure_texture(const SceGxmTexture &texture) override;
     void upload_texture_impl(SceGxmTextureBaseFormat base_format, uint32_t width, uint32_t height, uint32_t mip_index, const void *pixels, int face, uint32_t pixels_per_stride) override;
     void upload_done() override;
+    bool supports_partial_upload() const override { return true; }
+    bool gpu_may_write_guest_range(uint32_t begin, uint32_t end) const override;
     bool upload_yuv_gpu(const SceGxmTexture &texture, SceGxmTextureBaseFormat base_format, const uint8_t *src, uint32_t width, uint32_t height, uint32_t stride_pixels, uint32_t layout_width, uint32_t layout_height) override;
     void configure_sampler(size_t index, const SceGxmTexture &texture, bool no_linear) override;
 

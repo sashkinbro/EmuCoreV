@@ -25,6 +25,7 @@
 
 #include <gxm/functions.h>
 #include <mem/functions.h>
+#include <mem/state.h>
 #include <mem/ptr.h>
 #include <util/align.h>
 #include <util/log.h>
@@ -45,23 +46,25 @@
 namespace renderer {
 namespace texture {
 
-// GPU writes don't trip write-protection, so keep hashing large textures
-static constexpr bool protect_only_is_sufficient = true;
-
 static uint64_t hash_data(const void *data, size_t size) {
     return XXH3_64bits(data, size);
 }
 
-static uint64_t hash_palette_data(const SceGxmTexture &texture, size_t count, const MemState &mem) {
-    const uint32_t *const palette_bytes = get_texture_palette(texture, mem);
-    return hash_data(palette_bytes, count * sizeof(uint32_t));
+static size_t palette_entry_count(SceGxmTextureBaseFormat base_format) {
+    return base_format == SCE_GXM_TEXTURE_BASE_FORMAT_P4 ? 16 : 256;
 }
 
-uint64_t hash_texture_data(const SceGxmTexture &texture, uint32_t texture_size, const MemState &mem) {
-    const SceGxmTextureFormat format = gxm::get_format(texture);
-    const SceGxmTextureBaseFormat base_format = gxm::get_base_format(format);
+uint64_t hash_texture_palette(const SceGxmTexture &texture, const MemState &mem) {
+    const SceGxmTextureBaseFormat base_format = gxm::get_base_format(gxm::get_format(texture));
+    const size_t bytes = palette_entry_count(base_format) * sizeof(uint32_t);
+    const Address address = static_cast<Address>(texture.palette_addr) << 6;
+    if (!address || !is_valid_addr_range(mem, address, address + static_cast<Address>(bytes)))
+        return 0;
+    return hash_data(get_texture_palette(texture, mem), bytes);
+}
+
+uint64_t hash_texture_pixels(const SceGxmTexture &texture, uint32_t texture_size, const MemState &mem) {
     const Ptr<const void> data(texture.data_addr << 2);
-    uint64_t data_hash = 0;
 
     // the texture memory may have been freed by the game while this bind was queued
     if (data.address() && !is_valid_addr_range(mem, data.address(), data.address() + texture_size)) {
@@ -69,18 +72,7 @@ uint64_t hash_texture_data(const SceGxmTexture &texture, uint32_t texture_size, 
         return 0;
     }
 
-    if (data.address()) {
-        data_hash = hash_data(data.get(mem), texture_size);
-    }
-
-    switch (base_format) {
-    case SCE_GXM_TEXTURE_BASE_FORMAT_P4:
-        return data_hash ^ hash_palette_data(texture, 16, mem);
-    case SCE_GXM_TEXTURE_BASE_FORMAT_P8:
-        return data_hash ^ hash_palette_data(texture, 256, mem);
-    default:
-        return data_hash;
-    }
+    return data.address() ? hash_data(data.get(mem), texture_size) : 0;
 }
 
 // Function to hash an arbitrary swizzled texture in the most optimized way possible
@@ -202,13 +194,13 @@ uint64_t hash_texture_nostride(const SceGxmTexture &texture, const MemState &mem
     // handle paletted texture (create one hash for each variant)
     switch (base_format) {
     case SCE_GXM_TEXTURE_BASE_FORMAT_P4:
-        hash ^= hash_palette_data(texture, 16, mem);
+        hash ^= hash_texture_palette(texture, mem);
         // update the block dimensions in this case (needed for hashing latter)
         block_width = 2;
         block_height = 1;
         break;
     case SCE_GXM_TEXTURE_BASE_FORMAT_P8:
-        hash ^= hash_palette_data(texture, 256, mem);
+        hash ^= hash_texture_palette(texture, mem);
         break;
     default:
         break;
@@ -303,9 +295,8 @@ uint16_t get_upload_mip(const uint16_t true_mip, const uint16_t width, const uin
 
 using namespace texture;
 
-bool TextureCache::init(const bool hashless_texture_cache, const fs::path &texture_folder, std::string_view game_id, const size_t sampler_cache_size) {
-    use_protect = hashless_texture_cache;
-
+bool TextureCache::init([[maybe_unused]] const bool hashless_texture_cache, const fs::path &texture_folder, std::string_view game_id, const size_t sampler_cache_size) {
+    // write-trap tracking is always on: the "hashless" setting no longer selects a different cache
     // initialize the texture queue
     texture_queue.init(TextureCacheSize);
     // set the proper index of each entry
@@ -333,7 +324,7 @@ bool TextureCache::init(const bool hashless_texture_cache, const fs::path &textu
     return true;
 }
 
-void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &mem) {
+void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &mem, const texture_policy::RowRun *rows) {
     R_PROFILE(__func__);
 
     bool is_vulkan = (backend == renderer::Backend::Vulkan);
@@ -423,6 +414,12 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
     const uint32_t org_layout_width = layout_width;
     const uint32_t org_layout_height = layout_height;
 
+    // a row range only exists for the single level of a linear texture (the caller planned it from the same layout)
+    if (rows && (total_mip != 1 || face_total_count != 1 || !partial_upload || rows->row_end <= rows->row_begin))
+        rows = nullptr;
+    if (!rows)
+        upload_row_offset = 0;
+
     while (face_uploaded_count < face_total_count && org_width > 0 && org_height > 0) {
         pixels = texture_data;
 
@@ -447,6 +444,18 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
         }
         pixels_per_stride = align(pixels_per_stride, align_width);
         memory_height = align(memory_height, align_height);
+
+        // only the rows [row_begin, row_end) of the first level: start at their source row and convert/upload just them
+        uint32_t upload_height = height;
+        if (rows) {
+            const uint32_t block_row_bytes = (pixels_per_stride * block_height * bpp) / 8;
+            pixels = texture_data + (rows->row_begin / block_height) * block_row_bytes;
+            memory_height = rows->row_end - rows->row_begin;
+            upload_height = std::min(rows->row_end, height) - std::min(rows->row_begin, height);
+            upload_row_offset = rows->row_begin;
+            if (upload_height == 0)
+                break;
+        }
 
         // A queued bind can be processed after the game released the staging memory, and reading it crashes on decommitted.
         {
@@ -629,7 +638,7 @@ void TextureCache::upload_texture(const SceGxmTexture &gxm_texture, MemState &me
             upload_pixels = texture_data_decompressed.data();
         }
 
-        upload_texture_impl(upload_format, width, height, mip_index, upload_pixels, upload_type, pixels_per_stride);
+        upload_texture_impl(upload_format, width, upload_height, mip_index, upload_pixels, upload_type, pixels_per_stride);
         if (export_textures)
             export_texture_impl(upload_format, width, height, mip_index, pixels, upload_type, pixels_per_stride);
 
@@ -691,12 +700,239 @@ static constexpr TextureGxmDataRepr strided_texture_mask = {
     0xF3FFFFFF
 };
 
+// ---------------------------------------------------------------------------------------------
+// Write-trap tracking (policy: texture_policy.h)
+// ---------------------------------------------------------------------------------------------
+
+// Watches the host pages covering [address, address + bytes) for writes. The trap is one-shot and also fires for
+// reads of a merged read-protected neighbour (the surface cache): "fired" only means "judge the bytes by hash".
+static std::shared_ptr<TextureTrap> arm_write_trap(MemState &mem, Address address, uint32_t bytes) {
+    const texture_policy::PageSpan span = texture_policy::trap_span(address, bytes, KiB(4));
+    std::shared_ptr<TextureTrap> trap = std::make_shared<TextureTrap>();
+    add_protect(mem, span.begin, span.end - span.begin, MemPerm::ReadOnly, [trap](Address, bool) {
+        trap->fired.store(true);
+        return true;
+    });
+    return trap;
+}
+
+static bool trap_has_fired(MemState &mem, const std::shared_ptr<TextureTrap> &trap) {
+    if (!trap || !trap->fired.load())
+        return false;
+    // the fault handler flags the trap before it opens the pages: wait until it has finished, so the bytes
+    // hashed next are read after the access that tripped the trap (a still-pending write faults on the re-armed pages)
+    { const std::lock_guard<std::mutex> handler_done(mem.protect_mutex); }
+    return true;
+}
+
+void TextureCache::reset_tracking(TextureCacheInfo &info) {
+    info.pixel_trap.reset();
+    info.palette_trap.reset();
+    info.chunk_hashes.clear();
+    info.palette_hash = 0;
+    info.chunk_plan = {};
+    info.total_rows = 0;
+    info.block_rows = 1;
+    info.row_pitch_bytes = 0;
+    info.partial_capable = false;
+    info.pixel_epoch = 0;
+    info.palette_epoch = 0;
+    info.validated_scene = 0;
+    info.dirty = false;
+}
+
+static bool is_paletted_base(SceGxmTextureBaseFormat base_format) {
+    return base_format == SCE_GXM_TEXTURE_BASE_FORMAT_P4 || base_format == SCE_GXM_TEXTURE_BASE_FORMAT_P8;
+}
+
+// Row layout of the first level as upload_texture reads it, for linear textures that can be uploaded by rows.
+static void plan_entry_layout(TextureCacheInfo &info, const SceGxmTexture &gxm_texture, const bool partial_allowed) {
+    info.chunk_plan = {};
+    info.total_rows = 0;
+    info.block_rows = 1;
+    info.row_pitch_bytes = 0;
+    info.partial_capable = false;
+
+    const SceGxmTextureBaseFormat base_format = gxm::get_base_format(gxm::get_format(gxm_texture));
+    const SceGxmTextureType type = gxm_texture.texture_type();
+    if (!partial_allowed || (type != SCE_GXM_TEXTURE_LINEAR && type != SCE_GXM_TEXTURE_LINEAR_STRIDED))
+        return;
+    if (gxm::is_yuv_format(base_format) || gxm::is_pvrt_format(base_format))
+        return;
+
+    const uint32_t width = gxm::get_width(gxm_texture);
+    const uint32_t height = gxm::get_height(gxm_texture);
+    if (width == 0 || height == 0 || get_upload_mip(gxm_texture.true_mip_count(), width, height) != 1)
+        return;
+
+    const auto [block_width, block_height] = gxm::get_block_size(base_format);
+    const uint32_t bpp = gxm::bits_per_pixel(base_format);
+    // same stride rules as upload_texture
+    uint32_t pixels_per_stride = width;
+    uint32_t align_width = block_width;
+    if (type == SCE_GXM_TEXTURE_LINEAR_STRIDED) {
+        pixels_per_stride = gxm::get_stride_in_bytes(gxm_texture) / ((bpp + 7) >> 3);
+        if (base_format == SCE_GXM_TEXTURE_BASE_FORMAT_P4)
+            pixels_per_stride *= 2;
+    } else {
+        align_width = std::max(align_width, 8U);
+    }
+    pixels_per_stride = align(pixels_per_stride, align_width);
+
+    const uint32_t total_rows = align(height, block_height);
+    const uint32_t row_pitch_bytes = (pixels_per_stride * block_height * bpp) / 8;
+    const uint64_t rows_bytes = static_cast<uint64_t>(row_pitch_bytes) * (total_rows / block_height);
+    if (row_pitch_bytes == 0 || rows_bytes > info.texture_size)
+        return;
+
+    info.total_rows = total_rows;
+    info.block_rows = block_height;
+    info.row_pitch_bytes = row_pitch_bytes;
+    info.partial_capable = true;
+    info.chunk_plan = texture_policy::plan_chunks(true, static_cast<uint32_t>(rows_bytes), row_pitch_bytes, total_rows, block_height);
+}
+
+// Hashes of the texture bytes: one per chunk of a big linear texture, otherwise a single one.
+static void hash_entry_chunks(const TextureCacheInfo &info, const SceGxmTexture &gxm_texture, const MemState &mem, std::vector<uint64_t> &out) {
+    out.clear();
+    if (info.chunk_plan.rows_per_chunk == 0) {
+        out.push_back(hash_texture_pixels(gxm_texture, info.texture_size, mem));
+        return;
+    }
+    const Address base = gxm_texture.data_addr << 2;
+    const uint64_t rows_bytes = static_cast<uint64_t>(info.row_pitch_bytes) * (info.total_rows / info.block_rows);
+    if (!is_valid_addr_range(mem, base, base + static_cast<Address>(rows_bytes))) {
+        LOG_WARN_ONCE("Texture data not in valid memory (addr=0x{:08X} size={}), not hashing", base, rows_bytes);
+        out.assign(info.chunk_plan.chunk_count, 0);
+        return;
+    }
+    const uint8_t *data = Ptr<const uint8_t>(base).get(mem);
+    const uint64_t chunk_bytes = static_cast<uint64_t>(info.chunk_plan.rows_per_chunk / info.block_rows) * info.row_pitch_bytes;
+    for (uint32_t i = 0; i < info.chunk_plan.chunk_count; i++) {
+        const uint64_t begin = i * chunk_bytes;
+        out.push_back(hash_data(data + begin, std::min(chunk_bytes, rows_bytes - begin)));
+    }
+}
+
+// Arms the write trap over the texture bytes (before they are hashed), and hashes them into `hashes`.
+static void arm_and_hash_pixels(TextureCacheInfo &info, const SceGxmTexture &gxm_texture, MemState &mem, std::vector<uint64_t> &hashes) {
+    const Address base = gxm_texture.data_addr << 2;
+    // the trap goes first: a write after it fires the trap, a write before it is seen by the hash
+    info.pixel_epoch = release_epoch_now(mem);
+    if (base && info.texture_size && is_valid_addr_range(mem, base, base + info.texture_size))
+        info.pixel_trap = arm_write_trap(mem, base, info.texture_size);
+    else
+        info.pixel_trap.reset();
+    hash_entry_chunks(info, gxm_texture, mem, hashes);
+}
+
+static void arm_and_hash_palette(TextureCacheInfo &info, const SceGxmTexture &gxm_texture, MemState &mem, uint64_t &hash) {
+    const SceGxmTextureBaseFormat base_format = gxm::get_base_format(gxm::get_format(gxm_texture));
+    const Address address = static_cast<Address>(gxm_texture.palette_addr) << 6;
+    const uint32_t bytes = static_cast<uint32_t>(palette_entry_count(base_format) * sizeof(uint32_t));
+    info.palette_epoch = release_epoch_now(mem);
+    if (address && is_valid_addr_range(mem, address, address + bytes))
+        info.palette_trap = arm_write_trap(mem, address, bytes);
+    else
+        info.palette_trap.reset();
+    hash = hash_texture_palette(gxm_texture, mem);
+}
+
+// (Re)builds every baseline of an entry that is about to be uploaded whole.
+static void track_entry(TextureCacheInfo &info, const SceGxmTexture &gxm_texture, MemState &mem, const bool partial_allowed) {
+    plan_entry_layout(info, gxm_texture, partial_allowed);
+    arm_and_hash_pixels(info, gxm_texture, mem, info.chunk_hashes);
+    if (is_paletted_base(gxm::get_base_format(gxm::get_format(gxm_texture))))
+        arm_and_hash_palette(info, gxm_texture, mem, info.palette_hash);
+}
+
+// A bind of an entry that is already in the cache: reads guest memory only when a write trap says it may have
+// changed. Returns what has to be uploaded; `runs` receives the row runs of a partial upload.
+texture_policy::UploadKind TextureCache::revalidate_entry(TextureCacheInfo &info, const SceGxmTexture &gxm_texture, MemState &mem, std::vector<texture_policy::RowRun> &runs, bool &hashed) {
+    using namespace texture_policy;
+    runs.clear();
+    hashed = false;
+
+    const bool partial_allowed = supports_partial_upload() && !(import_textures || export_textures);
+
+    if (info.dirty) {
+        // forced (replacement toggled): rebuild all baselines with the upload
+        track_entry(info, gxm_texture, mem, partial_allowed);
+        hashed = true;
+        info.dirty = false;
+        info.validated_scene = current_scene;
+        return UploadKind::Full;
+    }
+
+    const SceGxmTextureBaseFormat base_format = gxm::get_base_format(gxm::get_format(gxm_texture));
+    const Address base = gxm_texture.data_addr << 2;
+
+    EntryState state;
+    state.validated_this_scene = current_scene != 0 && info.validated_scene == current_scene;
+    state.pixels_armed = static_cast<bool>(info.pixel_trap);
+    state.paletted = is_paletted_base(base_format);
+    state.palette_armed = static_cast<bool>(info.palette_trap);
+    if (!state.validated_this_scene) {
+        state.gpu_may_write = gpu_may_write_guest_range(base, base + info.texture_size);
+        state.pixels_fired = trap_has_fired(mem, info.pixel_trap);
+        state.palette_fired = trap_has_fired(mem, info.palette_trap);
+        // guest memory freed (and maybe reused for new data) since a trap was armed
+        if (state.pixels_armed && released_since(mem, base, base + info.texture_size, info.pixel_epoch))
+            state.memory_released = true;
+        if (state.palette_armed) {
+            const Address palette = static_cast<Address>(gxm_texture.palette_addr) << 6;
+            if (released_since(mem, palette, palette + static_cast<Address>(palette_entry_count(base_format) * sizeof(uint32_t)), info.palette_epoch))
+                state.memory_released = true;
+        }
+    }
+
+    const Revalidation need = revalidation_needed(state);
+    info.validated_scene = current_scene;
+    if (need.skip)
+        return UploadKind::None;
+
+    HashOutcome outcome;
+    outcome.total_rows = info.total_rows;
+    outcome.partial_possible = partial_allowed && info.partial_capable && info.chunk_plan.rows_per_chunk != 0;
+
+    std::vector<uint64_t> new_hashes;
+    if (need.hash_pixels) {
+        arm_and_hash_pixels(info, gxm_texture, mem, new_hashes);
+        hashed = true;
+        outcome.pixels_checked = true;
+        if (outcome.partial_possible) {
+            runs = changed_runs(info.chunk_hashes, new_hashes, info.chunk_plan, info.total_rows);
+            outcome.pixels_changed = !runs.empty();
+            outcome.dirty_rows = rows_in_runs(runs);
+        } else {
+            outcome.pixels_changed = info.chunk_hashes != new_hashes;
+        }
+        info.chunk_hashes = std::move(new_hashes);
+    }
+    if (need.hash_palette) {
+        uint64_t palette_hash = 0;
+        arm_and_hash_palette(info, gxm_texture, mem, palette_hash);
+        hashed = true;
+        outcome.palette_checked = true;
+        outcome.palette_changed = palette_hash != info.palette_hash;
+        info.palette_hash = palette_hash;
+    }
+
+    const UploadKind kind = decide_upload(outcome);
+    if (kind != UploadKind::Partial)
+        runs.clear();
+    return kind;
+}
+
 void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemState &mem) {
     R_PROFILE(__func__);
 
     size_t index = 0;
     bool configure = false;
     bool upload = false;
+    texture_policy::UploadKind upload_kind = texture_policy::UploadKind::None;
+    bool hashed = false;
+    std::vector<texture_policy::RowRun> partial_runs;
 
     // Try to find GXM texture in cache.
     int cached_gxm_texture_index = -1;
@@ -712,9 +948,6 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
         // we found the texture in the cache
         cached_gxm_texture_index = gxm_it->second->index;
 
-    Address range_protect_begin = 0;
-    Address range_protect_end = 0;
-
     TextureCacheInfo *info;
     if (cached_gxm_texture_index == -1) {
         // Texture not found in cache.
@@ -727,9 +960,11 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
             texture_lookup.erase(std::bit_cast<TextureGxmDataRepr>(info->texture));
         }
         texture_lookup[texture_repr] = info;
+        reset_tracking(*info);
 
         configure = true;
         upload = true;
+        upload_kind = texture_policy::UploadKind::Full;
         // track the WHOLE mip chain, not just the first level
         info->texture_size = gxm::texture_size(gxm_texture);
         if (info->texture_size > 0 && !is_valid_addr_range(mem, gxm_texture.data_addr << 2, (gxm_texture.data_addr << 2) + info->texture_size))
@@ -738,51 +973,19 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
         // from texture_lookup later
         info->texture = std::bit_cast<SceGxmTexture>(texture_repr);
 
-        // To prevent protecting too commonly accessed data that belongs to the page where the texture also resides
-        // (for example, uniform buffer value and texture data got mixed, so page faults are triggered too many, it's not always good).
-        // This works under the assumption that once this big enough texture decided to modify. It will have to modify either all of its data,
-        // or replace with an entire new texture.
-        bool should_use_hash = true;
-        if (use_protect && info->texture_size >= mem.host_page_size * 4) {
-            range_protect_begin = align(gxm_texture.data_addr << 2, mem.host_page_size);
-            range_protect_end = align_down((gxm_texture.data_addr << 2) + info->texture_size, mem.host_page_size);
-
-            if (range_protect_end - range_protect_begin >= mem.host_page_size * 4) {
-                should_use_hash = protect_only_is_sufficient;
-            }
-        }
-
-        info->use_hash = should_use_hash;
-        info->last_hash_scene = current_scene;
-        if (info->use_hash) {
-            if (import_textures || export_textures)
-                info->hash = hash_texture_nostride(gxm_texture, mem);
-            else
-                // the xor 1 is to make sure it won't be the same as hash_texture_nostride
-                info->hash = hash_texture_data(gxm_texture, info->texture_size, mem) ^ 1;
+        info->validated_scene = current_scene;
+        if (gxm_texture.data_addr != 0) {
+            track_entry(*info, gxm_texture, mem, supports_partial_upload() && !(import_textures || export_textures));
+            hashed = true;
         }
     } else {
         // Texture is cached.
         index = cached_gxm_texture_index;
         info = gxm_it->second;
         configure = false;
-        if (info->use_hash) {
-            if (current_scene != 0 && info->last_hash_scene == current_scene) {
-                upload = false;
-            } else {
-                info->last_hash_scene = current_scene;
-                const uint64_t previous_hash = info->hash;
-                if (import_textures || export_textures)
-                    info->hash = hash_texture_nostride(gxm_texture, mem);
-                else
-                    info->hash = hash_texture_data(gxm_texture, info->texture_size, mem) ^ 1;
-
-                upload = previous_hash != info->hash;
-            }
-        } else {
-            range_protect_begin = align(gxm_texture.data_addr << 2, mem.host_page_size);
-            range_protect_end = align_down((gxm_texture.data_addr << 2) + info->texture_size, mem.host_page_size);
-            upload = info->dirty;
+        if (gxm_texture.data_addr != 0) {
+            upload_kind = revalidate_entry(*info, gxm_texture, mem, partial_runs, hashed);
+            upload = upload_kind != texture_policy::UploadKind::None;
         }
     }
     current_info = info;
@@ -791,8 +994,8 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
         upload = false;
     }
 
-    if (upload && !info->use_hash && (import_textures || export_textures)) {
-        // we still need to get a hash of the texture
+    if (upload && (import_textures || export_textures)) {
+        // the replacement textures are matched by the hash of the visible pixels
         info->hash = hash_texture_nostride(gxm_texture, mem);
     }
 
@@ -830,20 +1033,17 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
         if (export_textures && !importing_texture)
             export_select(gxm_texture);
 
-        if (importing_texture)
+        if (importing_texture) {
             import_upload_texture();
-        else
+        } else if (upload_kind == texture_policy::UploadKind::Partial && !configure) {
+            // only the changed row runs; the rest of the image is kept
+            partial_upload = true;
+            for (const texture_policy::RowRun &run : partial_runs)
+                upload_texture(gxm_texture, mem, &run);
+            partial_upload = false;
+            upload_row_offset = 0;
+        } else {
             upload_texture(gxm_texture, mem);
-
-        if (!info->use_hash) {
-            info->dirty = false;
-            add_protect(mem, range_protect_begin, range_protect_end - range_protect_begin, MemPerm::ReadOnly, [info, texture_repr](Address, bool) {
-                if (memcmp(&info->texture, &texture_repr, sizeof(SceGxmTexture)) == 0) {
-                    info->dirty = true;
-                }
-
-                return true;
-            });
         }
 
         upload_done();
@@ -856,7 +1056,7 @@ void TextureCache::cache_and_bind_texture(const SceGxmTexture &gxm_texture, MemS
     if (ecv::oracle::gpu::enabled()) {
         const Address oracle_addr = gxm_texture.data_addr << 2;
         const bool oracle_valid = upload && oracle_addr && is_valid_addr_range(mem, oracle_addr, oracle_addr + info->texture_size);
-        ecv::oracle::gpu::tex_cache_result(upload, configure, info->use_hash, info->texture_size, info->hash,
+        ecv::oracle::gpu::tex_cache_result(upload, configure, hashed, info->texture_size, info->hash,
             oracle_valid ? hash_data(Ptr<const void>(oracle_addr).get(mem), info->texture_size) : 0);
     }
 #endif

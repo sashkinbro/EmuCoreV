@@ -76,9 +76,7 @@ uint64_t VKTextureCache::release_all_cached_textures() {
 
         texture_lookup.erase(std::bit_cast<TextureGxmDataRepr>(info.texture));
         info.texture_size = 0;
-        info.dirty = false;
-        info.use_hash = false;
-        info.last_hash_scene = 0;
+        reset_tracking(info);
 
         TextureCacheEntry &entry = textures[info.index];
         if (entry.texture.image) {
@@ -94,6 +92,10 @@ uint64_t VKTextureCache::release_all_cached_textures() {
     current_texture = nullptr;
     gxm_texture = nullptr;
     return freed;
+}
+
+bool VKTextureCache::gpu_may_write_guest_range(uint32_t begin, uint32_t end) const {
+    return state.surface_cache.gpu_writes_guest_range(begin, end);
 }
 
 void VKTextureCache::cleanup() {
@@ -383,8 +385,9 @@ void VKTextureCache::prepare_staging_buffer(bool is_configure) {
         .layerCount = current_texture->is_cube ? 6U : 1U
     };
 
-    // if this is done during configure, layout is undefined, otherwise it is shader read only
-    if (is_configure)
+    // if this is done during configure, layout is undefined, otherwise it is shader read only;
+    // a partial upload keeps the rows it does not write
+    if (is_configure || partial_upload)
         current_texture->texture.transition_to(cmd_buffer, vkutil::ImageLayout::TransferDst, range);
     else
         current_texture->texture.transition_to_discard(cmd_buffer, vkutil::ImageLayout::TransferDst, range);
@@ -720,7 +723,7 @@ void VKTextureCache::upload_texture_impl(SceGxmTextureBaseFormat base_format, ui
         .bufferRowLength = pixels_per_stride,
         .bufferImageHeight = buffer_height,
         .imageSubresource = layer,
-        .imageOffset = { 0, 0, 0 },
+        .imageOffset = { 0, static_cast<int32_t>(upload_row_offset), 0 },
         .imageExtent = { width, height, 1 }
     };
     cmd_buffer.copyBufferToImage(staging_buffer.buffer.buffer, image.image, vk::ImageLayout::eTransferDstOptimal, region);

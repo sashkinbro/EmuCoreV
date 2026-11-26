@@ -286,7 +286,9 @@ uint32_t decode_morton2_y(uint32_t code);
 uint32_t encode_morton(uint16_t x, uint16_t y, uint16_t width, uint16_t height);
 bool can_texture_be_unswizzled_without_decode(SceGxmTextureBaseFormat fmt, bool is_vulkan);
 uint32_t get_compressed_size(SceGxmTextureBaseFormat base_format, uint32_t width, uint32_t height);
-uint64_t hash_texture_data(const SceGxmTexture &texture, uint32_t texture_size, const MemState &mem);
+// hash of the texture bytes only (the palette of P4/P8 textures is hashed on its own), 0 when the range is not mapped
+uint64_t hash_texture_pixels(const SceGxmTexture &texture, uint32_t texture_size, const MemState &mem);
+uint64_t hash_texture_palette(const SceGxmTexture &texture, const MemState &mem);
 // hash texture used for texture replacement such that byte in the stride are not hashed
 // this prevent texture duplication in case there are random bytes in the stride
 uint64_t hash_texture_nostride(const SceGxmTexture &texture, const MemState &mem);
