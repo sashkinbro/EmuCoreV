@@ -372,8 +372,13 @@ static void perform_transfer_downscale(MemState &mem, const SceGxmTransferImage 
         LOG_WARN_ONCE("Downscale skipped: src 0x{:08X}+{} or dst 0x{:08X}+{} is not fully allocated guest memory", src_addr, src_bytes, dst_addr, dst_bytes);
         return;
     }
-    const uint8_t *src_ptr = src.address.cast<uint8_t>().get(mem);
-    uint8_t *dst_ptr = dst.address.cast<uint8_t>().get(mem);
+    // Stage through the guest-memory helpers (protected/trapped pages, page-table mapping) instead of raw pointers.
+    std::vector<uint8_t> src_staging(static_cast<size_t>(src_bytes));
+    std::vector<uint8_t> dst_staging(static_cast<size_t>(dst_bytes));
+    memcpy_from_guest(mem, src_staging.data(), src_addr, static_cast<uint32_t>(src_bytes));
+    memcpy_from_guest(mem, dst_staging.data(), dst_addr, static_cast<uint32_t>(dst_bytes));
+    const uint8_t *src_ptr = src_staging.data();
+    uint8_t *dst_ptr = dst_staging.data();
     const transfer::FormatDesc src_desc = transfer::describe(src.format);
     const transfer::FormatDesc dst_desc = transfer::describe(dst.format);
     const bool box = src_desc.bytes != 0 && (src.format == dst.format || dst_desc.bytes != 0);
@@ -396,6 +401,7 @@ static void perform_transfer_downscale(MemState &mem, const SceGxmTransferImage 
             }
         }
     }
+    memcpy_to_guest(mem, dst_addr, dst_staging.data(), static_cast<uint32_t>(dst_bytes));
 }
 
 COMMAND(handle_transfer_downscale) {

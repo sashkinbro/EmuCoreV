@@ -19,7 +19,7 @@ data class VitaCoreConfig(
     val backendRenderer: String = "Vulkan",
     val customDriverName: String = "",
     val turboMode: Boolean = false,
-    val highAccuracy: Boolean = false,
+    val highAccuracy: Boolean = true,
     val resolutionMultiplier: Float = 1.0f,
     val disableSurfaceSync: Boolean = false,
     val eagerSurfaceSync: Boolean = false,
