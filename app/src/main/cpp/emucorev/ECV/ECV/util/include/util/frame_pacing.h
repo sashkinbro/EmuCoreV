@@ -50,6 +50,66 @@ constexpr PresentMode choose_present_mode(bool vsync, const PresentModeSupport &
 }
 
 // ---------------------------------------------------------------------------------------------
+// Swapchain pre-rotation
+// ---------------------------------------------------------------------------------------------
+
+// Clockwise quarter turns between the window's orientation and the panel's natural one
+// (VK_SURFACE_TRANSFORM_ROTATE_90/180/270). With pre-rotation the swapchain images are created in
+// the panel's orientation with that transform as preTransform and the final present pass rotates
+// the frame into them, so the presentation engine (on Android: the display hardware) shows the
+// buffer as it is instead of rotating it in a composition pass every frame.
+enum class PreRotation : uint8_t {
+    None = 0,
+    Rotate90 = 1,
+    Rotate180 = 2,
+    Rotate270 = 3,
+};
+
+constexpr bool rotation_swaps_axes(PreRotation rotation) {
+    return rotation == PreRotation::Rotate90 || rotation == PreRotation::Rotate270;
+}
+
+struct Extent {
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+
+// The swapchain image size for a window of `window` pixels (the surface reports its current extent
+// in the window's orientation).
+constexpr Extent pre_rotated_extent(PreRotation rotation, Extent window) {
+    return rotation_swaps_axes(rotation) ? Extent{ window.height, window.width } : window;
+}
+
+// Pre-rotate only for a pure rotation the surface supports and whose rotated size fits the surface
+// limits; mirrored transforms and anything else are left to the presentation engine.
+constexpr PreRotation choose_pre_rotation(PreRotation current, bool current_supported, Extent window, Extent min_extent, Extent max_extent) {
+    if (current == PreRotation::None || !current_supported)
+        return PreRotation::None;
+    const Extent rotated = pre_rotated_extent(current, window);
+    if (rotated.width < min_extent.width || rotated.width > max_extent.width
+        || rotated.height < min_extent.height || rotated.height > max_extent.height)
+        return PreRotation::None;
+    return current;
+}
+
+struct Uv {
+    float u = 0;
+    float v = 0;
+};
+
+// The window-orientation texture coordinate shown at normalised swapchain-image coordinate (pu, pv)
+// when the image content is rotated `rotation` clockwise (what preTransform declares).
+constexpr Uv pre_rotation_source_uv(PreRotation rotation, float pu, float pv) {
+    switch (rotation) {
+    case PreRotation::Rotate90: return { pv, 1.0f - pu };
+    case PreRotation::Rotate180: return { 1.0f - pu, 1.0f - pv };
+    case PreRotation::Rotate270: return { 1.0f - pv, pu };
+    case PreRotation::None: break;
+    }
+    return { pu, pv };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Panel refresh measurement
 // ---------------------------------------------------------------------------------------------
 

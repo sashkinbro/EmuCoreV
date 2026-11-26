@@ -3,6 +3,7 @@
 #include <util/frame_pacing.h>
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 using namespace frame_pacing;
@@ -183,4 +184,60 @@ TEST(IntervalHistogram, BinsAndMean) {
     EXPECT_EQ(h.bin(8), 2u);
     EXPECT_EQ(h.bin(16), 1u);
     EXPECT_EQ(h.bin(IntervalHistogram::bins - 1), 1u);
+}
+
+TEST(PreRotation, OnlyPureSupportedRotationsThatFitTheSurface) {
+    const Extent window{ 2400, 1080 };
+    const Extent min_extent{ 1, 1 };
+    const Extent max_extent{ 4096, 4096 };
+    EXPECT_EQ(choose_pre_rotation(PreRotation::None, true, window, min_extent, max_extent), PreRotation::None);
+    EXPECT_EQ(choose_pre_rotation(PreRotation::Rotate90, false, window, min_extent, max_extent), PreRotation::None);
+    EXPECT_EQ(choose_pre_rotation(PreRotation::Rotate90, true, window, min_extent, max_extent), PreRotation::Rotate90);
+    EXPECT_EQ(choose_pre_rotation(PreRotation::Rotate270, true, window, min_extent, max_extent), PreRotation::Rotate270);
+    EXPECT_EQ(choose_pre_rotation(PreRotation::Rotate180, true, window, min_extent, max_extent), PreRotation::Rotate180);
+    // the rotated image (1080 x 2400) must fit the surface limits
+    EXPECT_EQ(choose_pre_rotation(PreRotation::Rotate90, true, window, min_extent, { 4096, 2000 }), PreRotation::None);
+    EXPECT_EQ(choose_pre_rotation(PreRotation::Rotate180, true, window, min_extent, { 4096, 2000 }), PreRotation::Rotate180);
+}
+
+TEST(PreRotation, ExtentSwapsForQuarterTurns) {
+    const Extent window{ 2400, 1080 };
+    EXPECT_EQ(pre_rotated_extent(PreRotation::Rotate90, window).width, 1080u);
+    EXPECT_EQ(pre_rotated_extent(PreRotation::Rotate90, window).height, 2400u);
+    EXPECT_EQ(pre_rotated_extent(PreRotation::Rotate270, window).width, 1080u);
+    EXPECT_EQ(pre_rotated_extent(PreRotation::Rotate180, window).width, 2400u);
+    EXPECT_EQ(pre_rotated_extent(PreRotation::None, window).height, 1080u);
+}
+
+namespace {
+// Rotates a W x H window image `turns` times 90 degrees clockwise, pixel by pixel (the reference).
+std::pair<uint32_t, uint32_t> rotate_pixel_clockwise(uint32_t x, uint32_t y, uint32_t w, uint32_t h, int turns) {
+    for (int i = 0; i < turns; ++i) {
+        const uint32_t nx = h - 1 - y;
+        const uint32_t ny = x;
+        x = nx;
+        y = ny;
+        std::swap(w, h);
+    }
+    return { x, y };
+}
+} // namespace
+
+TEST(PreRotation, SourceUvShowsTheClockwiseRotatedWindowImage) {
+    // every window pixel lands where rotating the window image clockwise puts it, sampled at texel centres
+    const uint32_t w = 6, h = 4;
+    for (int turns = 0; turns < 4; ++turns) {
+        const auto rotation = static_cast<PreRotation>(turns);
+        const Extent image = pre_rotated_extent(rotation, { w, h });
+        for (uint32_t y = 0; y < h; ++y) {
+            for (uint32_t x = 0; x < w; ++x) {
+                const auto [px, py] = rotate_pixel_clockwise(x, y, w, h, turns);
+                ASSERT_LT(px, image.width);
+                ASSERT_LT(py, image.height);
+                const Uv uv = pre_rotation_source_uv(rotation, (px + 0.5f) / image.width, (py + 0.5f) / image.height);
+                EXPECT_EQ(static_cast<uint32_t>(uv.u * w), x) << "turns " << turns;
+                EXPECT_EQ(static_cast<uint32_t>(uv.v * h), y) << "turns " << turns;
+            }
+        }
+    }
 }
