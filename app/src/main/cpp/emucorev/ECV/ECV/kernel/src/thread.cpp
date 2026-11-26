@@ -100,6 +100,7 @@ int ThreadState::init(const char *name, Ptr<const void> entry_point, int init_pr
 
     const Ptr<uint8_t> user_tls_ptr = base_tls_ptr + KERNEL_TLS_SIZE;
     write_tpidruro(*cpu, user_tls_ptr.address());
+    write_tpidrurw(*cpu, 0);
     if (kernel.tls_address) {
         assert(kernel.tls_psize <= kernel.tls_msize);
         memcpy(user_tls_ptr.get(mem), kernel.tls_address.get(mem), kernel.tls_psize);

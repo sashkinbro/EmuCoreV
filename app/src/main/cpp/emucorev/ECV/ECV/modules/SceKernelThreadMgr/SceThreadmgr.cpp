@@ -435,7 +435,7 @@ EXPORT(int, _sceKernelGetThreadContextForVM, SceUID threadId, Ptr<SceKernelThrea
         infoCpu->st = context.cpu_registers[13];
         infoCpu->sb = thread->stack.get() + thread->stack_size;
         infoCpu->teehbr = 0; // ThumbEE handler base: unused by the GC.
-        infoCpu->tpidrurw = read_tpidruro(*thread->cpu);
+        infoCpu->tpidrurw = read_tpidrurw(*thread->cpu);
     }
 
     SceKernelThreadVfpRegisterInfo *infoVfp = pVfpRegisterInfo.get(emuenv.mem);
