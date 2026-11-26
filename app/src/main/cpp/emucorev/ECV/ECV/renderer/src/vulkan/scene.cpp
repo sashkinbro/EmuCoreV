@@ -572,6 +572,10 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
 #endif
         // PAF's glow must sample completed pixels, not a simultaneous write to
         // the same attachment on a non-coherent mobile framebuffer-fetch path.
+        // The instance that follows the copy continues the scene: it loads the depth-stencil (the scene-begin clear must not run again; a
+        // macroblock scene keeps its clear for the next macroblock, so the ops are restored afterwards).
+        const auto scene_dyn_pass = context.dyn_pass;
+        context.dyn_pass.depth_load = context.dyn_pass.stencil_load = true;
         context.stop_render_pass();
         auto &source = *context.current_color_base_image;
         auto &snapshot = *context.shell_fetch_snapshot;
@@ -596,6 +600,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
             snapshot.layout = vkutil::ImageLayout::StorageImage;
         }
         context.start_render_pass();
+        context.dyn_pass = scene_dyn_pass;
     }
 
     if (context.state.features.preserve_f16_nan_as_u16) {

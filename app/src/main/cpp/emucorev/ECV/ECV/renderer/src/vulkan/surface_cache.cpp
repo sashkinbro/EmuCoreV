@@ -2330,7 +2330,9 @@ Framebuffer &VKSurfaceCache::retrieve_framebuffer_handle(MemState &mem, SceGxmCo
     // (the dynamic rendering path has neither framebuffers nor the shell input-attachment snapshot: local read does the job)
     if (!state.use_dynamic_rendering && color && !color_result.raw_image
         && (state.use_copy_snapshot || (state.current_title_id == "SceShell" && color_result.base_image->format == vk::Format::eR8G8B8A8Unorm))) {
-        shell_snapshot = std::make_shared<vkutil::Image>(framebuffer_width, framebuffer_height, color_result.base_image->format);
+        // same format as the pass attachment it replaces (a gamma-corrected surface is rendered through an sRGB view of its UNORM image; the copy is bit-exact between the two)
+        shell_snapshot = std::make_shared<vkutil::Image>(framebuffer_width, framebuffer_height, static_cast<VKContext *>(state.context)->current_color_format);
+        LOG_INFO_ONCE("Fbfetch snapshot image: {} {}x{} (base image {})", vk::to_string(shell_snapshot->format), framebuffer_width, framebuffer_height, vk::to_string(color_result.base_image->format));
         shell_snapshot->init_image(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eColorAttachment);
         auto &context = *static_cast<VKContext *>(state.context);
         shell_snapshot->transition_to(context.prerender_cmd, vkutil::ImageLayout::StorageImage);
