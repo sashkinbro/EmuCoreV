@@ -11,6 +11,7 @@
 #include <emucorev/savestate/memory_image.h>
 #include <emucorev/savestate/ngs_state_io.h>
 #include <emucorev/savestate/state_io.h>
+#include <emucorev/savestate/thread_tls_io.h>
 #include <emucorev/savestate/kernel_state_io.h>
 #include <emucorev/savestate/kernel_base_io.h>
 #include <emucorev/savestate/display_state_io.h>
@@ -445,7 +446,20 @@ bool write_threads(EmuEnvState &emuenv, Writer &writer, std::string &error) {
     std::vector<ThreadState::Snapshot> snapshots;
     if (!capture_thread_snapshots(emuenv.kernel, 0, snapshots, error)) return false;
     write_thread_snapshots(buffer, snapshots);
-    return writer.write_section(SectionId::Threads, buffer.data().data(), buffer.size(), true, error);
+    if (!writer.write_section(SectionId::Threads, buffer.data().data(), buffer.size(), true, error))
+        return false;
+
+    std::vector<ThreadTlsEntry> tls_entries;
+    for (const auto &snapshot : snapshots) {
+        if (!snapshot.registered)
+            continue;
+        const auto thread = emuenv.kernel.get_thread(snapshot.id);
+        if (thread && thread->cpu)
+            tls_entries.push_back({ static_cast<uint32_t>(snapshot.id), read_tpidrurw(*thread->cpu) });
+    }
+    BufferWriter tls_buffer;
+    encode_thread_tpidrurw(tls_buffer, tls_entries);
+    return writer.write_section(SectionId::ThreadTls, tls_buffer.data().data(), tls_buffer.size(), true, error);
 }
 
 bool read_threads(EmuEnvState &emuenv, const std::vector<uint8_t> &data, std::vector<ThreadState::Snapshot> &deferred, bool session_paused, std::string &error) {
@@ -2032,6 +2046,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     std::vector<uint8_t> input_data;
     std::vector<uint8_t> np_data;
     std::vector<uint8_t> io_data;
+    std::vector<uint8_t> thread_tls_data;
 
     if (!reader.read_section(SectionId::Kernel, kernel_data, error)
         || !reader.read_section(SectionId::KernelSync, kernel_sync_data, error)
@@ -2049,7 +2064,9 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         || (reader.has_section(SectionId::VideoCodecs)
             && !reader.read_section(SectionId::VideoCodecs, videocodec_data, error))
         || (reader.has_section(SectionId::Np)
-            && !reader.read_section(SectionId::Np, np_data, error))) {
+            && !reader.read_section(SectionId::Np, np_data, error))
+        || (reader.has_section(SectionId::ThreadTls)
+            && !reader.read_section(SectionId::ThreadTls, thread_tls_data, error))) {
         result.status = Status::InvalidFile;
         result.error = error;
         return result;
@@ -2092,6 +2109,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     DisplaySnapshot display_snapshot;
     ParsedKernelSync sync_snapshot;
     std::vector<ThreadState::Snapshot> thread_snapshots;
+    std::vector<ThreadTlsEntry> thread_tls;
     const auto valid_range = [&](Address address, size_t size) { return memory_image->contains(address, size); };
     NpSnapshot np_snapshot;
     if ((result.meta.engine_version >= 17 && !reader.has_section(SectionId::Np))
@@ -2108,6 +2126,7 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         || !validate_kernel_modules(kernel_snapshot, *memory_image, error)
         || !parse_kernel_sync(kernel_sync_data, sync_snapshot, error)
         || !parse_thread_snapshots(threads_data, thread_snapshots, error)
+        || !parse_thread_tpidrurw(thread_tls_data, thread_tls, error)
         || !validate_kernel_continuations(thread_snapshots, kernel_snapshot.callbacks, sync_snapshot, valid_range, external_tag, error)
         || !validate_kernel_import_abis(thread_snapshots, *memory_image, error)
         || !validate_kernel_thread_allocations(thread_snapshots, kernel_snapshot.tls_msize, *memory_image, error)
@@ -2424,6 +2443,12 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
         result.status = Status::InvalidFile;
         result.error = error;
         return result;
+    }
+    // Threads from a state without the section keep the 0 they were created with.
+    for (const ThreadTlsEntry &entry : thread_tls) {
+        const auto thread = emuenv.kernel.get_thread(static_cast<SceUID>(entry.thread_id));
+        if (thread && thread->cpu)
+            write_tpidrurw(*thread->cpu, entry.tpidrurw);
     }
     LOG_DEBUG("[savestate] load: threads recreated");
     if (!read_display(emuenv, display_snapshot, error)) {

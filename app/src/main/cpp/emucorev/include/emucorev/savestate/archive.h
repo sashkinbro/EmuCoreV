@@ -46,6 +46,8 @@ enum class SectionId : uint32_t {
     GpuBufferPages = 16,
     Np = 17,
     VideoCodecs = 18,
+    // Optional (absent in engine 20 saves recorded before it existed): per-thread TPIDRURW.
+    ThreadTls = 19,
 };
 
 enum SectionFlags : uint32_t {

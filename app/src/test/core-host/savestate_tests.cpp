@@ -807,3 +807,58 @@ TEST(SaveStateLayout, RawStructsMustBeRegisteredWithTheirSize) {
     static_assert(!ss::raw_layout_registered<UnregisteredRawStruct>());
     SUCCEED();
 }
+
+// ---- optional ThreadTls section (per-thread TPIDRURW) ----
+namespace {
+std::vector<ss::ThreadTlsEntry> thread_tls_round_trip(const fs::path &file, const std::vector<ss::ThreadTlsEntry> *entries) {
+    ss::Writer writer;
+    std::string error;
+    EXPECT_TRUE(writer.open(file, error)) << error;
+    const uint8_t marker = 1;
+    EXPECT_TRUE(writer.write_section(ss::SectionId::Meta, &marker, 1, false, error)) << error;
+    if (entries) {
+        ss::BufferWriter buffer;
+        ss::encode_thread_tpidrurw(buffer, *entries);
+        EXPECT_TRUE(writer.write_section(ss::SectionId::ThreadTls, buffer.data().data(), buffer.size(), true, error)) << error;
+    }
+    EXPECT_TRUE(writer.finalize(error)) << error;
+
+    ss::Reader reader;
+    EXPECT_TRUE(reader.open(file, error)) << error;
+    std::vector<uint8_t> data;
+    if (reader.has_section(ss::SectionId::ThreadTls))
+        EXPECT_TRUE(reader.read_section(ss::SectionId::ThreadTls, data, error)) << error;
+    std::vector<ss::ThreadTlsEntry> parsed;
+    EXPECT_TRUE(ss::parse_thread_tpidrurw(data, parsed, error)) << error;
+    return parsed;
+}
+} // namespace
+
+TEST(SaveStateThreadTls, SectionRoundTripKeepsNonZeroValuesByThreadId) {
+    const fs::path file = fs::temp_directory_path() / "ecv-threadtls-with.ecvs";
+    const std::vector<ss::ThreadTlsEntry> entries{ { 0x40010001, 0x81234560 }, { 0x40010002, 0 }, { 0x40010003, 7 } };
+    const auto parsed = thread_tls_round_trip(file, &entries);
+    ASSERT_EQ(parsed.size(), 2u);
+    EXPECT_EQ(parsed[0].thread_id, 0x40010001u);
+    EXPECT_EQ(parsed[0].tpidrurw, 0x81234560u);
+    EXPECT_EQ(parsed[1].thread_id, 0x40010003u);
+    EXPECT_EQ(parsed[1].tpidrurw, 7u);
+    boost::system::error_code ec;
+    fs::remove(file, ec);
+}
+
+TEST(SaveStateThreadTls, MissingSectionParsesAsNoEntries) {
+    const fs::path file = fs::temp_directory_path() / "ecv-threadtls-without.ecvs";
+    EXPECT_TRUE(thread_tls_round_trip(file, nullptr).empty());
+    boost::system::error_code ec;
+    fs::remove(file, ec);
+}
+
+TEST(SaveStateThreadTls, MalformedPayloadIsRejected) {
+    std::vector<ss::ThreadTlsEntry> out;
+    std::string error;
+    std::vector<uint8_t> truncated{ 1, 0, 0, 0, 5, 0, 0, 0 }; // count 1, only one word follows
+    EXPECT_FALSE(ss::parse_thread_tpidrurw(truncated, out, error));
+    std::vector<uint8_t> huge{ 0xFF, 0xFF, 0xFF, 0xFF };
+    EXPECT_FALSE(ss::parse_thread_tpidrurw(huge, out, error));
+}
