@@ -28,6 +28,10 @@
 
 #include <util/log.h>
 
+#if ECV_ORACLE
+#include <ecv_lab_input.h> // oracle: lab input injection (debug builds only)
+#endif
+
 #include <SDL3/SDL_events.h>
 
 #include <cmath>
@@ -192,6 +196,20 @@ void touch_vsync_update(EmuEnvState &emuenv) {
                     for (unsigned int i = 0; i < source->reportNum && data.reportNum < limit; ++i)
                         data.report[data.reportNum++] = source->report[i];
             }
+#if ECV_ORACLE
+            {
+                ecv::oracle::lab_input::TouchPointOut lab_points[6];
+                const unsigned lab_count = ecv::oracle::lab_input::touch_points(port, lab_points, 6);
+                for (unsigned i = 0; i < lab_count && data.reportNum < limit; ++i) {
+                    auto &report = data.report[data.reportNum++];
+                    report = {};
+                    report.x = lab_points[i].x;
+                    report.y = lab_points[i].y;
+                    report.id = lab_points[i].id;
+                    report.force = touch.force_touch_enabled[port] ? 128 : 0;
+                }
+            }
+#endif
             data.timeStamp = timestamp;
         }
 
@@ -525,6 +543,16 @@ int touch_get(const SceUID thread_id, EmuEnvState &emuenv, const SceUInt32 &port
             corr_buffer_idx %= MAX_TOUCH_BUFFER_SAVED;
         }
     }
+
+#if ECV_ORACLE
+    {
+        ecv::oracle::lab_input::TouchPointOut reported[6];
+        const unsigned count = std::min<unsigned>(pData[0].reportNum, 6);
+        for (unsigned i = 0; i < count; ++i)
+            reported[i] = { pData[0].report[i].x, pData[0].report[i].y, static_cast<uint8_t>(pData[0].report[i].id) };
+        ecv::oracle::lab_input::note_touch_read(port_idx, count, reported);
+    }
+#endif
 
     return nb_returned_data;
 }

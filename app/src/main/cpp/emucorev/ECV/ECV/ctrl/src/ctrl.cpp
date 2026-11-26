@@ -28,6 +28,10 @@
 #include <kernel/input_read_continuation.h>
 #include <util/log.h>
 
+#if ECV_ORACLE
+#include <ecv_lab_input.h> // oracle: lab input injection (debug builds only)
+#endif
+
 static int reserve_port(CtrlState &state) {
     for (int i = 0; i < SCE_CTRL_MAX_WIRELESS_NUM; i++) {
         if (state.free_ports[i]) {
@@ -301,6 +305,10 @@ static void retrieve_ctrl_data(EmuEnvState &emuenv, int port, bool is_v2, bool n
             apply_controller(emuenv, &buttons, axes.data(), controller, is_v2);
         }
     }
+#if ECV_ORACLE
+    if (port == 1)
+        ecv::oracle::lab_input::apply_ctrl(is_v2, buttons, axes.data());
+#endif
 
     // Hand the pad over in positive logic, the cheat engine needs it to evaluate `$C2` codes.
     if (port == 1)

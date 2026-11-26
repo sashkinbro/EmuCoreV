@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Debug-only lab input injection (adb shell am broadcast -a com.sbro.emucorev.LAB_INPUT -p com.sbro.emucorev with string extra cmd). -->
+        <receiver
+            android:name="com.sbro.emucorev.core.LabInputReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.sbro.emucorev.LAB_INPUT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
