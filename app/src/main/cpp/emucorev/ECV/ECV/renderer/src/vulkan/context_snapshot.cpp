@@ -52,7 +52,12 @@ bool validate_vk_context_snapshot(const VKContextSnapshot &snapshot, std::string
         || snapshot.visibility_query_index >= static_cast<int32_t>(kMaxVisibilityQueriesInSnapshot)
         || (snapshot.visibility_query_index >= 0
             && snapshot.visibility_buffer_address
-            && static_cast<uint32_t>(snapshot.visibility_query_index) >= snapshot.visibility_stride / sizeof(uint32_t)))
+            && static_cast<uint32_t>(snapshot.visibility_query_index) >= snapshot.visibility_stride / sizeof(uint32_t))
+        || snapshot.visibility_back_query_index < -1
+        || snapshot.visibility_back_query_index >= static_cast<int32_t>(kMaxVisibilityQueriesInSnapshot)
+        || (snapshot.visibility_back_query_index >= 0
+            && snapshot.visibility_buffer_address
+            && static_cast<uint32_t>(snapshot.visibility_back_query_index) >= snapshot.visibility_stride / sizeof(uint32_t)))
         return fail("invalid Vulkan visibility-buffer checkpoint");
 
     // The renderer is parked only at batch boundaries. A live recording here is
@@ -134,6 +139,8 @@ bool capture_vk_context_snapshot(const VKContext &context, Address context_addre
     }
     staged.visibility_query_index = context.current_query_idx;
     staged.visibility_query_increment = context.is_query_op_increment;
+    staged.visibility_back_query_index = context.back_query_idx;
+    staged.visibility_back_query_increment = context.back_query_op_increment;
 
     if (!validate_vk_context_snapshot(staged, error))
         return false;
@@ -186,6 +193,9 @@ bool restore_vk_context_snapshot(VKContext &context, MemState &mem, VKRenderTarg
         sync_visibility_index(context, snapshot.visibility_query_index >= 0,
             snapshot.visibility_query_index >= 0 ? static_cast<uint32_t>(snapshot.visibility_query_index) : 0,
             snapshot.visibility_query_increment);
+        sync_visibility_index_back(context, snapshot.visibility_back_query_index >= 0,
+            snapshot.visibility_back_query_index >= 0 ? static_cast<uint32_t>(snapshot.visibility_back_query_index) : 0,
+            snapshot.visibility_back_query_increment);
         return true;
     }
     if (!render_target) {

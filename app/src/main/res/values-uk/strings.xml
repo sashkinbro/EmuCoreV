@@ -1486,6 +1486,8 @@
     <string name="emulation_savestate_loaded_toast">Завантажено</string>
     <string name="emulation_savestate_deleted_toast">Видалено</string>
     <string name="emulation_savestate_failed_toast">Не вдалося виконати дію</string>
+    <string name="emulation_savestate_other_version_toast">Цей стан збереження створено іншою версією застосунку, тому його не можна завантажити. Файл збережено.</string>
+    <string name="emulation_savestate_other_version_boot_toast">Швидке збереження створено іншою версією застосунку, тому його не можна завантажити. Гра запускається звичайно; файл збережено.</string>
     <string name="emulation_savestate_vulkan_only">Збереження стану працюють лише з рендерером Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Гру не запущено, стан зберегти неможливо</string>
     <string name="emulation_savestate_refused_exiting">Гра закривається, повторіть пізніше</string>

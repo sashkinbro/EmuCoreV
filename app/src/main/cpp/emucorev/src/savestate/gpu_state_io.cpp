@@ -95,6 +95,8 @@ void write_context(BufferWriter &writer, const renderer::vulkan::VKContextSnapsh
     writer.u32(context.visibility_stride);
     writer.i32(context.visibility_query_index);
     writer.boolean(context.visibility_query_increment);
+    writer.i32(context.visibility_back_query_index);
+    writer.boolean(context.visibility_back_query_increment);
 }
 bool read_context(BufferReader &reader, renderer::vulkan::VKContextSnapshot &context, std::string &error) {
     context.context_address = reader.u32();
@@ -130,6 +132,8 @@ bool read_context(BufferReader &reader, renderer::vulkan::VKContextSnapshot &con
     context.visibility_stride = reader.u32();
     context.visibility_query_index = reader.i32();
     context.visibility_query_increment = reader.boolean();
+    context.visibility_back_query_index = reader.i32();
+    context.visibility_back_query_increment = reader.boolean();
     return reader.ok() && renderer::vulkan::validate_vk_context_snapshot(context, error);
 }
 }
@@ -354,7 +358,7 @@ bool encode_gpu_state(const GpuSnapshot &snapshot, std::vector<uint8_t> &data, s
     std::vector<uint8_t> surfaces;
     if (!renderer::vulkan::encode_surface_cache_snapshot(snapshot.surfaces, surfaces, error))
         return false;
-    uint64_t size = surfaces.size() + 64 + snapshot.clocks.size() * 20 + snapshot.contexts.size() * 111;
+    uint64_t size = surfaces.size() + 64 + snapshot.clocks.size() * 20 + snapshot.contexts.size() * 116; // upper bound of write_context
     for (const auto &target : snapshot.targets)
         size += 44 + target.color.bytes.size() + target.depth_stencil.bytes.size();
     for (const auto &buffer : snapshot.buffers) {
@@ -404,7 +408,7 @@ bool encode_gpu_state_metadata(const GpuSnapshot &snapshot, std::vector<uint8_t>
     std::vector<uint8_t> surfaces;
     if (!renderer::vulkan::encode_surface_cache_snapshot(snapshot.surfaces, surfaces, error))
         return false;
-    uint64_t size = surfaces.size() + 64 + snapshot.clocks.size() * 20 + snapshot.contexts.size() * 111;
+    uint64_t size = surfaces.size() + 64 + snapshot.clocks.size() * 20 + snapshot.contexts.size() * 116; // upper bound of write_context
     for (const auto &target : snapshot.targets)
         size += 44 + target.color.bytes.size() + target.depth_stencil.bytes.size();
     size += snapshot.buffers.size() * 12;
@@ -524,7 +528,7 @@ bool parse_gpu_state(const std::vector<uint8_t> &data, GpuSnapshot &snapshot, st
         clock.frame = reader.u64();
         clock.scene = reader.u64();
     }
-    if (!count(reader, amount, 107)) return false;
+    if (!count(reader, amount, 112)) return false;
     staged.contexts.resize(amount);
     for (auto &context : staged.contexts) if (!read_context(reader, context, error)) return false;
     if (!reader.ok() || reader.remaining()) { error = "invalid GPU snapshot"; return false; }

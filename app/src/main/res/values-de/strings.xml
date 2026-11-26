@@ -1484,6 +1484,8 @@
     <string name="emulation_savestate_loaded_toast">Geladen</string>
     <string name="emulation_savestate_deleted_toast">Gelöscht</string>
     <string name="emulation_savestate_failed_toast">Aktion fehlgeschlagen</string>
+    <string name="emulation_savestate_other_version_toast">Dieser Speicherstand stammt aus einer anderen App-Version und kann nicht geladen werden. Die Datei bleibt erhalten.</string>
+    <string name="emulation_savestate_other_version_boot_toast">Der Schnellspeicherstand stammt aus einer anderen App-Version und kann nicht geladen werden. Das Spiel startet normal; die Datei bleibt erhalten.</string>
     <string name="emulation_savestate_vulkan_only">Speicherstände benötigen den Vulkan-Renderer</string>
     <string name="emulation_savestate_refused_no_game">Es läuft kein Spiel, der Zustand kann nicht gespeichert werden</string>
     <string name="emulation_savestate_refused_exiting">Das Spiel wird beendet, versuche es später erneut</string>

@@ -6,7 +6,26 @@
 #include <type_traits>
 #include <vector>
 
+#include <emucorev/savestate/serialized_layout.h>
+
 namespace emucorev::savestate {
+
+// Raw-byte serialization guard. A struct written or read as raw bytes (value<T>, or the bulk readers
+// built on bytes()) must be registered with its exact size in serialized_layout.h; an unregistered
+// struct, or one whose size changed, fails the build. Changing a registered layout therefore means:
+// bump kEngineVersion (old saves are rejected, never misread) and update the recorded size.
+template <typename T>
+constexpr bool raw_layout_registered() {
+    if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>)
+        return true;
+    else
+        return SerializedLayout<T>::size == sizeof(T);
+}
+
+#define ECV_ASSERT_RAW_LAYOUT(T)                                                                              \
+    static_assert(std::is_trivially_copyable_v<T>, "raw save-state serialization requires a trivially copyable type"); \
+    static_assert(::emucorev::savestate::raw_layout_registered<T>(),                                         \
+        "raw save-state struct is unregistered or changed size: bump kEngineVersion and update serialized_layout.h")
 
 class BufferWriter {
 public:
@@ -20,7 +39,7 @@ public:
 
     template <typename T>
     void value(const T &v) {
-        static_assert(std::is_trivially_copyable_v<T>, "value() requires a trivially copyable type");
+        ECV_ASSERT_RAW_LAYOUT(T);
         append(&v, sizeof(T));
     }
 
@@ -80,7 +99,7 @@ public:
 
     template <typename T>
     T value() {
-        static_assert(std::is_trivially_copyable_v<T>, "value() requires a trivially copyable type");
+        ECV_ASSERT_RAW_LAYOUT(T);
         T out{};
         if (!bytes(&out, sizeof(T)))
             return T{};

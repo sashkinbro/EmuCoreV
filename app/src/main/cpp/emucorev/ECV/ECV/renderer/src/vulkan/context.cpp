@@ -515,6 +515,9 @@ static void configure_context_scene(VKContext &context, MemState &mem, VKRenderT
         sync_visibility_index(context, resume->visibility_query_index >= 0,
             resume->visibility_query_index >= 0 ? static_cast<uint32_t>(resume->visibility_query_index) : 0,
             resume->visibility_query_increment);
+        sync_visibility_index_back(context, resume->visibility_back_query_index >= 0,
+            resume->visibility_back_query_index >= 0 ? static_cast<uint32_t>(resume->visibility_back_query_index) : 0,
+            resume->visibility_back_query_increment);
     }
 }
 

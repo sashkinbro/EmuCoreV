@@ -17,6 +17,8 @@ data class SaveStateResult(
     val isOk: Boolean get() = status == STATUS_OK
     val isSessionMismatch: Boolean get() = status == STATUS_SESSION_MISMATCH
     val isTitleMismatch: Boolean get() = status == STATUS_TITLE_MISMATCH
+    /** Written by another engine version (saves are not converted between versions); the file is left in place. */
+    val isUnsupportedVersion: Boolean get() = status == STATUS_UNSUPPORTED_VERSION
     val requiresRendererRestart: Boolean get() = status == STATUS_CONFIGURATION_MISMATCH && sessionUsable
 
     companion object {

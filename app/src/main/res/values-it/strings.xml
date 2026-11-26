@@ -1485,6 +1485,8 @@
     <string name="emulation_savestate_loaded_toast">Caricato</string>
     <string name="emulation_savestate_deleted_toast">Eliminato</string>
     <string name="emulation_savestate_failed_toast">Operazione non riuscita</string>
+    <string name="emulation_savestate_other_version_toast">Questo stato salvato è stato creato da un’altra versione dell’app e non può essere caricato. Il file è stato conservato.</string>
+    <string name="emulation_savestate_other_version_boot_toast">Il salvataggio rapido è stato creato da un’altra versione dell’app e non può essere caricato. Il gioco si avvia normalmente; il file è stato conservato.</string>
     <string name="emulation_savestate_vulkan_only">Gli stati salvati richiedono il renderer Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Nessun gioco in esecuzione, impossibile salvare lo stato</string>
     <string name="emulation_savestate_refused_exiting">Il gioco si sta chiudendo, riprova più tardi</string>

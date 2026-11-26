@@ -25,6 +25,8 @@ struct GxmSnapshot {
     std::vector<std::pair<SceUID, PendingDisplaySubmission>> display_submissions;
     std::map<Address, MemoryMapInfo> regions;
 };
+// The GXM section codec: encode writes exactly what parse reads (program source extension included).
+bool encode_gxm_state(const GxmSnapshot &, BufferWriter &, std::string &);
 bool parse_gxm_state(const std::vector<uint8_t> &, GxmSnapshot &, std::string &);
 bool validate_gxm_state(const GxmSnapshot &, const MemoryImage &, std::string &);
 // Append the optional, bounded GXP source extension used by new save states.

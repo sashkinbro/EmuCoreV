@@ -407,6 +407,7 @@ fun EmulationOverlayHost(
                     }
                     result.isSessionMismatch -> R.string.emulation_savestate_session_mismatch_toast
                     result.isTitleMismatch -> R.string.emulation_savestate_title_mismatch_toast
+                    result.isUnsupportedVersion -> R.string.emulation_savestate_other_version_toast
                     else -> R.string.emulation_savestate_failed_toast
                 }
                 if (!result.sessionUsable && action is SaveStateAction.Load) {

@@ -482,7 +482,8 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
                 }
                 if (!repository.validStatePath(gameId, explicitState)) {
                     Log.e(TAG, "Rejected save state for $gameId: $explicitState")
-                    return abortLaunch(R.string.emulation_savestate_failed_toast)
+                    return abortLaunch(if (repository.isStateFromOtherBuild(gameId, explicitState))
+                        R.string.emulation_savestate_other_version_toast else R.string.emulation_savestate_failed_toast)
                 }
             }
             return true
@@ -526,7 +527,12 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
             skipAutomatic = intent.getBooleanExtra(SKIP_AUTOMATIC_STATE_LOAD_EXTRA, false) || LabSession.active,
             vulkanBackend = vulkanBackend) {
             val quick = repository.validQuickStatePath(gameId)
-            if (quick != null && quick == interrupted) {
+            if (quick == null && repository.isQuickStateFromOtherBuild(gameId)) {
+                // Saves are not converted between engine versions: boot normally, keep the file.
+                Log.w(TAG, "Automatic quick load skipped for $gameId: the quick save was made by another app version")
+                runOnUiThread { Toast.makeText(this, R.string.emulation_savestate_other_version_boot_toast, Toast.LENGTH_LONG).show() }
+                null
+            } else if (quick != null && quick == interrupted) {
                 // The last automatic load of this file killed the process: boot normally once.
                 Log.e(TAG, "Previous automatic load of $quick never finished; skipping it")
                 repository.finishLoad(gameId)

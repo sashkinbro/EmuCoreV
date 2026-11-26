@@ -84,6 +84,21 @@ class SaveStateRepository internal constructor(
         file.absolutePath.takeIf { inspection.isOk && inspection.titleId == titleId && inspection.engineVersion > 0 }
     }
 
+    /**
+     * True when [path] is a state of [titleId] that this build refuses only because another engine
+     * version wrote it. Such a file is never loaded, converted or deleted here.
+     */
+    fun isStateFromOtherBuild(titleId: String, path: String): Boolean = operationLock.withLock {
+        if (titleId.isBlank() || path.isBlank()) return@withLock false
+        val file = File(path)
+        if (!file.isFile || file.length() == 0L) return@withLock false
+        val inspection = backend.inspect(file.absolutePath)
+        inspection.isUnsupportedVersion && inspection.titleId == titleId
+    }
+
+    fun isQuickStateFromOtherBuild(titleId: String): Boolean =
+        titleId.isNotBlank() && isStateFromOtherBuild(titleId, stateFile(titleId, QUICK_SLOT).absolutePath)
+
     fun thumbnailFile(titleId: String, slot: Int): File =
         File(slotsDirectory(titleId), baseName(slot) + THUMBNAIL_EXTENSION)
 

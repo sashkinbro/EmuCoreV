@@ -33,3 +33,4 @@
 *.jar binary
 *.so binary
 *.a binary
+*.ecvs binary

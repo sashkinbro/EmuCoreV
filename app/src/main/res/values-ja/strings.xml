@@ -1484,6 +1484,8 @@
     <string name="emulation_savestate_loaded_toast">読み込みました</string>
     <string name="emulation_savestate_deleted_toast">削除しました</string>
     <string name="emulation_savestate_failed_toast">操作に失敗しました</string>
+    <string name="emulation_savestate_other_version_toast">このステートセーブは別のバージョンのアプリで作成されたため読み込めません。ファイルは保持されています。</string>
+    <string name="emulation_savestate_other_version_boot_toast">クイックセーブは別のバージョンのアプリで作成されたため読み込めません。ゲームを通常どおり起動します。ファイルは保持されています。</string>
     <string name="emulation_savestate_vulkan_only">ステートセーブには Vulkan レンダラーが必要です</string>
     <string name="emulation_savestate_refused_no_game">ゲームが実行されていないため、状態を保存できません</string>
     <string name="emulation_savestate_refused_exiting">ゲームを終了中です。しばらくしてからお試しください</string>

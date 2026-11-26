@@ -48,6 +48,8 @@ struct ContextSnapshot {
     Address alloc_space_start = 0;
     uint32_t pending_first = 0, pending_last = 0;
     bool was_vert_default_uniform_reserved = false, was_frag_default_uniform_reserved = false;
+    // renderer::Context::yuv_profile: sceGxmSetYuvProfile per [program type][CSC slot] (engine 20)
+    uint8_t yuv_profile[2][2] = { { 0, 2 }, { 0, 2 } };
     std::vector<DeferredListSnapshot> deferred_lists;
 };
 

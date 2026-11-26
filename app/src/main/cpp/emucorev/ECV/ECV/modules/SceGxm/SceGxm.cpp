@@ -1703,6 +1703,8 @@ bool capture_contexts(EmuEnvState &emuenv, std::vector<ContextSnapshot> &output,
         snapshot.address = address;
         snapshot.deferred = deferred;
         snapshot.renderer_record = context->renderer->record;
+        static_assert(sizeof(snapshot.yuv_profile) == sizeof(context->renderer->yuv_profile));
+        std::memcpy(snapshot.yuv_profile, context->renderer->yuv_profile, sizeof(snapshot.yuv_profile));
         if (context->renderer->current_render_target) {
             const auto targets = runtime_render_targets(emuenv);
             const auto target = std::find_if(targets.begin(), targets.end(), [&](const auto &target) {
@@ -1978,6 +1980,7 @@ bool restore_contexts(EmuEnvState &emuenv, const std::vector<ContextSnapshot> &s
             return false;
         }
         context->renderer->record = snapshot.renderer_record;
+        std::memcpy(context->renderer->yuv_profile, snapshot.yuv_profile, sizeof(snapshot.yuv_profile));
         renderer::RenderTarget *target = nullptr;
         if (snapshot.render_target_address) {
             target = std::find_if(targets.begin(), targets.end(), [&](const auto &target) {

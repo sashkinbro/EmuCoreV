@@ -1485,6 +1485,8 @@
     <string name="emulation_savestate_loaded_toast">Loaded</string>
     <string name="emulation_savestate_deleted_toast">Deleted</string>
     <string name="emulation_savestate_failed_toast">Could not complete the operation</string>
+    <string name="emulation_savestate_other_version_toast">This save state was made by a different app version and can\'t be loaded. The file was kept.</string>
+    <string name="emulation_savestate_other_version_boot_toast">The quick save was made by a different app version and can\'t be loaded. Starting the game normally; the file was kept.</string>
     <string name="emulation_savestate_vulkan_only">Save states need the Vulkan renderer</string>
     <string name="emulation_savestate_refused_no_game">No game is running, so the state cannot be saved</string>
     <string name="emulation_savestate_refused_exiting">The game is closing, try again later</string>

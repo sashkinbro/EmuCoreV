@@ -1488,6 +1488,8 @@
     <string name="emulation_savestate_loaded_toast">تم التحميل</string>
     <string name="emulation_savestate_deleted_toast">تم الحذف</string>
     <string name="emulation_savestate_failed_toast">تعذر إكمال العملية</string>
+    <string name="emulation_savestate_other_version_toast">تم إنشاء حالة الحفظ هذه بإصدار مختلف من التطبيق ولا يمكن تحميلها. تم الاحتفاظ بالملف.</string>
+    <string name="emulation_savestate_other_version_boot_toast">تم إنشاء الحفظ السريع بإصدار مختلف من التطبيق ولا يمكن تحميله. يتم تشغيل اللعبة بشكل عادي؛ تم الاحتفاظ بالملف.</string>
     <string name="emulation_savestate_vulkan_only">حالات الحفظ تتطلب عارض Vulkan</string>
     <string name="emulation_savestate_refused_no_game">لا توجد لعبة قيد التشغيل، لذا لا يمكن حفظ الحالة</string>
     <string name="emulation_savestate_refused_exiting">اللعبة قيد الإغلاق، حاول لاحقًا</string>

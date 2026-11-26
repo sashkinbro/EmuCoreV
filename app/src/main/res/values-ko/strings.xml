@@ -1484,6 +1484,8 @@
     <string name="emulation_savestate_loaded_toast">불러옴</string>
     <string name="emulation_savestate_deleted_toast">삭제됨</string>
     <string name="emulation_savestate_failed_toast">작업을 완료하지 못했습니다</string>
+    <string name="emulation_savestate_other_version_toast">이 상태 저장은 다른 버전의 앱에서 만들어져 불러올 수 없습니다. 파일은 보존되었습니다.</string>
+    <string name="emulation_savestate_other_version_boot_toast">빠른 저장은 다른 버전의 앱에서 만들어져 불러올 수 없습니다. 게임을 정상적으로 시작합니다. 파일은 보존되었습니다.</string>
     <string name="emulation_savestate_vulkan_only">세이브 스테이트에는 Vulkan 렌더러가 필요합니다</string>
     <string name="emulation_savestate_refused_no_game">실행 중인 게임이 없어 상태를 저장할 수 없습니다</string>
     <string name="emulation_savestate_refused_exiting">게임이 종료되는 중입니다. 나중에 다시 시도하세요</string>

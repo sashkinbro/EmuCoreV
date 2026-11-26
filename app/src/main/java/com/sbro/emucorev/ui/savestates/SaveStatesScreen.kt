@@ -87,6 +87,7 @@ fun SaveStatesScreen(
     val deletedMessage = stringResource(R.string.emulation_savestate_deleted_toast)
     val loadedMessage = stringResource(R.string.emulation_savestate_loaded_toast)
     val failedMessage = stringResource(R.string.emulation_savestate_failed_toast)
+    val otherVersionMessage = stringResource(R.string.emulation_savestate_other_version_toast)
     val launchFailedMessage = stringResource(R.string.game_launch_failed)
     val storageUnavailableMessage = stringResource(R.string.storage_unavailable_message)
     val launchFirmwareMessage = stringResource(R.string.game_launch_requires_firmware)
@@ -100,6 +101,7 @@ fun SaveStatesScreen(
     fun describe(result: SaveStateResult, successMessage: String): String = when {
         result.isOk -> successMessage
         result.isSessionMismatch -> launchUnavailableMessage
+        result.isUnsupportedVersion -> otherVersionMessage
         else -> result.error.takeIf { it.isNotBlank() } ?: failedMessage
     }
 

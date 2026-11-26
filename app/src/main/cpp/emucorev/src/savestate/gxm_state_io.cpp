@@ -3,6 +3,7 @@
 #include <emucorev/savestate/memory_image.h>
 #include <gxm/functions.h>
 #include <renderer/vulkan/context_snapshot.h>
+#include <renderer/yuv.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -22,6 +23,7 @@ constexpr uint64_t max_gxm_section_size = 64ull * 1024u * 1024u;
 template <typename T>
 T checked_struct(BufferReader &reader, std::initializer_list<size_t> bools, bool &malformed,
     std::initializer_list<size_t> reserved = {}) {
+    ECV_ASSERT_RAW_LAYOUT(T);
     std::array<uint8_t, sizeof(T)> raw{};
     T value{};
     if (!reader.bytes(raw.data(), raw.size())) return value;
@@ -46,6 +48,7 @@ DisplayCallback read_display(BufferReader &reader, bool &bad) {
 }
 template <typename T>
 bool read_array(BufferReader &reader, std::vector<T> &out, uint32_t limit) {
+    ECV_ASSERT_RAW_LAYOUT(T);
     const uint32_t count = reader.u32();
     if (!reader.ok() || count > limit || count > reader.remaining() / sizeof(T)) return false;
     out.resize(count);
@@ -93,6 +96,11 @@ bool parse_gxm_state(const std::vector<uint8_t> &data, GxmSnapshot &output, std:
         context.pending_first = reader.u32(); context.pending_last = reader.u32();
         context.was_vert_default_uniform_reserved = reader.boolean();
         context.was_frag_default_uniform_reserved = reader.boolean();
+        for (auto &program_type : context.yuv_profile)
+            for (uint8_t &profile : program_type) {
+                profile = reader.u8();
+                if (!reader.ok() || profile >= renderer::yuv::profile_count) { error = "invalid saved YUV profile"; return false; }
+            }
         const uint32_t list_count = reader.u32();
         if (!reader.ok() || list_count > 65536 || list_count > reader.remaining() / 25) { error = "invalid deferred GXM list table"; return false; }
         context.deferred_lists.resize(list_count);
@@ -863,4 +871,182 @@ bool validate_gxm_state(const GxmSnapshot &state, const MemoryImage &memory, std
     }
     return true;
 }
+bool encode_gxm_state(const GxmSnapshot &snapshot, BufferWriter &buffer, std::string &error) {
+    buffer.value(snapshot.params);
+    buffer.u32(snapshot.global_timestamp);
+    buffer.u32(snapshot.last_display_global);
+    buffer.u32(snapshot.notification_region);
+    buffer.u32(snapshot.last_immediate_context);
+    buffer.u32(snapshot.renderer_context_address);
+    buffer.i32(snapshot.display_queue_thread);
+    buffer.u32(snapshot.display_worker_phase);
+    buffer.u32(snapshot.display_previous_entry);
+
+    buffer.u32(static_cast<uint32_t>(snapshot.contexts.size()));
+    for (const gxm::ContextSnapshot &context : snapshot.contexts) {
+        buffer.u32(context.address);
+        buffer.boolean(context.deferred);
+        buffer.u32(context.render_target_address);
+        buffer.value(context.renderer_record);
+        buffer.value(context.state);
+        buffer.boolean(context.last_precomputed);
+        buffer.u64(context.command_next_free_pos);
+        buffer.u32(context.alloc_space.address());
+        buffer.u32(context.alloc_space_end.address());
+        buffer.u32(context.command_allocator_size);
+        buffer.u32(context.alloc_space_start);
+        buffer.u32(context.pending_first);
+        buffer.u32(context.pending_last);
+        buffer.boolean(context.was_vert_default_uniform_reserved);
+        buffer.boolean(context.was_frag_default_uniform_reserved);
+        for (const auto &program_type : context.yuv_profile)
+            for (const uint8_t profile : program_type)
+                buffer.u8(profile);
+        buffer.u32(static_cast<uint32_t>(context.deferred_lists.size()));
+        for (const auto &list : context.deferred_lists) {
+            buffer.u32(list.guest_address);
+            buffer.u64(list.identity);
+            buffer.u32(list.first);
+            buffer.u32(list.last);
+            buffer.boolean(list.current);
+            buffer.u32(static_cast<uint32_t>(list.ranges.size()));
+            for (const auto &[start, end] : list.ranges) {
+                buffer.u32(start);
+                buffer.u32(end);
+            }
+        }
+    }
+    buffer.u32(static_cast<uint32_t>(snapshot.commands.size()));
+    for (const auto &command : snapshot.commands) {
+        buffer.u8(static_cast<uint8_t>(command.opcode));
+        buffer.boolean(command.deferred_allocation);
+        buffer.u32(command.next);
+        buffer.u64(command.completion_id);
+        buffer.append(command.data.data(), command.data.size());
+        buffer.u32(command.render_target_address);
+        buffer.boolean(command.has_color_surface);
+        buffer.boolean(command.has_depth_surface);
+        if (command.has_color_surface) buffer.value(command.color_surface);
+        if (command.has_depth_surface) buffer.value(command.depth_surface);
+        buffer.u32(command.transfer_color_key_value);
+        buffer.u32(command.transfer_color_key_mask);
+        buffer.u32(command.transfer_color_key_mode);
+        buffer.u32(command.transfer_src_type);
+        buffer.u32(command.transfer_dst_type);
+        buffer.u32(command.transfer_fill_color);
+        const auto write_image = [&](const renderer::TransferImageSnapshot &image) {
+            buffer.u32(image.format);
+            buffer.u32(image.address);
+            buffer.u32(image.x);
+            buffer.u32(image.y);
+            buffer.u32(image.width);
+            buffer.u32(image.height);
+            buffer.i32(image.stride);
+        };
+        write_image(command.transfer_src);
+        write_image(command.transfer_dst);
+        buffer.boolean(command.has_display_frame);
+        buffer.u32(command.display_frame.base);
+        buffer.u32(command.display_frame.pitch);
+        buffer.u32(command.display_frame.pixelformat);
+        buffer.i32(command.display_frame.width);
+        buffer.i32(command.display_frame.height);
+        buffer.u32(command.new_frame_context_address);
+        buffer.str(command.screen_filter);
+    }
+    buffer.u32(static_cast<uint32_t>(snapshot.batches.size()));
+    for (const auto &batch : snapshot.batches) {
+        buffer.u32(batch.context_address);
+        buffer.u32(batch.first);
+        buffer.u32(batch.last);
+    }
+
+    buffer.u32(static_cast<uint32_t>(snapshot.finish_operations.size()));
+    for (const auto &finish : snapshot.finish_operations) {
+        buffer.u64(finish.id);
+        buffer.i32(finish.owner);
+        buffer.u32(finish.context_address);
+        buffer.u32(static_cast<uint32_t>(finish.phase));
+        buffer.boolean(finish.fence_done);
+        buffer.boolean(finish.drain_done);
+        buffer.i32(finish.result);
+    }
+
+    buffer.u32(static_cast<uint32_t>(snapshot.sync_objects.size()));
+    for (const gxm::SyncObjectSnapshot &sync : snapshot.sync_objects) {
+        buffer.u32(sync.address);
+        buffer.u32(sync.timestamp_current);
+        buffer.u32(sync.timestamp_ahead);
+        buffer.u32(sync.last_display);
+        buffer.u32(sync.last_operation_global);
+    }
+
+    buffer.u32(static_cast<uint32_t>(snapshot.render_targets.size()));
+    for (const gxm::RenderTargetSnapshot &render_target : snapshot.render_targets) {
+        buffer.u32(render_target.address);
+        buffer.u16(render_target.width);
+        buffer.u16(render_target.height);
+        buffer.u16(render_target.scenes_per_frame);
+        buffer.i32(render_target.driver_mem_block);
+        buffer.value(render_target.params);
+    }
+
+    buffer.u32(static_cast<uint32_t>(snapshot.fragment_programs.size()));
+    for (const gxm::FragmentProgramSnapshot &program : snapshot.fragment_programs) {
+        buffer.u32(program.address);
+        buffer.u32(program.program.address());
+        buffer.boolean(program.has_blend);
+        buffer.value(program.blend);
+        buffer.boolean(program.is_mask_update);
+        buffer.u32(program.reference_count);
+    }
+
+    buffer.u32(static_cast<uint32_t>(snapshot.vertex_programs.size()));
+    for (const gxm::VertexProgramSnapshot &program : snapshot.vertex_programs) {
+        buffer.u32(program.address);
+        buffer.u32(program.program.address());
+        buffer.u64(program.key_hash);
+        buffer.u32(program.reference_count);
+        buffer.list<SceGxmVertexAttribute>(program.attributes, [&buffer](const SceGxmVertexAttribute &attribute) { buffer.value(attribute); });
+        buffer.list<SceGxmVertexStream>(program.streams, [&buffer](const SceGxmVertexStream &stream) { buffer.value(stream); });
+    }
+
+    buffer.u32(static_cast<uint32_t>(snapshot.shader_patchers.size()));
+    for (const gxm::ShaderPatcherSnapshot &patcher : snapshot.shader_patchers) {
+        buffer.u32(patcher.address);
+        buffer.value(patcher.params);
+    }
+
+    buffer.u32(static_cast<uint32_t>(snapshot.display_entries.size()));
+    for (const DisplayCallback &entry : snapshot.display_entries)
+        buffer.value(entry);
+    buffer.u32(static_cast<uint32_t>(snapshot.display_submissions.size()));
+    for (const auto &[producer, pending] : snapshot.display_submissions) {
+        buffer.i32(producer);
+        const auto &entry = pending.callback;
+        buffer.u32(entry.data);
+        buffer.u32(entry.old_sync.address());
+        buffer.u32(entry.new_sync.address());
+        buffer.u32(entry.old_sync_timestamp);
+        buffer.u32(entry.new_sync_timestamp);
+        buffer.boolean(entry.frame_predicted);
+        buffer.boolean(pending.has_prediction);
+        buffer.u32(pending.prediction.base.address());
+        buffer.u32(pending.prediction.pitch);
+        buffer.u32(pending.prediction.pixelformat);
+        buffer.i32(pending.prediction.image_size.x);
+        buffer.i32(pending.prediction.image_size.y);
+    }
+
+    buffer.u32(static_cast<uint32_t>(snapshot.regions.size()));
+    for (const auto &[address, region] : snapshot.regions) {
+        buffer.u32(address);
+        buffer.u32(region.offset);
+        buffer.u32(region.size);
+        buffer.u32(region.perm);
+    }
+
+    return append_gxm_program_source_extension(buffer, snapshot.fragment_programs, snapshot.vertex_programs, error);
+}
+
 } // namespace emucorev::savestate

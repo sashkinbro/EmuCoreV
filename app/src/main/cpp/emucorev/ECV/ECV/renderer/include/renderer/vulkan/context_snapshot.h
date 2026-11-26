@@ -59,6 +59,9 @@ struct VKContextSnapshot {
     uint32_t visibility_stride = 0;
     int32_t visibility_query_index = -1;
     bool visibility_query_increment = true;
+    // back-face visibility index (sceGxmSetBackVisibilityIndex, engine 20)
+    int32_t visibility_back_query_index = -1;
+    bool visibility_back_query_increment = true;
 };
 
 bool validate_vk_context_snapshot(const VKContextSnapshot &snapshot, std::string &error);

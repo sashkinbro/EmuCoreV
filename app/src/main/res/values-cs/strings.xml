@@ -1487,6 +1487,8 @@
     <string name="emulation_savestate_loaded_toast">Načteno</string>
     <string name="emulation_savestate_deleted_toast">Smazáno</string>
     <string name="emulation_savestate_failed_toast">Operace se nezdařila</string>
+    <string name="emulation_savestate_other_version_toast">Tento uložený stav vytvořila jiná verze aplikace a nelze jej načíst. Soubor byl zachován.</string>
+    <string name="emulation_savestate_other_version_boot_toast">Rychlé uložení vytvořila jiná verze aplikace a nelze jej načíst. Hra se spouští normálně; soubor byl zachován.</string>
     <string name="emulation_savestate_vulkan_only">Uložené stavy vyžadují renderer Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Neběží žádná hra, stav nelze uložit</string>
     <string name="emulation_savestate_refused_exiting">Hra se zavírá, zkuste to později</string>

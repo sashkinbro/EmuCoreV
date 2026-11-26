@@ -10,13 +10,17 @@ struct EmuEnvState;
 
 namespace emucorev::savestate {
 
-constexpr uint32_t kEngineVersion = 19;
-// Older revisions remain readable, but cannot recover NP state (<17) or video codec
-// handles (<18) they never saved, and cannot recreate open savedata files missing on the
-// loading machine (<19).
+// Engine 20 changed the GXM context layout (back-face visibility index, P8), saves the sceGxmSetYuvProfile
+// table (P4) and the renderer's back-face visibility query. Saves are not migrated between engine
+// versions: an older (or newer) save is rejected up front with a clear reason, and the file is kept.
+// Every struct serialized as raw bytes is size-checked in serialized_layout.h, so a layout change
+// fails the build until this version is bumped.
+constexpr uint32_t kEngineVersion = 20;
 constexpr bool supports_engine_version(uint32_t version) {
-    return version == 15 || version == 16 || version == 17 || version == 18 || version == kEngineVersion;
+    return version == kEngineVersion;
 }
+// The user-facing reason for a save this build cannot read.
+std::string unsupported_engine_version_reason(uint32_t version);
 
 struct Meta {
     uint32_t format_version = 0;

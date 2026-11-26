@@ -851,199 +851,39 @@ bool read_display(EmuEnvState &emuenv, const DisplaySnapshot &snapshot, std::str
 }
 
 bool write_gxm(EmuEnvState &emuenv, Writer &writer, std::string &error) {
-    BufferWriter buffer;
     GxmState &gxm = emuenv.gxm;
+    GxmSnapshot snapshot;
+    snapshot.params = gxm.params;
+    snapshot.global_timestamp = gxm.global_timestamp.load();
+    snapshot.last_display_global = gxm.last_display_global;
+    snapshot.notification_region = gxm.notification_region.address();
+    snapshot.last_immediate_context = gxm.last_immediate_context;
+    snapshot.renderer_context_address = gxm::runtime_selected_context_address(emuenv);
+    snapshot.display_queue_thread = gxm.display_queue_thread;
+    snapshot.display_worker_phase = static_cast<uint32_t>(gxm.display_phase);
+    snapshot.display_previous_entry = gxm.display_previous_entry_point;
 
-    buffer.value(gxm.params);
-    buffer.u32(gxm.global_timestamp.load());
-    buffer.u32(gxm.last_display_global);
-    buffer.u32(gxm.notification_region.address());
-    buffer.u32(gxm.last_immediate_context);
-    buffer.u32(gxm::runtime_selected_context_address(emuenv));
-    buffer.i32(gxm.display_queue_thread);
-    buffer.u32(static_cast<uint32_t>(gxm.display_phase));
-    buffer.u32(gxm.display_previous_entry_point);
-
-    std::vector<gxm::ContextSnapshot> contexts;
-    std::vector<renderer::CommandSnapshot> commands;
-    std::vector<gxm::BatchSnapshot> batches;
-    if (!gxm::capture_contexts(emuenv, contexts, commands, batches, error))
+    if (!gxm::capture_contexts(emuenv, snapshot.contexts, snapshot.commands, snapshot.batches, error))
         return false;
-    buffer.u32(static_cast<uint32_t>(contexts.size()));
-    for (const gxm::ContextSnapshot &context : contexts) {
-        buffer.u32(context.address);
-        buffer.boolean(context.deferred);
-        buffer.u32(context.render_target_address);
-        buffer.value(context.renderer_record);
-        buffer.value(context.state);
-        buffer.boolean(context.last_precomputed);
-        buffer.u64(context.command_next_free_pos);
-        buffer.u32(context.alloc_space.address());
-        buffer.u32(context.alloc_space_end.address());
-        buffer.u32(context.command_allocator_size);
-        buffer.u32(context.alloc_space_start);
-        buffer.u32(context.pending_first);
-        buffer.u32(context.pending_last);
-        buffer.boolean(context.was_vert_default_uniform_reserved);
-        buffer.boolean(context.was_frag_default_uniform_reserved);
-        buffer.u32(static_cast<uint32_t>(context.deferred_lists.size()));
-        for (const auto &list : context.deferred_lists) {
-            buffer.u32(list.guest_address);
-            buffer.u64(list.identity);
-            buffer.u32(list.first);
-            buffer.u32(list.last);
-            buffer.boolean(list.current);
-            buffer.u32(static_cast<uint32_t>(list.ranges.size()));
-            for (const auto &[start, end] : list.ranges) {
-                buffer.u32(start);
-                buffer.u32(end);
-            }
-        }
-    }
-    buffer.u32(static_cast<uint32_t>(commands.size()));
-    for (const auto &command : commands) {
-        buffer.u8(static_cast<uint8_t>(command.opcode));
-        buffer.boolean(command.deferred_allocation);
-        buffer.u32(command.next);
-        buffer.u64(command.completion_id);
-        buffer.append(command.data.data(), command.data.size());
-        buffer.u32(command.render_target_address);
-        buffer.boolean(command.has_color_surface);
-        buffer.boolean(command.has_depth_surface);
-        if (command.has_color_surface) buffer.value(command.color_surface);
-        if (command.has_depth_surface) buffer.value(command.depth_surface);
-        buffer.u32(command.transfer_color_key_value);
-        buffer.u32(command.transfer_color_key_mask);
-        buffer.u32(command.transfer_color_key_mode);
-        buffer.u32(command.transfer_src_type);
-        buffer.u32(command.transfer_dst_type);
-        buffer.u32(command.transfer_fill_color);
-        const auto write_image = [&](const renderer::TransferImageSnapshot &image) {
-            buffer.u32(image.format);
-            buffer.u32(image.address);
-            buffer.u32(image.x);
-            buffer.u32(image.y);
-            buffer.u32(image.width);
-            buffer.u32(image.height);
-            buffer.i32(image.stride);
-        };
-        write_image(command.transfer_src);
-        write_image(command.transfer_dst);
-        buffer.boolean(command.has_display_frame);
-        buffer.u32(command.display_frame.base);
-        buffer.u32(command.display_frame.pitch);
-        buffer.u32(command.display_frame.pixelformat);
-        buffer.i32(command.display_frame.width);
-        buffer.i32(command.display_frame.height);
-        buffer.u32(command.new_frame_context_address);
-        buffer.str(command.screen_filter);
-    }
-    buffer.u32(static_cast<uint32_t>(batches.size()));
-    for (const auto &batch : batches) {
-        buffer.u32(batch.context_address);
-        buffer.u32(batch.first);
-        buffer.u32(batch.last);
-    }
-
-    std::vector<renderer::FinishSnapshot> finishes;
-    if (!renderer::capture_finish_operations(*emuenv.renderer, finishes, error)
-        || !renderer::validate_finish_operations(finishes, commands, error)) return false;
-    buffer.u32(static_cast<uint32_t>(finishes.size()));
-    for (const auto &finish : finishes) {
-        buffer.u64(finish.id);
-        buffer.i32(finish.owner);
-        buffer.u32(finish.context_address);
-        buffer.u32(static_cast<uint32_t>(finish.phase));
-        buffer.boolean(finish.fence_done);
-        buffer.boolean(finish.drain_done);
-        buffer.i32(finish.result);
-    }
-
-    const auto sync_objects = gxm::capture_sync_objects(emuenv);
-    buffer.u32(static_cast<uint32_t>(sync_objects.size()));
-    for (const gxm::SyncObjectSnapshot &sync : sync_objects) {
-        buffer.u32(sync.address);
-        buffer.u32(sync.timestamp_current);
-        buffer.u32(sync.timestamp_ahead);
-        buffer.u32(sync.last_display);
-        buffer.u32(sync.last_operation_global);
-    }
-
-    const auto render_targets = gxm::capture_render_targets(emuenv);
-    buffer.u32(static_cast<uint32_t>(render_targets.size()));
-    for (const gxm::RenderTargetSnapshot &render_target : render_targets) {
-        buffer.u32(render_target.address);
-        buffer.u16(render_target.width);
-        buffer.u16(render_target.height);
-        buffer.u16(render_target.scenes_per_frame);
-        buffer.i32(render_target.driver_mem_block);
-        buffer.value(render_target.params);
-    }
-
-    const auto fragment_programs = gxm::capture_fragment_programs(emuenv);
-    buffer.u32(static_cast<uint32_t>(fragment_programs.size()));
-    for (const gxm::FragmentProgramSnapshot &program : fragment_programs) {
-        buffer.u32(program.address);
-        buffer.u32(program.program.address());
-        buffer.boolean(program.has_blend);
-        buffer.value(program.blend);
-        buffer.boolean(program.is_mask_update);
-        buffer.u32(program.reference_count);
-    }
-
-    const auto vertex_programs = gxm::capture_vertex_programs(emuenv);
-    buffer.u32(static_cast<uint32_t>(vertex_programs.size()));
-    for (const gxm::VertexProgramSnapshot &program : vertex_programs) {
-        buffer.u32(program.address);
-        buffer.u32(program.program.address());
-        buffer.u64(program.key_hash);
-        buffer.u32(program.reference_count);
-        buffer.list<SceGxmVertexAttribute>(program.attributes, [&buffer](const SceGxmVertexAttribute &attribute) { buffer.value(attribute); });
-        buffer.list<SceGxmVertexStream>(program.streams, [&buffer](const SceGxmVertexStream &stream) { buffer.value(stream); });
-    }
-
-    const auto shader_patchers = gxm::capture_shader_patchers(emuenv);
-    buffer.u32(static_cast<uint32_t>(shader_patchers.size()));
-    for (const gxm::ShaderPatcherSnapshot &patcher : shader_patchers) {
-        buffer.u32(patcher.address);
-        buffer.value(patcher.params);
-    }
-
-    const std::vector<DisplayCallback> display_entries = gxm.display_queue.snapshot_items();
-    buffer.u32(static_cast<uint32_t>(display_entries.size()));
-    for (const DisplayCallback &entry : display_entries)
-        buffer.value(entry);
+    if (!renderer::capture_finish_operations(*emuenv.renderer, snapshot.finish_operations, error)
+        || !renderer::validate_finish_operations(snapshot.finish_operations, snapshot.commands, error)) return false;
+    snapshot.sync_objects = gxm::capture_sync_objects(emuenv);
+    snapshot.render_targets = gxm::capture_render_targets(emuenv);
+    snapshot.fragment_programs = gxm::capture_fragment_programs(emuenv);
+    snapshot.vertex_programs = gxm::capture_vertex_programs(emuenv);
+    snapshot.shader_patchers = gxm::capture_shader_patchers(emuenv);
+    snapshot.display_entries = gxm.display_queue.snapshot_items();
     {
         const std::lock_guard lock(gxm.display_submissions_mutex);
-        buffer.u32(static_cast<uint32_t>(gxm.pending_display_submissions.size()));
-        for (const auto &[producer, pending] : gxm.pending_display_submissions) {
-            buffer.i32(producer);
-            const auto &entry = pending->callback;
-            buffer.u32(entry.data);
-            buffer.u32(entry.old_sync.address());
-            buffer.u32(entry.new_sync.address());
-            buffer.u32(entry.old_sync_timestamp);
-            buffer.u32(entry.new_sync_timestamp);
-            buffer.boolean(entry.frame_predicted);
-            buffer.boolean(pending->has_prediction);
-            buffer.u32(pending->prediction.base.address());
-            buffer.u32(pending->prediction.pitch);
-            buffer.u32(pending->prediction.pixelformat);
-            buffer.i32(pending->prediction.image_size.x);
-            buffer.i32(pending->prediction.image_size.y);
-        }
+        snapshot.display_submissions.reserve(gxm.pending_display_submissions.size());
+        for (const auto &[producer, pending] : gxm.pending_display_submissions)
+            snapshot.display_submissions.emplace_back(producer, *pending);
     }
+    snapshot.regions = gxm.memory_mapped_regions;
 
-    write_map(buffer, gxm.memory_mapped_regions, [&buffer](const auto &entry) {
-        buffer.u32(entry.first);
-        buffer.u32(entry.second.offset);
-        buffer.u32(entry.second.size);
-        buffer.u32(entry.second.perm);
-    });
-
-    if (!append_gxm_program_source_extension(buffer, fragment_programs, vertex_programs, error))
+    BufferWriter buffer;
+    if (!encode_gxm_state(snapshot, buffer, error))
         return false;
-
     return writer.write_section(SectionId::Gxm, buffer.data().data(), buffer.size(), true, error);
 }
 
@@ -1939,6 +1779,11 @@ bool read_kernel(EmuEnvState &emuenv, const KernelBaseSnapshot &snapshot, std::s
 
 } // namespace
 
+std::string unsupported_engine_version_reason(uint32_t version) {
+    return fmt::format("save state was made by an {} build (engine version {}, this build reads {})",
+        version < kEngineVersion ? "older" : "newer", version, kEngineVersion);
+}
+
 const char *status_name(Status status) {
     switch (status) {
     case Status::Ok: return "ok";
@@ -2135,8 +1980,9 @@ Result load_state(EmuEnvState &emuenv, const fs::path &path, bool allow_cross_se
     }
 
     if (!supports_engine_version(result.meta.engine_version)) {
+        // Rejected before any section is parsed or any live state is touched; the file is kept.
         result.status = Status::UnsupportedVersion;
-        result.error = "save state was created by an incompatible build";
+        result.error = unsupported_engine_version_reason(result.meta.engine_version);
         return result;
     }
 
@@ -2677,7 +2523,7 @@ Result prepare_launch_gpu_config(EmuEnvState &emuenv, const fs::path &path) {
         || !read_meta(data, result.meta))
         return fail(Status::InvalidFile, error.empty() ? "invalid meta section" : error);
     if (!supports_engine_version(result.meta.engine_version))
-        return fail(Status::UnsupportedVersion, "save state was created by an incompatible build");
+        return fail(Status::UnsupportedVersion, unsupported_engine_version_reason(result.meta.engine_version));
     if (emuenv.io.title_id.empty() || result.meta.title_id != emuenv.io.title_id)
         return fail(Status::TitleMismatch, "save state belongs to another title");
     if (result.meta.core_flags != static_cast<uint32_t>(renderer::Backend::Vulkan))
@@ -2723,6 +2569,11 @@ Result inspect_state(const fs::path &path) {
         result.status = Status::InvalidFile;
         result.error = error.empty() ? "invalid meta section" : error;
         return result;
+    }
+    // The meta is still reported, so the frontend can tell an older build's save from a corrupt file.
+    if (!supports_engine_version(result.meta.engine_version)) {
+        result.status = Status::UnsupportedVersion;
+        result.error = unsupported_engine_version_reason(result.meta.engine_version);
     }
     return result;
 }

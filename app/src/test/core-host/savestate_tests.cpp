@@ -1,5 +1,6 @@
 // Host tests for the save-state fixes B013 (deferred GXM ring cursor), B019 (stale surface-cache
-// entries) and B018 (open savedata files missing on the loading machine).
+// entries), B018 (open savedata files missing on the loading machine) and the engine 20 layout change
+// (older saves are rejected by version, never misread; GXM/GPU codec round trip; raw layout guard).
 //
 // They run the real validation/parse code of the adapter against real save files. Artifact and library
 // directories are taken from EMUCOREV_LAB (default C:/Users/SBRO/emucorev-lab); a test whose input is
@@ -41,10 +42,21 @@ struct LoadedState {
     ss::GxmSnapshot gxm;
     ss::GpuSnapshot gpu;
     std::string error;
+    // Set when the file was written by another engine version: Load() rejects it before parsing.
+    bool other_engine = false;
 
     bool load(const fs::path &path, const std::string &scratch) {
         if (!reader.open(path, error) || !reader.validate_sections(error))
             return false;
+        std::vector<uint8_t> meta_data;
+        ss::Meta meta;
+        if (!reader.read_section(ss::SectionId::Meta, meta_data, error) || !ss::read_meta(meta_data, meta))
+            return false;
+        if (!ss::supports_engine_version(meta.engine_version)) {
+            other_engine = true;
+            error = ss::unsupported_engine_version_reason(meta.engine_version);
+            return false;
+        }
         memory = ss::MemoryImage::preflight(reader, scratch_dir(scratch), error);
         if (!memory)
             return false;
@@ -68,6 +80,16 @@ bool validate_like_load(LoadedState &state, size_t *dropped = nullptr) {
 
 } // namespace
 
+// Artifacts recorded by an older engine document fixed bugs; their layout is no longer readable, so the
+// version gate (tested in SaveStateVersion) is what Load() applies to them.
+#define LOAD_OR_SKIP_OTHER_ENGINE(state, path, scratch)                                    \
+    do {                                                                                   \
+        const bool loaded_ = (state).load((path), (scratch));                              \
+        if (!loaded_ && (state).other_engine)                                              \
+            GTEST_SKIP() << (path).string() << ": " << (state).error;                      \
+        ASSERT_TRUE(loaded_) << (path).string() << ": " << (state).error;                 \
+    } while (0)
+
 // ---- B013 -----------------------------------------------------------------------------------
 
 TEST(SaveStateB013, TearawayArtifactsValidate) {
@@ -76,7 +98,7 @@ TEST(SaveStateB013, TearawayArtifactsValidate) {
         if (!fs::exists(path))
             GTEST_SKIP() << "missing artifact " << path.string();
         LoadedState state;
-        ASSERT_TRUE(state.load(path, "b013")) << name << ": " << state.error;
+        LOAD_OR_SKIP_OTHER_ENGINE(state, path, "b013");
         EXPECT_TRUE(validate_like_load(state)) << name << ": " << state.error;
     }
 }
@@ -86,7 +108,7 @@ TEST(SaveStateB013, IdleDeferredContextKeepsCursorAfterRingWasReleased) {
     if (!fs::exists(path))
         GTEST_SKIP() << "missing artifact";
     LoadedState state;
-    ASSERT_TRUE(state.load(path, "b013b")) << state.error;
+    LOAD_OR_SKIP_OTHER_ENGINE(state, path, "b013b");
     // The root cause: deferred contexts that are not recording have ring size 0 but a nonzero cursor.
     size_t idle_with_cursor = 0;
     for (const auto &context : state.gxm.contexts)
@@ -115,7 +137,7 @@ TEST(SaveStateB019, KillzoneArtifactHadDanglingSurfaceEntries) {
     if (!fs::exists(path))
         GTEST_SKIP() << "missing artifact " << path.string();
     LoadedState state;
-    ASSERT_TRUE(state.load(path, "b019")) << state.error;
+    LOAD_OR_SKIP_OTHER_ENGINE(state, path, "b019");
 
     // Without the fix: the exact failure from the device log.
     ASSERT_TRUE(ss::validate_gxm_state(state.gxm, *state.memory, state.error)) << state.error;
@@ -166,10 +188,17 @@ TEST(SaveStateLibrary, EveryRecordedSaveStillValidatesAndNothingIsDropped) {
     const fs::path root = lab_root() / "saves";
     if (!fs::exists(root))
         GTEST_SKIP() << "missing library " << root.string();
-    size_t checked = 0;
+    size_t checked = 0, rejected = 0;
     for (fs::recursive_directory_iterator it(root), end; it != end; ++it) {
         if (it->path().extension() != ".ecvs")
             continue;
+        // A save of another engine version must be refused up front with the version reason.
+        const ss::Result inspected = ss::inspect_state(it->path());
+        if (inspected.status == ss::Status::UnsupportedVersion) {
+            EXPECT_NE(inspected.error.find("build (engine version"), std::string::npos) << it->path().string();
+            ++rejected;
+            continue;
+        }
         LoadedState state;
         ASSERT_TRUE(state.load(it->path(), "library")) << it->path().string() << ": " << state.error;
         size_t dropped = 0;
@@ -177,8 +206,8 @@ TEST(SaveStateLibrary, EveryRecordedSaveStillValidatesAndNothingIsDropped) {
         EXPECT_EQ(dropped, 0u) << it->path().string();
         ++checked;
     }
-    std::printf("[library] %zu saves validated\n", checked);
-    EXPECT_GT(checked, 0u);
+    std::printf("[library] %zu saves validated, %zu rejected by engine version\n", checked, rejected);
+    EXPECT_GT(checked + rejected, 0u);
 }
 
 // ---- B018 -----------------------------------------------------------------------------------
@@ -427,8 +456,10 @@ TEST(SaveStateB018, StatesWithoutTheExtensionStillParse) {
     std::string error;
     ASSERT_TRUE(ss::parse_io_state(buffer.data(), snapshot, error)) << error;
     EXPECT_TRUE(snapshot.embedded.empty());
-    EXPECT_TRUE(ss::supports_engine_version(15) && ss::supports_engine_version(18) && ss::supports_engine_version(19));
-    EXPECT_FALSE(ss::supports_engine_version(20));
+    // Saves are not migrated across engine versions (engine 20 changed the GXM context layout).
+    EXPECT_FALSE(ss::supports_engine_version(15) || ss::supports_engine_version(18) || ss::supports_engine_version(19));
+    EXPECT_TRUE(ss::supports_engine_version(20));
+    EXPECT_FALSE(ss::supports_engine_version(21));
 }
 
 TEST(SaveStateB018, ExtensionRejectsCorruptionAndStrayFiles) {
@@ -469,4 +500,310 @@ TEST(SaveStateB018, EmbeddablePaths) {
     EXPECT_FALSE(iof::embeddable_path("ux0:/patch/PCSE00537/x"));
     EXPECT_FALSE(iof::embeddable_path("ux0:/addcont/PCSE00537/x"));
     EXPECT_FALSE(iof::embeddable_path("vs0:/data/x"));
+}
+
+// ---- Engine 20: version gate, codec round trip, raw layout guard ---------------------------------
+
+namespace {
+
+// Meta sections copied byte for byte out of real engine-18 saves from the lab library (the full files
+// are 15-30 MB). Regenerate with --gtest_also_run_disabled_tests --gtest_filter=*ExtractLegacyMeta*.
+fs::path legacy_meta_dir() {
+    return fs::path(__FILE__).parent_path() / "data" / "legacy-meta";
+}
+
+std::vector<uint8_t> meta_bytes(uint32_t engine_version, const std::string &title) {
+    ss::BufferWriter meta;
+    meta.u32(engine_version);
+    meta.u32(0x1234);
+    meta.u64(1764000000000ull);
+    meta.u32(static_cast<uint32_t>(renderer::Backend::Vulkan));
+    meta.u32(0);
+    ss::write_string_field(meta, title);
+    ss::write_string_field(meta, "test");
+    ss::write_string_field(meta, "test");
+    return meta.data();
+}
+
+bool write_meta_only_state(const fs::path &path, const std::vector<uint8_t> &meta) {
+    ss::Writer writer;
+    std::string error;
+    return writer.open(path, error) && writer.write_section(ss::SectionId::Meta, meta.data(), meta.size(), false, error)
+        && writer.finalize(error);
+}
+
+// What the launch path and an explicit load see for a save this build cannot read.
+void expect_rejected_before_parse(const fs::path &path, const std::string &title, const char *direction) {
+    const uintmax_t size_before = fs::file_size(path);
+    const ss::Result inspected = ss::inspect_state(path);
+    EXPECT_EQ(inspected.status, ss::Status::UnsupportedVersion) << path.string();
+    EXPECT_EQ(inspected.meta.title_id, title) << path.string();
+    EXPECT_NE(inspected.error.find(direction), std::string::npos) << inspected.error;
+
+    FakeEnv env(scratch_dir("version-gate"));
+    env.io.title_id = title;
+    const ss::Result config = ss::prepare_launch_gpu_config(*env.emuenv, path);
+    EXPECT_EQ(config.status, ss::Status::UnsupportedVersion) << config.error;
+    const ss::Result loaded = ss::load_state(*env.emuenv, path, true);
+    EXPECT_EQ(loaded.status, ss::Status::UnsupportedVersion) << loaded.error;
+    EXPECT_TRUE(loaded.session_usable);
+    EXPECT_EQ(loaded.error, inspected.error);
+
+    // The file is kept untouched.
+    ASSERT_TRUE(fs::exists(path));
+    EXPECT_EQ(fs::file_size(path), size_before);
+}
+
+} // namespace
+
+TEST(SaveStateVersion, RealOlderEngineSavesAreRejectedCleanly) {
+    const fs::path dir = legacy_meta_dir();
+    ASSERT_TRUE(fs::is_directory(dir)) << dir.string();
+    size_t checked = 0;
+    for (const auto &entry : fs::directory_iterator(dir)) {
+        if (entry.path().extension() != ".ecvs")
+            continue;
+        const std::string title = entry.path().stem().string().substr(0, 9);
+        const ss::Result inspected = ss::inspect_state(entry.path());
+        EXPECT_LT(inspected.meta.engine_version, ss::kEngineVersion) << entry.path().string();
+        expect_rejected_before_parse(entry.path(), title, "older build");
+        ++checked;
+    }
+    EXPECT_GE(checked, 4u);
+}
+
+TEST(SaveStateVersion, NewerEngineIsRejectedToo) {
+    const fs::path path = scratch_dir("version-newer") / "quick0.ecvs";
+    ASSERT_TRUE(write_meta_only_state(path, meta_bytes(ss::kEngineVersion + 1, "PCSE00277")));
+    expect_rejected_before_parse(path, "PCSE00277", "newer build");
+}
+
+TEST(SaveStateVersion, CurrentEngineIsAccepted) {
+    const fs::path path = scratch_dir("version-current") / "quick0.ecvs";
+    ASSERT_TRUE(write_meta_only_state(path, meta_bytes(ss::kEngineVersion, "PCSE00277")));
+    const ss::Result inspected = ss::inspect_state(path);
+    EXPECT_TRUE(inspected.ok()) << inspected.error;
+    EXPECT_EQ(inspected.meta.engine_version, ss::kEngineVersion);
+}
+
+// Copies the Meta section of the lab's older-engine saves into data/legacy-meta (run on demand only).
+TEST(SaveStateVersion, DISABLED_ExtractLegacyMetaFixtures) {
+    const std::pair<const char *, const char *> sources[] = {
+        { "PCSA00011", "anbernic-quick" }, // Gravity Rush: "invalid deferred GXM ranges"
+        { "PCSA00144", "anbernic-cutscene1" }, // Tearaway: "invalid deferred GXM list table"
+        { "PCSA00549", "anbernic-quick" }, // LittleBigPlanet: "invalid GXM sync object table"
+        { "PCSE00277", "anbernic-quick" }, // Rayman Origins: "invalid renderer Finish table"
+        { "PCSA00126", "anbernic-gameplay1" }, // God of War: "invalid renderer Finish table"
+    };
+    fs::create_directories(legacy_meta_dir());
+    for (const auto &[title, scene] : sources) {
+        const fs::path source = lab_root() / "saves" / title / (std::string(scene) + ".ecvs");
+        ss::Reader reader;
+        std::string error;
+        std::vector<uint8_t> meta;
+        ASSERT_TRUE(reader.open(source, error) && reader.read_section(ss::SectionId::Meta, meta, error)) << source.string() << ": " << error;
+        ASSERT_TRUE(write_meta_only_state(legacy_meta_dir() / (std::string(title) + "-" + scene + ".ecvs"), meta));
+    }
+}
+
+namespace {
+
+ss::GxmSnapshot sample_gxm_snapshot() {
+    ss::GxmSnapshot snapshot;
+    snapshot.params.flags = 0;
+    snapshot.params.displayQueueMaxPendingCount = 2;
+    snapshot.global_timestamp = 77;
+    snapshot.last_display_global = 75;
+    snapshot.notification_region = 0x81000000;
+    snapshot.last_immediate_context = 0x81100000;
+    snapshot.renderer_context_address = 0x81100000;
+    snapshot.display_queue_thread = 0x40010003;
+    snapshot.display_worker_phase = 2;
+    snapshot.display_previous_entry = 0x81200000;
+
+    gxm::ContextSnapshot context{}; // value-initialized: Ptr<> members have no default
+    context.address = 0x81100000;
+    context.deferred = true;
+    context.state.type = SCE_GXM_CONTEXT_TYPE_DEFERRED;
+    context.state.visibility_enable = true;
+    context.state.visibility_index = 3;
+    context.state.visibility_back_enable = true;
+    context.state.visibility_back_index = 9;
+    context.state.visibility_back_is_increment = true;
+    context.state.active = true;
+    context.renderer_record.depth_bias_unit = -4;
+    context.renderer_record.depth_bias_slope = 2;
+    context.command_next_free_pos = 128;
+    context.command_allocator_size = 64;
+    context.pending_first = 1;
+    context.pending_last = 2;
+    context.yuv_profile[0][0] = 1;
+    context.yuv_profile[0][1] = 3;
+    context.yuv_profile[1][0] = 2;
+    context.yuv_profile[1][1] = 0;
+    gxm::DeferredListSnapshot list;
+    list.guest_address = 0x81300000;
+    list.identity = 0xABCDEF;
+    list.first = 1;
+    list.last = 2;
+    list.current = true;
+    list.ranges = { { 0x81400000, 0x81400100 }, { 0x81500000, 0x81500040 } };
+    context.deferred_lists.push_back(list);
+    snapshot.contexts.push_back(context);
+
+    snapshot.batches.push_back({ 0x81100000, 1, 2 });
+    renderer::FinishSnapshot finish;
+    finish.id = 5;
+    finish.owner = 0x40010005;
+    finish.context_address = 0x81100000;
+    finish.fence_done = true;
+    finish.result = -1;
+    snapshot.finish_operations.push_back(finish);
+    snapshot.sync_objects.push_back({ 0x81600000, 10, 11, 9, 8 });
+    gxm::RenderTargetSnapshot target;
+    target.address = 0x81700000;
+    target.width = 960;
+    target.height = 544;
+    target.scenes_per_frame = 1;
+    target.driver_mem_block = 0x40010007;
+    snapshot.render_targets.push_back(target);
+
+    const auto source = std::make_shared<std::vector<uint8_t>>(std::vector<uint8_t>{ 'G', 'X', 'P', 0, 1, 2, 3 });
+    gxm::FragmentProgramSnapshot fragment;
+    fragment.address = 0x81800000;
+    fragment.program = Ptr<const SceGxmProgram>(0x81810000);
+    fragment.program_source = source;
+    fragment.has_blend = true;
+    snapshot.fragment_programs.push_back(fragment);
+    gxm::VertexProgramSnapshot vertex;
+    vertex.address = 0x81900000;
+    vertex.program = Ptr<const SceGxmProgram>(0x81910000);
+    vertex.program_source = std::make_shared<std::vector<uint8_t>>(std::vector<uint8_t>{ 'G', 'X', 'P', 0, 9 });
+    vertex.attributes.resize(2);
+    vertex.streams.resize(1);
+    vertex.key_hash = 0x1122334455667788ull;
+    snapshot.vertex_programs.push_back(vertex);
+    snapshot.shader_patchers.push_back({ 0x81A00000, {} });
+    snapshot.display_entries.resize(1);
+    PendingDisplaySubmission pending;
+    pending.callback.data = 0x81B00000;
+    pending.has_prediction = true;
+    pending.prediction.pitch = 960;
+    snapshot.display_submissions.emplace_back(0x40010009, pending);
+    snapshot.regions[0x81000000] = MemoryMapInfo{ 0, 0x100000, 3 };
+    return snapshot;
+}
+
+} // namespace
+
+TEST(SaveStateRoundTrip, GxmSectionKeepsEngine20Fields) {
+    const ss::GxmSnapshot original = sample_gxm_snapshot();
+    ss::BufferWriter first;
+    std::string error;
+    ASSERT_TRUE(ss::encode_gxm_state(original, first, error)) << error;
+
+    ss::GxmSnapshot parsed;
+    ASSERT_TRUE(ss::parse_gxm_state(first.data(), parsed, error)) << error;
+    ASSERT_EQ(parsed.contexts.size(), 1u);
+    const gxm::ContextSnapshot &context = parsed.contexts[0];
+    EXPECT_TRUE(context.state.visibility_back_enable);
+    EXPECT_EQ(context.state.visibility_back_index, 9u);
+    EXPECT_TRUE(context.state.visibility_back_is_increment);
+    EXPECT_TRUE(context.state.active);
+    EXPECT_EQ(context.renderer_record.depth_bias_unit, -4);
+    EXPECT_EQ(std::memcmp(context.yuv_profile, original.contexts[0].yuv_profile, sizeof(context.yuv_profile)), 0);
+    ASSERT_EQ(context.deferred_lists.size(), 1u);
+    EXPECT_EQ(context.deferred_lists[0].ranges, original.contexts[0].deferred_lists[0].ranges);
+    ASSERT_EQ(parsed.finish_operations.size(), 1u);
+    EXPECT_EQ(parsed.finish_operations[0].result, -1);
+    ASSERT_EQ(parsed.sync_objects.size(), 1u);
+    EXPECT_EQ(parsed.sync_objects[0].last_operation_global, 8u);
+    ASSERT_EQ(parsed.vertex_programs.size(), 1u);
+    EXPECT_EQ(*parsed.vertex_programs[0].program_source, *original.vertex_programs[0].program_source);
+    ASSERT_EQ(parsed.display_submissions.size(), 1u);
+    EXPECT_EQ(parsed.display_submissions[0].second.prediction.pitch, 960u);
+    EXPECT_EQ(parsed.regions.size(), 1u);
+
+    // Encoding what was parsed gives a section of the same layout that parses to the same values
+    // (raw structs carry their padding bytes, which a memberwise copy need not preserve, so the
+    // bytes themselves are not compared).
+    ss::BufferWriter second;
+    ASSERT_TRUE(ss::encode_gxm_state(parsed, second, error)) << error;
+    EXPECT_EQ(first.size(), second.size());
+    ss::GxmSnapshot reparsed;
+    ASSERT_TRUE(ss::parse_gxm_state(second.data(), reparsed, error)) << error;
+    ASSERT_EQ(reparsed.contexts.size(), 1u);
+    EXPECT_EQ(reparsed.contexts[0].state.visibility_back_index, 9u);
+    EXPECT_EQ(std::memcmp(reparsed.contexts[0].yuv_profile, original.contexts[0].yuv_profile, sizeof(context.yuv_profile)), 0);
+    EXPECT_EQ(reparsed.contexts[0].deferred_lists[0].identity, 0xABCDEFu);
+    EXPECT_EQ(reparsed.render_targets.size(), 1u);
+    EXPECT_EQ(reparsed.regions.size(), 1u);
+
+    // A YUV profile outside the table and a truncated section are refused.
+    ss::GxmSnapshot bad = original;
+    bad.contexts[0].yuv_profile[1][1] = renderer::yuv::profile_count;
+    ss::BufferWriter bad_bytes;
+    ASSERT_TRUE(ss::encode_gxm_state(bad, bad_bytes, error)) << error;
+    EXPECT_FALSE(ss::parse_gxm_state(bad_bytes.data(), parsed, error));
+    EXPECT_EQ(error, "invalid saved YUV profile");
+    auto truncated = first.data();
+    truncated.resize(truncated.size() - 1);
+    EXPECT_FALSE(ss::parse_gxm_state(truncated, parsed, error));
+}
+
+TEST(SaveStateRoundTrip, GpuSectionKeepsBackFaceVisibilityQuery) {
+    ss::GpuSnapshot original;
+    original.mapping_method = 1;
+    original.resolution = 2.0f;
+    original.surfaces.colors.resize(renderer::vulkan::surface_cache_snapshot_slots);
+    original.surfaces.depth_stencil.resize(renderer::vulkan::surface_cache_snapshot_slots);
+    for (uint32_t slot = 0; slot < renderer::vulkan::surface_cache_snapshot_slots; ++slot) {
+        original.surfaces.color_mru_order.push_back(static_cast<uint8_t>(slot));
+        original.surfaces.depth_stencil_mru_order.push_back(static_cast<uint8_t>(slot));
+    }
+    renderer::vulkan::VKContextSnapshot context;
+    context.context_address = 0x81100000;
+    context.visibility_buffer_address = 0x82000000;
+    context.visibility_stride = 64;
+    context.visibility_query_index = 3;
+    context.visibility_query_increment = false;
+    context.visibility_back_query_index = 9;
+    context.visibility_back_query_increment = true;
+    original.contexts.push_back(context);
+
+    std::vector<uint8_t> first;
+    std::string error;
+    ASSERT_TRUE(ss::encode_gpu_state(original, first, error)) << error;
+    ss::GpuSnapshot parsed;
+    ASSERT_TRUE(ss::parse_gpu_state(first, parsed, error)) << error;
+    ASSERT_EQ(parsed.contexts.size(), 1u);
+    EXPECT_EQ(parsed.contexts[0].visibility_query_index, 3);
+    EXPECT_FALSE(parsed.contexts[0].visibility_query_increment);
+    EXPECT_EQ(parsed.contexts[0].visibility_back_query_index, 9);
+    EXPECT_TRUE(parsed.contexts[0].visibility_back_query_increment);
+    std::vector<uint8_t> second;
+    ASSERT_TRUE(ss::encode_gpu_state(parsed, second, error)) << error;
+    EXPECT_EQ(first, second);
+
+    // A back-face index outside the visibility buffer is refused like the front one.
+    original.contexts[0].visibility_back_query_index = 16;
+    ASSERT_TRUE(ss::encode_gpu_state(original, first, error)) << error;
+    EXPECT_FALSE(ss::parse_gpu_state(first, parsed, error));
+}
+
+namespace {
+struct UnregisteredRawStruct {
+    uint32_t a = 0;
+    uint16_t b = 0;
+};
+} // namespace
+
+TEST(SaveStateLayout, RawStructsMustBeRegisteredWithTheirSize) {
+    // The guard value<T>() enforces at compile time (see serialized_layout.h).
+    static_assert(ss::raw_layout_registered<uint32_t>());
+    static_assert(ss::raw_layout_registered<GxmContextState>());
+    static_assert(ss::SerializedLayout<GxmContextState>::size == 1032);
+    static_assert(ss::raw_layout_registered<renderer::GxmRecordState>());
+    static_assert(!ss::raw_layout_registered<UnregisteredRawStruct>());
+    SUCCEED();
 }

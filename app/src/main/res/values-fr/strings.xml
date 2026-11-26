@@ -1485,6 +1485,8 @@
     <string name="emulation_savestate_loaded_toast">Chargé</string>
     <string name="emulation_savestate_deleted_toast">Supprimé</string>
     <string name="emulation_savestate_failed_toast">Échec de l’opération</string>
+    <string name="emulation_savestate_other_version_toast">Cette sauvegarde d’état a été créée par une autre version de l’application et ne peut pas être chargée. Le fichier a été conservé.</string>
+    <string name="emulation_savestate_other_version_boot_toast">La sauvegarde rapide a été créée par une autre version de l’application et ne peut pas être chargée. Le jeu démarre normalement ; le fichier a été conservé.</string>
     <string name="emulation_savestate_vulkan_only">Les sauvegardes d’état nécessitent le moteur de rendu Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Aucun jeu n\'est en cours, l\'état ne peut pas être enregistré</string>
     <string name="emulation_savestate_refused_exiting">Le jeu est en train de se fermer, réessayez plus tard</string>

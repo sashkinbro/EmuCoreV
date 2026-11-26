@@ -1482,6 +1482,8 @@
     <string name="emulation_savestate_loaded_toast">已读取</string>
     <string name="emulation_savestate_deleted_toast">已删除</string>
     <string name="emulation_savestate_failed_toast">操作失败</string>
+    <string name="emulation_savestate_other_version_toast">此即时存档由其他版本的应用创建，无法载入。文件已保留。</string>
+    <string name="emulation_savestate_other_version_boot_toast">快速存档由其他版本的应用创建，无法载入。游戏将正常启动；文件已保留。</string>
     <string name="emulation_savestate_vulkan_only">存档状态需要 Vulkan 渲染器</string>
     <string name="emulation_savestate_refused_no_game">当前没有运行的游戏，无法保存状态</string>
     <string name="emulation_savestate_refused_exiting">游戏正在关闭，请稍后再试</string>

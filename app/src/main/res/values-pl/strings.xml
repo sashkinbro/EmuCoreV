@@ -1487,6 +1487,8 @@
     <string name="emulation_savestate_loaded_toast">Wczytano</string>
     <string name="emulation_savestate_deleted_toast">Usunięto</string>
     <string name="emulation_savestate_failed_toast">Nie udało się wykonać operacji</string>
+    <string name="emulation_savestate_other_version_toast">Ten stan zapisu utworzyła inna wersja aplikacji i nie można go wczytać. Plik został zachowany.</string>
+    <string name="emulation_savestate_other_version_boot_toast">Szybki zapis utworzyła inna wersja aplikacji i nie można go wczytać. Gra uruchamia się normalnie; plik został zachowany.</string>
     <string name="emulation_savestate_vulkan_only">Zapisy stanu wymagają renderera Vulkan</string>
     <string name="emulation_savestate_refused_no_game">Żadna gra nie jest uruchomiona, nie można zapisać stanu</string>
     <string name="emulation_savestate_refused_exiting">Gra się zamyka, spróbuj ponownie później</string>

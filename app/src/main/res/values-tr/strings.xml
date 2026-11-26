@@ -1484,6 +1484,8 @@
     <string name="emulation_savestate_loaded_toast">Yüklendi</string>
     <string name="emulation_savestate_deleted_toast">Silindi</string>
     <string name="emulation_savestate_failed_toast">İşlem tamamlanamadı</string>
+    <string name="emulation_savestate_other_version_toast">Bu durum kaydı uygulamanın farklı bir sürümüyle oluşturuldu ve yüklenemiyor. Dosya korundu.</string>
+    <string name="emulation_savestate_other_version_boot_toast">Hızlı kayıt uygulamanın farklı bir sürümüyle oluşturuldu ve yüklenemiyor. Oyun normal şekilde başlatılıyor; dosya korundu.</string>
     <string name="emulation_savestate_vulkan_only">Kayıt durumları Vulkan oluşturucusunu gerektirir</string>
     <string name="emulation_savestate_refused_no_game">Çalışan bir oyun yok, durum kaydedilemez</string>
     <string name="emulation_savestate_refused_exiting">Oyun kapanıyor, daha sonra tekrar deneyin</string>

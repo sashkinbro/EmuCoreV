@@ -1485,6 +1485,8 @@
     <string name="emulation_savestate_loaded_toast">Cargado</string>
     <string name="emulation_savestate_deleted_toast">Eliminado</string>
     <string name="emulation_savestate_failed_toast">No se pudo completar la operación</string>
+    <string name="emulation_savestate_other_version_toast">Este estado guardado se creó con otra versión de la app y no se puede cargar. Se ha conservado el archivo.</string>
+    <string name="emulation_savestate_other_version_boot_toast">El guardado rápido se creó con otra versión de la app y no se puede cargar. El juego se inicia normalmente; se ha conservado el archivo.</string>
     <string name="emulation_savestate_vulkan_only">Los estados guardados requieren el renderizador Vulkan</string>
     <string name="emulation_savestate_refused_no_game">No hay ningún juego en ejecución, no se puede guardar el estado</string>
     <string name="emulation_savestate_refused_exiting">El juego se está cerrando, inténtalo más tarde</string>

@@ -1484,6 +1484,8 @@
     <string name="emulation_savestate_loaded_toast">लोड हो गया</string>
     <string name="emulation_savestate_deleted_toast">हटा दिया गया</string>
     <string name="emulation_savestate_failed_toast">कार्रवाई पूरी नहीं हो सकी</string>
+    <string name="emulation_savestate_other_version_toast">यह सेव स्टेट ऐप के किसी अन्य संस्करण से बनाई गई थी और लोड नहीं हो सकती। फ़ाइल रखी गई है।</string>
+    <string name="emulation_savestate_other_version_boot_toast">क्विक सेव ऐप के किसी अन्य संस्करण से बनाई गई थी और लोड नहीं हो सकती। गेम सामान्य रूप से शुरू हो रहा है; फ़ाइल रखी गई है।</string>
     <string name="emulation_savestate_vulkan_only">सेव स्टेट के लिए Vulkan रेंडरर आवश्यक है</string>
     <string name="emulation_savestate_refused_no_game">कोई गेम नहीं चल रहा है, इसलिए स्टेट सेव नहीं हो सकता</string>
     <string name="emulation_savestate_refused_exiting">गेम बंद हो रहा है, बाद में पुनः प्रयास करें</string>
