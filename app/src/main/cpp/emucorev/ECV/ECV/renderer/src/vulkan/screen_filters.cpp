@@ -41,7 +41,7 @@ SinglePassScreenFilter::SinglePassScreenFilter(ScreenRenderer &screen)
 SinglePassScreenFilter::~SinglePassScreenFilter() {
     vk::Device device = screen.state.device;
     // this will only happen when the user changes the option in the GUI, we can afford to waitIdle
-    device.waitIdle();
+    screen.state.wait_device_idle();
     device.destroy(pipeline);
     device.destroy(pipeline_layout);
     device.destroy(descriptor_pool);
@@ -386,7 +386,7 @@ struct RcasConstant {
 
 FSRScreenFilter::~FSRScreenFilter() {
     vk::Device device = screen.state.device;
-    device.waitIdle();
+    screen.state.wait_device_idle();
 
     device.destroy(sampler);
 

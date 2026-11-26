@@ -23,9 +23,12 @@
 #include "emucorev/shaders/vulkan_shader_chain.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
+#include <thread>
 
 namespace renderer::vulkan {
 
@@ -110,6 +113,33 @@ public:
     std::string retroarch_shader_error() const;
 
 private:
+    struct PresentRequest {
+        vk::SwapchainKHR swapchain;
+        uint32_t image_index = 0;
+        vk::Semaphore wait_semaphore;
+    };
+
+    // Present thread: one request waits in the slot while the previous one is inside vkQueuePresentKHR, so the
+    // render thread keeps recording while a FIFO present blocks on the panel.
+    void start_present_thread();
+    void stop_present_thread();
+    // waits until no present is queued or running (before the swapchain, its semaphores or the device go away)
+    void drain_present();
+    void present_thread_main();
+    vk::Result present_now(const PresentRequest &request);
+    // applies the outcome of a present (the result of the previous asynchronous one when presenting on the thread)
+    bool handle_present_result(vk::Result result);
+
+    std::thread present_thread;
+    std::mutex present_mutex;
+    std::condition_variable present_cv;
+    std::optional<PresentRequest> present_pending;
+    bool present_busy = false;
+    bool present_quit = false;
+    // vk::Result of the last failed or suboptimal asynchronous present not yet consumed by the render thread;
+    // 0 (success) = none
+    std::atomic<int> present_async_result{ 0 };
+
     void create_render_pass();
     void create_layout_sync();
     bool create_swapchain();

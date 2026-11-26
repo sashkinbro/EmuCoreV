@@ -673,7 +673,7 @@ IMGUI_API void ImGui_ImplSdlVulkan_DeleteTexture(ImGui_VulkanState &state, ImTex
     auto texture_ptr = static_cast<TextureState *>(texture);
     auto &vk_state = get_renderer(state);
 
-    vk_state.device.waitIdle();
+    vk_state.wait_device_idle();
     vk_state.device.destroy(texture_ptr->image_view);
     vk_state.allocator.destroyImage(texture_ptr->image, texture_ptr->allocation);
 

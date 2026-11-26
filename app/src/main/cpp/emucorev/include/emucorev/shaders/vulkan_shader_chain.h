@@ -2,6 +2,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <string>
@@ -49,8 +50,9 @@ public:
     void clearParameters();
 
     // Applies a pending preset replacement on the renderer thread. An empty path resets.
+    // wait_idle idles the whole device (the caller synchronises it against its other queue users).
     bool applyPending(VkInstance instance, VkPhysicalDevice physical_device, VkDevice device,
-        VkQueue queue, PFN_vkGetInstanceProcAddr entry, PFN_vkDeviceWaitIdle wait_idle, std::string &error);
+        VkQueue queue, PFN_vkGetInstanceProcAddr entry, const std::function<void()> &wait_idle, std::string &error);
 
     // Records a complete RetroArch pass chain. Input must be shader-read-only and output
     // color-attachment-optimal; callers own layout transitions and render-pass boundaries.

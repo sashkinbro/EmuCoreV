@@ -750,7 +750,7 @@ VKSurfaceCache::VKSurfaceCache(VKState &state)
 void VKSurfaceCache::reset() {
     // cleanup() destroys views, images and framebuffers immediately; the render thread may
     // still have submitted work (and descriptor sets) referencing them
-    state.device.waitIdle();
+    state.wait_device_idle();
     cleanup();
     color_address_lookup.clear();
     depth_address_lookup.clear();

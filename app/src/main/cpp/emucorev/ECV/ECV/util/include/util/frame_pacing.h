@@ -34,12 +34,15 @@ struct PresentModeSupport {
 
 // v-sync on: FIFO (always available, one image per refresh, never tears, no frame is dropped).
 // v-sync off: the best mode that does not tear first (mailbox), then the ones that may.
-constexpr PresentMode choose_present_mode(bool vsync, const PresentModeSupport &support) {
+// Immediate is skipped where it is known to exhaust the window system's buffer queue (Android: the
+// compositor holds on to the buffers and the driver stalls or drops frames), so the caller passes
+// allow_immediate = false there and falls through to FIFO_RELAXED / FIFO.
+constexpr PresentMode choose_present_mode(bool vsync, const PresentModeSupport &support, bool allow_immediate = true) {
     if (vsync)
         return PresentMode::Fifo;
     if (support.mailbox)
         return PresentMode::Mailbox;
-    if (support.immediate)
+    if (support.immediate && allow_immediate)
         return PresentMode::Immediate;
     if (support.fifo_relaxed)
         return PresentMode::FifoRelaxed;

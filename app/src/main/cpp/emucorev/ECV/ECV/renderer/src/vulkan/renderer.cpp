@@ -1132,6 +1132,12 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
     // Get Queues
     general_queue = device.getQueue(general_family_index, 0);
     transfer_queue = device.getQueue(transfer_family_index, 0);
+    // A second queue of the general family (all of the family's queues were created, and every queue of a
+    // family presents to the same surfaces) lets presentation run on its own thread.
+    present_queue = general_queue;
+    if (general_family_index < physical_device_queue_families.size()
+        && physical_device_queue_families[general_family_index].queueCount > 1)
+        present_queue = device.getQueue(general_family_index, 1);
 
     // Create Command Pools
     {
@@ -1589,7 +1595,7 @@ void VKState::cleanup() {
     };
 
     try {
-        device.waitIdle();
+        wait_device_idle();
     } catch (const vk::DeviceLostError &) {
         log_device_fault();
         throw;
@@ -1891,7 +1897,7 @@ void VKState::swap_window() {
     // Android asked us to give memory back!
     const int trim_level = mem_diag::pending_trim_level.exchange(-1, std::memory_order_relaxed);
     if (trim_level >= 0) {
-        device.waitIdle();
+        wait_device_idle();
         const uint64_t freed = texture_cache.release_all_cached_textures();
         LOG_WARN("[ANDROID MEMORY] trim level {}: released {} MiB of cached textures", trim_level, freed / (1024 * 1024));
         logging::flush();
@@ -2383,7 +2389,7 @@ bool VKState::reset_frame_runtime_for_restore(std::string &error) {
         return false;
     }
     try {
-        device.waitIdle();
+        wait_device_idle();
         reset_frame_runtime_after_idle(frames,
             [](FrameObject &frame) { frame.destroy_queue.destroy_objects(); },
             [&](FrameObject &frame) {
@@ -2405,8 +2411,13 @@ void VKState::flush_surfaces(MemState &mem) {
     surface_cache.flush_all_surfaces(mem);
 }
 
-void VKState::wait_gpu_idle() {
+void VKState::wait_device_idle() {
+    const std::lock_guard<std::mutex> lock(present_queue_mutex);
     device.waitIdle();
+}
+
+void VKState::wait_gpu_idle() {
+    wait_device_idle();
     // Cold launches have no GXM context/request reader yet. GPU completion
     // remains necessary, but no host writeback marker can run in that state.
     if (!features.enable_memory_mapping || !context
@@ -2437,7 +2448,7 @@ void VKState::unmap_memory(MemState &mem, Ptr<void> address) {
 
     // we need to wait in case the buffer is being used
     try {
-        device.waitIdle();
+        wait_device_idle();
     } catch (const vk::DeviceLostError &) {
         log_device_fault();
         throw;

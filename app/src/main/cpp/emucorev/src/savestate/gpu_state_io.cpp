@@ -850,7 +850,7 @@ bool wait_gpu_snapshot_idle(EmuEnvState &env, std::string &error) {
     }
     auto &state = static_cast<renderer::vulkan::VKState &>(*env.renderer);
     try {
-        state.device.waitIdle();
+        state.wait_device_idle();
     } catch (const std::exception &exception) {
         error = std::string("Vulkan device idle wait failed: ") + exception.what();
         return false;

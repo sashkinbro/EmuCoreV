@@ -123,6 +123,14 @@ struct VKState : public renderer::State {
     uint32_t transfer_queue_last = 0;
     vk::Queue general_queue;
     vk::Queue transfer_queue;
+    // Second queue of the general family when the device exposes one: the present thread presents on it
+    // so a blocking vkQueuePresentKHR never holds up submissions. Equals general_queue when the family has a
+    // single queue (the screen renderer then presents on the render thread).
+    vk::Queue present_queue;
+    // Held by the present thread around vkQueuePresentKHR and by wait_device_idle(): vkDeviceWaitIdle
+    // needs every queue externally synchronised.
+    std::mutex present_queue_mutex;
+    void wait_device_idle();
 
     // These might be merged into one queue, but for now they are different.
     vk::CommandPool general_command_pool;

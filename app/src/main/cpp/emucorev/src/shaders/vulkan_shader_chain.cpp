@@ -73,7 +73,7 @@ void VulkanShaderChain::clearParameters() {
 }
 
 bool VulkanShaderChain::applyPending(VkInstance instance, VkPhysicalDevice physical_device, VkDevice device,
-    VkQueue queue, PFN_vkGetInstanceProcAddr entry, PFN_vkDeviceWaitIdle wait_idle, std::string &error) {
+    VkQueue queue, PFN_vkGetInstanceProcAddr entry, const std::function<void()> &wait_idle, std::string &error) {
 #if !defined(EMUCOREV_HAVE_LIBRASHADER)
     (void)instance;
     (void)physical_device;
@@ -123,7 +123,7 @@ bool VulkanShaderChain::applyPending(VkInstance instance, VkPhysicalDevice physi
             setLastError(error);
             return false;
         }
-        wait_idle(device);
+        wait_idle();
     }
     destroy();
     active_preset_ = requested;

@@ -137,7 +137,7 @@ void VKTextureCache::cleanup() {
 void VKTextureCache::reset() {
     const size_t sampler_cache_size = sampler_queue.items.size();
     // cleanup() destroys views, images and samplers immediately: wait for submitted work using them
-    state.device.waitIdle();
+    state.wait_device_idle();
     cleanup();
     texture_lookup.clear();
     texture_queue.init(TextureCacheSize);

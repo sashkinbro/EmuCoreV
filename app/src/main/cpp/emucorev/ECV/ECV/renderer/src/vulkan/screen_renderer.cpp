@@ -26,6 +26,9 @@
 #include "emucorev/shaders/shader_preset_bridge.h"
 
 #include <cstdint>
+#ifdef __ANDROID__
+#include <pthread.h>
+#endif
 #include <cmath>
 #include <exception>
 
@@ -255,6 +258,7 @@ bool ScreenRenderer::setup() {
     filter->init();
     emucorev::shaders::registerScreenRenderer(this);
 
+    start_present_thread();
     return true;
 }
 
@@ -268,7 +272,12 @@ void ScreenRenderer::select_present_mode() {
         support.fifo_relaxed |= mode == vk::PresentModeKHR::eFifoRelaxed;
     }
     const vk::PresentModeKHR previous = present_mode;
-    switch (frame_pacing::choose_present_mode(vsync_enabled, support)) {
+#ifdef __ANDROID__
+    constexpr bool allow_immediate = false; // IMMEDIATE exhausts the BufferQueue on Android
+#else
+    constexpr bool allow_immediate = true;
+#endif
+    switch (frame_pacing::choose_present_mode(vsync_enabled, support, allow_immediate)) {
     case frame_pacing::PresentMode::Mailbox: present_mode = vk::PresentModeKHR::eMailbox; break;
     case frame_pacing::PresentMode::Immediate: present_mode = vk::PresentModeKHR::eImmediate; break;
     case frame_pacing::PresentMode::FifoRelaxed: present_mode = vk::PresentModeKHR::eFifoRelaxed; break;
@@ -395,7 +404,8 @@ void ScreenRenderer::destroy_swapchain() {
 
 void ScreenRenderer::cleanup() {
     emucorev::shaders::unregisterScreenRenderer(this);
-    state.device.waitIdle();
+    stop_present_thread();
+    state.wait_device_idle();
 
     shader_chain.destroy();
     filter.reset();
@@ -471,6 +481,15 @@ bool ScreenRenderer::acquire_swapchain_image() {
     }
 
     vk::Result acquire_result = vk::Result::eErrorOutOfDateKHR;
+
+    // vkAcquireNextImageKHR and vkQueuePresentKHR both need the swapchain externally synchronised, and
+    // with minImageCount + 1 images the next image may only become available once the previous one is
+    // presented: the previous present finishes first. The present thread overlaps it with everything
+    // the render thread does between swap_window() and this acquire (the next guest frame).
+    drain_present();
+    // outcome of the last present made by the present thread
+    if (const int async_result = present_async_result.exchange(0, std::memory_order_acquire); async_result != 0)
+        handle_present_result(static_cast<vk::Result>(async_result));
 
     current_frame++;
     if (current_frame == swapchain_size + 1)
@@ -576,7 +595,7 @@ void ScreenRenderer::render(vk::ImageView image_view, vk::ImageLayout layout, co
         static_cast<VkDevice>(state.device),
         static_cast<VkQueue>(state.general_queue),
         VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
-        VULKAN_HPP_DEFAULT_DISPATCHER.vkDeviceWaitIdle,
+        [this] { state.wait_device_idle(); },
         shader_error);
     if (!shader_error.empty())
         LOG_ERROR("RetroArch shader preset could not be loaded: {}", shader_error);
@@ -730,7 +749,8 @@ bool ScreenRenderer::swap_window() {
         return false;
     }
 
-    // first submit the command buffer
+    // first submit the command buffer. The submit always happens, even when the present below is dropped
+    // (rebuild pending, failed present): the frame's GPU work and its fence never depend on the present.
     current_cmd_buffer.endRenderPass();
     current_cmd_buffer.end();
     vk::SubmitInfo submit_info{};
@@ -743,16 +763,35 @@ bool ScreenRenderer::swap_window() {
     submit_info.setCommandBuffers(current_cmd_buffer);
     state.general_queue.submit(submit_info, fences[swapchain_image_idx]);
 
-    // then present the surface
+    const PresentRequest request{ swapchain, swapchain_image_idx, image_ready_semaphores[swapchain_image_idx] };
+    swapchain_image_idx = ~0;
+    current_cmd_buffer = nullptr;
+
+    if (present_thread.joinable()) {
+        // hand the present to the present thread; its outcome is applied on the next acquire
+        std::unique_lock<std::mutex> lock(present_mutex);
+        present_cv.wait(lock, [this] { return !present_pending.has_value(); });
+        present_pending = request;
+        lock.unlock();
+        present_cv.notify_all();
+        return true;
+    }
+    return handle_present_result(present_now(request));
+}
+
+vk::Result ScreenRenderer::present_now(const PresentRequest &request) {
     vk::PresentInfoKHR present_info{
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &image_ready_semaphores[swapchain_image_idx],
+        .pWaitSemaphores = &request.wait_semaphore,
         .swapchainCount = 1,
-        .pSwapchains = &swapchain,
-        .pImageIndices = &swapchain_image_idx,
+        .pSwapchains = &request.swapchain,
+        .pImageIndices = &request.image_index,
     };
+    const std::lock_guard<std::mutex> lock(state.present_queue_mutex);
+    return state.present_queue.presentKHR(&present_info);
+}
 
-    auto result = state.general_queue.presentKHR(&present_info);
+bool ScreenRenderer::handle_present_result(vk::Result result) {
     if (result == vk::Result::eSuboptimalKHR) {
         if (note_size_mismatch(!surface_matches_window_size())) {
             need_rebuild = true;
@@ -764,14 +803,67 @@ bool ScreenRenderer::swap_window() {
         need_surface_recreate = result == vk::Result::eErrorSurfaceLostKHR;
     } else if (result != vk::Result::eSuccess) {
         LOG_ERROR("Could not present KHR.");
-        swapchain_image_idx = ~0;
-        current_cmd_buffer = nullptr;
         return false;
     }
-
-    swapchain_image_idx = ~0;
-    current_cmd_buffer = nullptr;
     return result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR;
+}
+
+void ScreenRenderer::start_present_thread() {
+    // Capability driven: a second queue of the general family exists. With a single queue every submit and
+    // present would have to be serialised against the render thread, which buys nothing.
+    if (present_thread.joinable())
+        return;
+    if (state.present_queue == state.general_queue) {
+        LOG_WARN("Present: on the render thread (the general queue family has a single queue)");
+        return;
+    }
+    present_quit = false;
+    present_thread = std::thread([this] { present_thread_main(); });
+    LOG_WARN("Present: dedicated present thread on queue 1 of family {}", state.general_family_index);
+}
+
+void ScreenRenderer::stop_present_thread() {
+    if (!present_thread.joinable())
+        return;
+    drain_present();
+    {
+        const std::lock_guard<std::mutex> lock(present_mutex);
+        present_quit = true;
+    }
+    present_cv.notify_all();
+    present_thread.join();
+}
+
+void ScreenRenderer::drain_present() {
+    if (!present_thread.joinable())
+        return;
+    std::unique_lock<std::mutex> lock(present_mutex);
+    present_cv.wait(lock, [this] { return !present_pending.has_value() && !present_busy; });
+}
+
+void ScreenRenderer::present_thread_main() {
+#ifdef __ANDROID__
+    pthread_setname_np(pthread_self(), "ecv-present");
+#endif
+    std::unique_lock<std::mutex> lock(present_mutex);
+    for (;;) {
+        present_cv.wait(lock, [this] { return present_pending.has_value() || present_quit; });
+        if (!present_pending.has_value())
+            return;
+        const PresentRequest request = *present_pending;
+        present_pending.reset();
+        present_busy = true;
+        lock.unlock();
+        present_cv.notify_all();
+
+        const vk::Result result = present_now(request);
+        if (result != vk::Result::eSuccess)
+            present_async_result.store(static_cast<int>(result), std::memory_order_release);
+
+        lock.lock();
+        present_busy = false;
+        present_cv.notify_all();
+    }
 }
 
 void ScreenRenderer::set_filter(const std::string_view &filter) {
@@ -947,7 +1039,8 @@ bool ScreenRenderer::rebuild_swapchain_if_visible() {
 
     // This is the most expensive thing the emulator does outside loading
     // it idles the device, which stalls the vblank thread too
-    state.device.waitIdle();
+    drain_present();
+    state.wait_device_idle();
     destroy_swapchain();
 
 #ifdef __ANDROID__
