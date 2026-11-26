@@ -36,6 +36,10 @@ internal fun LaunchStateLoadingOverlay(
     indeterminate: Boolean = false,
     showProgress: Boolean = true,
     scrimAlpha: Float = 1f,
+    // Vita shell sessions: the pack-built Vita dialog replaces the card. vitaPending only
+    // keeps the scrim up while the pack is being read, so the card never flashes first.
+    vitaAssets: VitaDialogAssets? = null,
+    vitaPending: Boolean = false,
     @StringRes messageRes: Int = R.string.emulation_savestate_startup_loading
 ) {
     if (!state.active) return
@@ -52,6 +56,18 @@ internal fun LaunchStateLoadingOverlay(
         contentAlignment = Alignment.Center
     ) {
         if (!showProgress) return@Box
+        if (vitaAssets != null) {
+            VitaLoadingDialog(
+                assets = vitaAssets,
+                message = stringResource(messageRes),
+                progress = if (indeterminate) null else state.progress,
+                modifier = Modifier.semantics {
+                    if (!indeterminate) stateDescription = "${(state.progress * 100).toInt()}%"
+                }
+            )
+            return@Box
+        }
+        if (vitaPending) return@Box
         Surface(
             modifier = Modifier
                 .widthIn(max = 420.dp)

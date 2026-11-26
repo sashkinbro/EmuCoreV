@@ -216,6 +216,17 @@ fun EmulationOverlayHost(
     )
     var menuButtonVisible by remember { mutableStateOf(false) }
     var userPaused by remember { mutableStateOf(false) }
+    // Vita shell sessions draw the loading dialog from the firmware resource pack.
+    val vitaDialogMode = remember(activity) { activity.returnsToNativeLibrary }
+    var vitaDialogAssets by remember { mutableStateOf<VitaDialogAssets?>(null) }
+    var vitaDialogResolved by remember { mutableStateOf(!vitaDialogMode) }
+    LaunchedEffect(vitaDialogMode) {
+        if (!vitaDialogMode) return@LaunchedEffect
+        vitaDialogAssets = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            VitaDialogAssets.packDirectory(activity)?.let(VitaDialogAssets::load)
+        }
+        vitaDialogResolved = true
+    }
     var saveStateBusyLoading by remember { mutableStateOf(false) }
     var saveStateBusySaving by remember { mutableStateOf(false) }
     var pendingSaveStateAction by remember { mutableStateOf<SaveStateAction?>(null) }
@@ -1121,6 +1132,8 @@ fun EmulationOverlayHost(
             showProgress = showRoutineStateFeedback,
             indeterminate = saveStateBusyLoading || saveStateBusySaving || autoSaving || waitingForStateFrame,
             scrimAlpha = if (saveStateBusySaving || autoSaving) 0.35f else 1f,
+            vitaAssets = vitaDialogAssets,
+            vitaPending = !vitaDialogResolved,
             messageRes = if (saveStateBusySaving || autoSaving) R.string.emulation_savestate_saving
                 else R.string.emulation_savestate_startup_loading
         )
