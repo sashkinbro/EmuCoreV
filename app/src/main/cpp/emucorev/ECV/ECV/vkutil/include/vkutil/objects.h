@@ -117,6 +117,8 @@ protected:
 
     uint32_t cursor = ~0;
     uint32_t capacity;
+    // number of times the cursor went back to the start
+    uint32_t wraps = 0;
 
 public:
     // any buffer alignment on vulkan is at most 256 on 99% of instances
@@ -150,6 +152,14 @@ public:
     uint32_t cursor_bytes() const {
         return cursor;
     }
+
+    uint32_t wrap_count() const {
+        return wraps;
+    }
+
+    vk::DeviceSize buffer_bytes() const {
+        return buffer.size;
+    }
 };
 
 // RingBuffer allocated in the GPU memory, may not be accessible from the host
@@ -179,6 +189,9 @@ public:
     void create() override;
 
     void copy(vk::CommandBuffer cmd_buffer, const uint32_t size, const void *data, const uint32_t offset = 0) override;
+
+    // reads `size` bytes at an absolute buffer offset (what a shader wrote there); only valid once the GPU work that wrote them has completed
+    void read_back(const uint32_t absolute_offset, const uint32_t size, void *dst);
 };
 
 // Queue that contains GPU objects that are planned to be destroyed (deferred destruction)

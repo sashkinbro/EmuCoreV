@@ -18,6 +18,7 @@
 #include <renderer/vulkan/pipeline_cache.h>
 
 #include <cstring>
+#include <renderer/vulkan/buffer_store_model.h>
 #include <renderer/vulkan/pipeline_cache_file.h>
 #include <renderer/vulkan/render_pass_sync.h>
 
@@ -666,6 +667,7 @@ vk::PipelineShaderStageCreateInfo PipelineCache::retrieve_shader(const SceGxmPro
                 };
 
                 module = state.device.createShaderModule(shader_info);
+                note_module_stores(module, source.data(), source.size());
 
                 std::lock_guard<std::mutex> guard(shaders_mutex);
                 // Save shader cache hashes
@@ -1186,6 +1188,16 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
             return nullptr;
         }
 
+        if (!state.features.enable_memory_mapping) {
+            uint8_t stages = 0;
+            std::lock_guard<std::mutex> guard(shaders_mutex);
+            if (container_writable_modules.contains(static_cast<VkShaderModule>(vertex_shader.module)))
+                stages |= buffer_store::Vertex;
+            if (!is_fragment_disabled && container_writable_modules.contains(static_cast<VkShaderModule>(fragment_shader.module)))
+                stages |= buffer_store::Fragment;
+            if (stages)
+                pipeline_store_stages[static_cast<VkPipeline>(result.value)] = stages;
+        }
         return result.value;
     } catch (const vk::SystemError &err) {
         LOG_CRITICAL("Failed to create pipeline: {}", err.what());
@@ -1350,7 +1362,25 @@ vk::ShaderModule PipelineCache::load_cached_shader_module(const Sha256Hash &hash
         .pCode = source.data()
     };
 
-    return state.device.createShaderModule(shader_info);
+    const vk::ShaderModule module = state.device.createShaderModule(shader_info);
+    note_module_stores(module, source.data(), source.size());
+    return module;
+}
+
+void PipelineCache::note_module_stores(vk::ShaderModule module, const uint32_t *words, size_t count) {
+    // with memory mapping the guest buffers are reached through device addresses and the container does not exist
+    if (state.features.enable_memory_mapping || !module || !buffer_store::spirv_has_writable_storage_buffer(words, count))
+        return;
+    std::lock_guard<std::mutex> guard(shaders_mutex);
+    container_writable_modules.insert(static_cast<VkShaderModule>(module));
+}
+
+uint8_t PipelineCache::pipeline_buffer_stores(vk::Pipeline pipeline) {
+    if (state.features.enable_memory_mapping || !pipeline)
+        return 0;
+    std::lock_guard<std::mutex> guard(shaders_mutex);
+    const auto it = pipeline_store_stages.find(static_cast<VkPipeline>(pipeline));
+    return it == pipeline_store_stages.end() ? 0 : it->second;
 }
 
 vk::ShaderModule PipelineCache::precompile_shader(const Sha256Hash &hash, bool search_first) {

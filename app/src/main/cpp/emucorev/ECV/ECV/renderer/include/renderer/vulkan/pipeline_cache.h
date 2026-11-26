@@ -31,6 +31,8 @@
 #include <mutex>
 #include <set>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 struct SceGxmProgram;
@@ -124,6 +126,12 @@ private:
     // a key whose check differs is a collision between two different states and is re-keyed instead of reusing the wrong pipeline.
     std::unordered_map<uint64_t, uint64_t> pipeline_checks;
 
+    // no memory mapping: modules whose guest buffer container is written by the shader (buffer_store_model.h), and for each pipeline which of its
+    // stages (buffer_store::Stage bits) hold such a module; both under shaders_mutex
+    std::unordered_set<VkShaderModule> container_writable_modules;
+    std::unordered_map<VkPipeline, uint8_t> pipeline_store_stages;
+    void note_module_stores(vk::ShaderModule module, const uint32_t *words, size_t count);
+
     // reads a precompiled module from the shader cache directory, does not touch the shaders map
     vk::ShaderModule load_cached_shader_module(const Sha256Hash &hash);
     vk::PipelineShaderStageCreateInfo retrieve_shader(const SceGxmProgram *program, const Sha256Hash &hash, bool is_vertex, bool maskupdate, MemState &mem, const shader::Hints &hints, bool is_srgb = false);
@@ -169,6 +177,8 @@ public:
     void save_pipeline_cache();
 
     vk::RenderPass retrieve_render_pass(vk::Format format, bool depth_load, bool stencil_load, bool force_store, bool is_color_transient, bool no_color = false, bool has_raw_attachment = false, vk::Format ds_format = vk::Format::eUndefined);
+    // stage bits (buffer_store::Stage) of the pipeline whose shader stores into the guest buffers (always 0 with memory mapping)
+    uint8_t pipeline_buffer_stores(vk::Pipeline pipeline);
     vk::Pipeline retrieve_pipeline(VKContext &context, SceGxmPrimitiveType &type, bool consider_for_async, MemState &mem, dsmodel::PassVariant variant = dsmodel::PassVariant::Front);
 
     vk::ShaderModule precompile_shader(const Sha256Hash &hash, bool search_first = true);

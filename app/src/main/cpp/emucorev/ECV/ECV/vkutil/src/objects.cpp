@@ -297,8 +297,10 @@ RingBuffer::RingBuffer(vk::BufferUsageFlags usage, const size_t capacity)
 }
 
 void RingBuffer::allocate(const uint32_t data_size) {
-    if (cursor + data_size > capacity)
+    if (cursor + data_size > capacity) {
         cursor = 0;
+        wraps++;
+    }
 
     data_offset = cursor;
 
@@ -321,6 +323,12 @@ void HostRingBuffer::copy(vk::CommandBuffer cmd_buffer, const uint32_t size, con
 
     if (!is_coherent)
         allocator.flushAllocation(buffer.allocation, data_offset + offset, size);
+}
+
+void HostRingBuffer::read_back(const uint32_t absolute_offset, const uint32_t size, void *dst) {
+    if (!is_coherent)
+        allocator.invalidateAllocation(buffer.allocation, absolute_offset, size);
+    memcpy(dst, static_cast<const uint8_t *>(buffer.mapped_data) + absolute_offset, size);
 }
 
 void LocalRingBuffer::create() {

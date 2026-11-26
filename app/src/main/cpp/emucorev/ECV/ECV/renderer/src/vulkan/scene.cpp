@@ -152,6 +152,7 @@ void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *
             }
 
             context.vertex_uniform_stream_ring_buffer.copy(context.prerender_cmd, data_size_upload, data.get(mem), offset_start_upload);
+            buffer_store::note_block(context.draw_store_blocks, { data.address(), data_size_upload, offset_start_upload, 0, buffer_store::Vertex, block_num });
         } else {
             if (!context.fragment_uniform_storage_allocated) {
                 // Allocate a region for it. Don't worry though, when the shader program is changed
@@ -160,6 +161,7 @@ void set_uniform_buffer(VKContext &context, MemState &mem, const ShaderProgram *
             }
 
             context.fragment_uniform_stream_ring_buffer.copy(context.prerender_cmd, data_size_upload, data.get(mem), offset_start_upload);
+            buffer_store::note_block(context.draw_store_blocks, { data.address(), data_size_upload, offset_start_upload, 0, buffer_store::Fragment, block_num });
         }
     }
 }
@@ -904,6 +906,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
 
     // bind the vertex streams
     if (!bind_vertex_streams(context, mem, instance_count, max_index)) {
+        context.draw_store_blocks.clear();
         context.vertex_uniform_storage_allocated = false;
         context.fragment_uniform_storage_allocated = false;
         return;
@@ -970,6 +973,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
     if (clip_inside)
         context.render_cmd.setScissor(0, context.scissor);
 
+    context.collect_buffer_stores(mem);
     context.vertex_uniform_storage_allocated = false;
     context.fragment_uniform_storage_allocated = false;
 }

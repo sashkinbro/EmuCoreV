@@ -1155,6 +1155,14 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
         visibility_max_used_idx = -1;
     }
 
+    if (!state.features.enable_memory_mapping && !pending_buffer_stores.empty()) {
+        // shader stores into the storage-buffer copy of the guest buffers become visible to the host read after the fence
+        vkutil::sync::Batch batch;
+        batch.global(vkutil::sync::S::eVertexShader | vkutil::sync::S::eFragmentShader, vkutil::sync::A::eShaderWrite,
+            vkutil::sync::S::eHost, vkutil::sync::A::eHostRead);
+        batch.flush(render_cmd);
+    }
+
     // remember which part of the colour surface this scene's draws could have touched (for write-back bounds)
     state.surface_cache.note_scene_draw_rect(draw_rect_x0, draw_rect_y0, draw_rect_x1, draw_rect_y1);
     ColorSurfaceCacheInfo *surface_info = nullptr;
@@ -1218,17 +1226,19 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
     cmdbuffers_to_submit.clear();
     state.frame().rendered_fences.push_back(fence);
 
-    if (!state.features.enable_memory_mapping && !pending_visibility.empty()) {
-        // no wait thread without memory mapping: wait for this scene and write the entries right here
+    if (!state.features.enable_memory_mapping && (!pending_visibility.empty() || !pending_buffer_stores.empty())) {
+        // no wait thread without memory mapping: wait for this scene and write the entries and the stored bytes right here
         const vk::Result wait_result = state.device.waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
         if (wait_result == vk::Result::eSuccess) {
             for (auto &resolve : pending_visibility)
                 resolve_visibility(mem, *resolve);
+            apply_buffer_stores(mem);
         } else {
             for (auto &resolve : pending_visibility)
                 resolve->staging.destroy();
         }
         pending_visibility.clear();
+        pending_buffer_stores.clear();
     }
 
     if (state.features.enable_memory_mapping) {
@@ -1266,6 +1276,52 @@ void VKContext::stop_recording(const SceGxmNotification &notif1, const SceGxmNot
 
         if (post_sync_after_notifications) {
             state.request_queue.push(PostSurfaceSyncRequest{ surface_info });
+        }
+    }
+}
+
+void VKContext::collect_buffer_stores(MemState &mem) {
+    if (draw_store_blocks.empty())
+        return;
+    uint8_t stages = state.pipeline_cache.pipeline_buffer_stores(current_pipeline);
+    if (split_pipeline)
+        stages |= state.pipeline_cache.pipeline_buffer_stores(split_pipeline);
+    if (stages != 0) {
+        for (buffer_store::Block block : draw_store_blocks) {
+            if (!(stages & block.stage))
+                continue;
+            const vkutil::HostRingBuffer &ring = block.stage == buffer_store::Vertex ? vertex_uniform_stream_ring_buffer : fragment_uniform_stream_ring_buffer;
+            block.ring_offset += ring.data_offset;
+            block.ring_wraps = ring.wrap_count();
+            PendingBufferStore pending;
+            pending.block = block;
+            if (is_valid_addr_range(mem, block.guest_address, block.guest_address + block.size)) {
+                const uint8_t *guest = Ptr<uint8_t>(block.guest_address).get(mem);
+                pending.before.assign(guest, guest + block.size);
+                pending_buffer_stores.push_back(std::move(pending));
+            }
+        }
+    }
+    draw_store_blocks.clear();
+}
+
+void VKContext::apply_buffer_stores(MemState &mem) {
+    std::vector<uint8_t> after;
+    for (const PendingBufferStore &pending : pending_buffer_stores) {
+        const buffer_store::Block &block = pending.block;
+        vkutil::HostRingBuffer &ring = block.stage == buffer_store::Vertex ? vertex_uniform_stream_ring_buffer : fragment_uniform_stream_ring_buffer;
+        if (!buffer_store::range_in_buffer(ring.buffer_bytes(), block.ring_offset, block.size)
+            || !buffer_store::ring_data_intact(block.ring_wraps, block.ring_offset, block.size, ring.wrap_count(), ring.cursor_bytes())) {
+            LOG_WARN_ONCE("A shader store into guest buffer 0x{:08X} was lost: the stream ring buffer was reused before the scene finished", block.guest_address);
+            continue;
+        }
+        after.resize(block.size);
+        ring.read_back(block.ring_offset, block.size, after.data());
+        for (const buffer_store::Run &run : buffer_store::changed_runs(pending.before.data(), after.data(), block.size)) {
+            const Address address = block.guest_address + run.offset;
+            if (!is_valid_addr_range(mem, address, address + run.length))
+                continue;
+            memcpy(Ptr<uint8_t>(address).get(mem), after.data() + run.offset, run.length);
         }
     }
 }

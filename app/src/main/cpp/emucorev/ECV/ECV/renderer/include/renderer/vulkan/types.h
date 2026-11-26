@@ -23,6 +23,7 @@
 #include <renderer/types.h>
 #include <renderer/vulkan/depth_stencil_model.h>
 #include <renderer/vulkan/raster_model.h>
+#include <renderer/vulkan/buffer_store_model.h>
 #include <renderer/vulkan/visibility_model.h>
 #include <shader/uniform_block.h>
 #include <renderer/vulkan/frame_command_buffer_cursor.h>
@@ -340,6 +341,18 @@ struct VKContext : public renderer::Context {
     int running_query_slot = -1;
     // resolves of the scene segments recorded but not submitted yet
     std::vector<std::shared_ptr<VisibilityResolve>> pending_visibility;
+    // no memory mapping, USSE buffer stores (buffer_store_model.h): the uniform blocks uploaded for the draw being recorded, and for the draws of
+    // the scene whose shader stores into them: block + the guest bytes at upload time, written back after the scene's fence
+    std::vector<buffer_store::Block> draw_store_blocks;
+    struct PendingBufferStore {
+        buffer_store::Block block;
+        std::vector<uint8_t> before;
+    };
+    std::vector<PendingBufferStore> pending_buffer_stores;
+    // collects the blocks of the draw just recorded when its pipeline stores into the guest buffers
+    void collect_buffer_stores(MemState &mem);
+    // after the scene's fence: writes the bytes the shaders changed back to guest memory
+    void apply_buffer_stores(MemState &mem);
     // DoubleBuffer: mirror -> guest forwards of colour transfers recorded since the last submit (pushed behind that submit's fence)
     std::vector<BufferSyncRequest> pending_buffer_syncs;
     std::optional<BufferSyncRequest> make_buffer_sync_request(const ColorSurfaceCacheInfo &info);

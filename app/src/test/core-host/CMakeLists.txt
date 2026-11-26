@@ -159,7 +159,7 @@ target_link_options(render_sync_host_tests PRIVATE -static -Wl,/force:unresolved
 # Buildout host tests: P7 colour format model, P8 visibility, P12 transfers, P15 rasteriser odds (header-only models).
 # Build and run with run-core-host-tests.ps1 -Target buildout_host_tests.
 add_executable(buildout_host_tests EXCLUDE_FROM_ALL
-    colour_format_tests.cpp visibility_model_tests.cpp raster_model_tests.cpp transfer_model_tests.cpp "${CORE_ROOT}/vkutil/src/vkutil.cpp")
+    colour_format_tests.cpp visibility_model_tests.cpp raster_model_tests.cpp transfer_model_tests.cpp buffer_store_model_tests.cpp "${CORE_ROOT}/vkutil/src/vkutil.cpp")
 target_include_directories(buildout_host_tests PRIVATE ${SS_INCLUDES})
 target_compile_definitions(buildout_host_tests PRIVATE ${SS_DEFINES})
 set_target_properties(buildout_host_tests PROPERTIES CXX_STANDARD 23)
