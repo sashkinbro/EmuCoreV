@@ -756,6 +756,8 @@ void VKContext::begin_deferred_pass() {
     }
     pass_secondary = frame.secondary_cmds[frame.secondary_cursor++];
     instance_draws = 0;
+    instance_queries = 0;
+    inst_rect = {};
     inst_depth_overwritten = inst_stencil_overwritten = false;
     // the ops this instance begins with: later changes of dyn_pass (the "load from now on" upgrades done right after the first draw) are for the NEXT instance
     inst_pass = dyn_pass;
@@ -802,6 +804,7 @@ void VKContext::begin_deferred_pass() {
     refresh_pipeline = true;
     current_pipeline = nullptr;
     split_pipeline = nullptr;
+    applied_cull_valid = false;
     // B140: the first draw of a multisampled instance copies the surface into every sample
     msaa::begin_instance(*this);
 }
@@ -811,6 +814,43 @@ void VKContext::emit_pass(bool scene_end) {
     // B140: the surface the instance's seed samples is copied just before the instance (outside a render pass)
     if (ms_scene.active)
         msaa::record_copies(*this);
+    // ---- pass scheduling: an instance that draws nothing, clears nothing and has no query changes nothing when it loads what it stores ----
+    // (restarts for a copy / split / flush often begin an instance and end it again before its first draw: begin + end would cost a full load and store of the target)
+    if (instance_draws == 0 && instance_queries == 0 && !inst_depth_overwritten && !inst_stencil_overwritten && inst_pass.depth_load && inst_pass.stencil_load
+        && current_color_loaded && !interlock_pass_active && !ms_scene.active) {
+        sync::stats().passes_elided++;
+        return;
+    }
+    const sync::IRect area_rect{ pass_area.offset.x, pass_area.offset.y, pass_area.offset.x + static_cast<int32_t>(pass_area.extent.width),
+        pass_area.offset.y + static_cast<int32_t>(pass_area.extent.height) };
+    // everything this instance can have written: its draws, and the whole area when it cleared depth/stencil
+    sync::IRect written = inst_rect;
+    if (inst_depth_overwritten || inst_stencil_overwritten)
+        written.add(area_rect);
+    // content states before the begin barriers mark the attachments dirty
+    const sync::State color_before = current_color_base_image ? current_color_base_image->sync : sync::State{};
+    const sync::State raw_before = current_color_raw_image ? current_color_raw_image->sync : sync::State{};
+    const sync::State ds_before = current_ds_image ? current_ds_image->sync : sync::State{};
+    struct KeepCleared {
+        VKContext &c;
+        const sync::State &color, &raw, &ds;
+        const sync::IRect &written;
+        bool disarm = false;
+        ~KeepCleared() {
+            if (disarm)
+                return;
+            if (c.current_color_base_image)
+                sync::keep_cleared_after_pass_begin(c.current_color_base_image->sync, color, written);
+            if (c.current_color_raw_image)
+                sync::keep_cleared_after_pass_begin(c.current_color_raw_image->sync, raw, written);
+            if (c.current_ds_image)
+                sync::keep_cleared_after_pass_begin(c.current_ds_image->sync, ds, written);
+        }
+    } keep_cleared{ *this, color_before, raw_before, ds_before, written };
+    // a multisampled instance renders into its own MS attachments and resolves: the tracked surface images are only written by the resolve, so their
+    // Cleared content is not kept (conservative: Dirty after the pass)
+    if (ms_scene.active)
+        keep_cleared.disarm = true;
     // ---- the final ops of this instance ----
     const bool store = derive_depth_store({ inst_pass.guest_store, !scene_depth_unbacked, !scene_end });
     if (!store)
@@ -829,7 +869,7 @@ void VKContext::emit_pass(bool scene_end) {
     // depth and stencil share one content state: only an instance that loads both can be rewritten
     sync::LoadChoice ds_choice = sync::LoadChoice::Load;
     if (depth_load && stencil_load && current_ds_image && current_ds_image->image) {
-        ds_choice = sync::derive_load(current_ds_image->sync.content, true);
+        ds_choice = sync::derive_load_in_area(current_ds_image->sync, area_rect, true);
         (ds_choice == sync::LoadChoice::Clear ? sync::stats().loads_to_clear : ds_choice == sync::LoadChoice::DontCare ? sync::stats().loads_to_dontcare : sync::stats().loads_kept)++;
     }
     const sync::ClearValue ds_cleared = current_ds_image ? current_ds_image->sync.cleared_to : sync::ClearValue{};
@@ -921,7 +961,7 @@ void VKContext::emit_pass(bool scene_end) {
     const auto choose = [&](vkutil::Image *img, bool wants) {
         if (!wants || !img || !img->image)
             return wants ? sync::LoadChoice::Load : sync::LoadChoice::DontCare;
-        const sync::LoadChoice c = sync::derive_load(img->sync.content, true);
+        const sync::LoadChoice c = sync::derive_load_in_area(img->sync, area_rect, true);
         (c == sync::LoadChoice::Clear ? sync::stats().loads_to_clear : c == sync::LoadChoice::DontCare ? sync::stats().loads_to_dontcare : sync::stats().loads_kept)++;
         return c;
     };

@@ -277,3 +277,53 @@ TEST(SyncValidationMessages, TheLayersHazardFormatsAreCounted) {
     EXPECT_FALSE(is_sync_hazard_message("vkCmdBeginRenderPass(): This render pass does not have VkRenderPassCreateInfo.pAttachments->loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR"));
     EXPECT_FALSE(is_sync_hazard_message(""));
 }
+
+TEST(DirtyRect, RectsIntersectAndUnion) {
+    IRect a{ 0, 0, 10, 10 }, b{ 10, 0, 20, 10 }, c{ 5, 5, 15, 15 };
+    EXPECT_FALSE(a.intersects(b)); // touching edges do not overlap
+    EXPECT_TRUE(a.intersects(c));
+    EXPECT_FALSE(IRect{}.intersects(a));
+    IRect u{};
+    u.add(a);
+    u.add(b);
+    EXPECT_EQ(u.x1, 20);
+    EXPECT_EQ(u.y1, 10);
+    u.add(IRect{});
+    EXPECT_EQ(u.x0, 0);
+}
+
+TEST(DirtyRect, ClearedImageIsClearedAgainWhereNothingWasWritten) {
+    State st;
+    st.content = Content::Cleared;
+    st.dirty = IRect{ 0, 0, 100, 100 };
+    // a later macroblock far from the written region: no load needed
+    EXPECT_EQ(derive_load_in_area(st, IRect{ 200, 0, 300, 100 }, true), LoadChoice::Clear);
+    // the same region (a restart in the macroblock that was drawn): the content is real
+    EXPECT_EQ(derive_load_in_area(st, IRect{ 50, 50, 150, 150 }, true), LoadChoice::Load);
+    st.dirty = IRect{};
+    EXPECT_EQ(derive_load_in_area(st, IRect{ 0, 0, 960, 544 }, true), LoadChoice::Clear);
+    st.content = Content::Dirty;
+    EXPECT_EQ(derive_load_in_area(st, IRect{ 0, 0, 960, 544 }, true), LoadChoice::Load);
+    st.content = Content::Invalidated;
+    EXPECT_EQ(derive_load_in_area(st, IRect{ 0, 0, 960, 544 }, true), LoadChoice::DontCare);
+    EXPECT_EQ(derive_load_in_area(st, IRect{ 0, 0, 960, 544 }, false), LoadChoice::DontCare); // never turns a non-load into a load
+}
+
+TEST(DirtyRect, AClearedImageStaysClearedOutsideWhatThePassWrote) {
+    State before;
+    before.content = Content::Cleared;
+    before.cleared_to.depth = 1.0f;
+    before.dirty = IRect{ 0, 0, 10, 10 };
+    State st = before;
+    st.content = Content::Dirty; // the begin barrier marks the image written
+    keep_cleared_after_pass_begin(st, before, IRect{ 20, 20, 30, 30 });
+    EXPECT_EQ(st.content, Content::Cleared);
+    EXPECT_EQ(st.dirty.x1, 30);
+    EXPECT_EQ(st.dirty.x0, 0);
+    // an image that was already dirty stays dirty
+    State dirty_before;
+    State st2 = dirty_before;
+    st2.content = Content::Dirty;
+    keep_cleared_after_pass_begin(st2, dirty_before, IRect{ 0, 0, 5, 5 });
+    EXPECT_EQ(st2.content, Content::Dirty);
+}

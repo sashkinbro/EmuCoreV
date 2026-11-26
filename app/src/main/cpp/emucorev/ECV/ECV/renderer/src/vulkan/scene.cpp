@@ -526,6 +526,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
             context.draw_rect_y0 = std::min(context.draw_rect_y0, y0);
             context.draw_rect_x1 = std::max(context.draw_rect_x1, x1);
             context.draw_rect_y1 = std::max(context.draw_rect_y1, y1);
+            context.inst_rect.add({ x0, y0, x1, y1 });
         }
     }
     context.scene_has_drawn = true;
@@ -679,6 +680,7 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
         const vk::QueryControlFlags control_flags = (context.is_query_op_increment && context.state.physical_device_features.occlusionQueryPrecise) ? vk::QueryControlFlagBits::ePrecise : vk::QueryControlFlags();
         context.render_cmd.beginQuery(context.current_visibility_buffer->query_pool, context.current_query_idx, control_flags);
         context.is_in_query = true;
+        context.instance_queries++;
     }
 
     // do we need to check for a pipeline change?
@@ -711,6 +713,8 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
                 new_pipeline = nullptr;
         }
         context.face_plan = plan;
+        context.draw_variant[0] = passes.variant[0];
+        context.draw_variant[1] = passes.variant[1];
         context.split_pipeline = new_split;
 
         if (new_pipeline != context.current_pipeline) {
@@ -883,12 +887,24 @@ void draw(VKContext &context, SceGxmPrimitiveType type, SceGxmIndexFormat format
 
     apply_depth_bias(context, context.face_plan == dsmodel::FacePlan::Back);
     context.instance_draws++;
+    const auto set_cull = [&](dsmodel::PassVariant variant) {
+        if (!context.state.use_extended_dynamic_state)
+            return;
+        const vk::CullModeFlags mode = PipelineCache::draw_cull_mode(context.record.cull_mode, variant);
+        if (!context.applied_cull_valid || context.applied_cull != mode) {
+            context.render_cmd.setCullModeEXT(mode);
+            context.applied_cull = mode;
+            context.applied_cull_valid = true;
+        }
+    };
+    set_cull(context.draw_variant[0]);
     context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
 
     if (context.split_pipeline != nullptr) {
         // second facing: its own pipeline and bias, then bind the first pipeline back (the draw loop assumes it is bound)
         apply_depth_bias(context, true);
         context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.split_pipeline);
+        set_cull(context.draw_variant[1]);
         context.render_cmd.drawIndexed(count, instance_count, 0, 0, 0);
         context.render_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, context.current_pipeline);
     }

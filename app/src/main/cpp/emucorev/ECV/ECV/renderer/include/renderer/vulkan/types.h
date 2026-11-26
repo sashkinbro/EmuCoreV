@@ -380,8 +380,14 @@ struct VKContext : public renderer::Context {
     vk::Rect2D pass_area{};
     vk::ClearDepthStencilValue pass_ds_clear{};
     bool interlock_pass_active = false;
+    // dynamic cull mode last set on the running secondary command buffer (extended dynamic state)
+    vk::CullModeFlags applied_cull{};
+    bool applied_cull_valid = false;
+    dsmodel::PassVariant draw_variant[2] = {};
     // dirty-rect coverage of the running instance: draws recorded so far, and whether a full-area clear came before the first draw (the loaded content is then dead)
     uint32_t instance_draws = 0;
+    uint32_t instance_queries = 0;
+    vkutil::sync::IRect inst_rect{}; // union of scissor x viewport of the draws of the running instance
     bool inst_depth_overwritten = false;
     bool inst_stencil_overwritten = false;
     // restarts of the pass inside the current scene (look-ahead statistics, docs/gpu-sync-tracker.md section 9)

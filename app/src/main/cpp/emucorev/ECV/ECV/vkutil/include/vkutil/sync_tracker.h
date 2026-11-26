@@ -54,6 +54,24 @@ struct ClearValue {
     float depth = 1.0f;
     uint32_t stencil = 0;
 };
+// Integer pixel rectangle (render target coordinates). Empty = nothing.
+struct IRect {
+    int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    bool empty() const { return x1 <= x0 || y1 <= y0; }
+    bool intersects(const IRect &o) const { return !empty() && !o.empty() && x0 < o.x1 && o.x0 < x1 && y0 < o.y1 && o.y0 < y1; }
+    void add(const IRect &o) {
+        if (o.empty())
+            return;
+        if (empty()) {
+            *this = o;
+            return;
+        }
+        x0 = x0 < o.x0 ? x0 : o.x0;
+        y0 = y0 < o.y0 ? y0 : o.y0;
+        x1 = x1 > o.x1 ? x1 : o.x1;
+        y1 = y1 > o.y1 ? y1 : o.y1;
+    }
+};
 enum class LoadChoice : uint8_t { Load, Clear, DontCare };
 // Load op for an attachment the pass was going to LOAD (`wants_content`). Never turns a non-load into a load.
 inline LoadChoice derive_load(Content c, bool wants_content) {
@@ -66,6 +84,10 @@ inline LoadChoice derive_load(Content c, bool wants_content) {
     }
 }
 
+// Load op for a pass that renders into `area` of an image with tracked content: a Cleared image whose dirty region does not touch the area is CLEARed
+// (every texel of the area still equals the clear value, nothing has to be read), an Invalidated one is not loaded, everything else is LOADed.
+// Declared after State below (needs the type).
+
 // Tracked state of one image or buffer (all subresources are tracked together).
 struct State {
     vk::ImageLayout layout = vk::ImageLayout::eUndefined; // images only
@@ -77,11 +99,34 @@ struct State {
     Access vis_access{};
     Content content = Content::Dirty;
     ClearValue cleared_to{};
+    // dirty-rect coverage: while content == Cleared, the region that passes have written since (everything outside still equals cleared_to)
+    IRect dirty{};
     uint32_t epoch = 0; // submit epoch of the last use (diagnostics: a hazard across epochs is an inter-submit hazard)
     const char *name = nullptr; // static string for logs, optional
 
     void reset() { *this = State{ .name = name }; }
 };
+
+inline LoadChoice derive_load_in_area(const State &st, const IRect &area, bool wants_content) {
+    if (!wants_content)
+        return LoadChoice::DontCare;
+    switch (st.content) {
+    case Content::Cleared: return st.dirty.intersects(area) ? LoadChoice::Load : LoadChoice::Clear;
+    case Content::Invalidated: return LoadChoice::DontCare;
+    default: return LoadChoice::Load;
+    }
+}
+
+// Called when a pass has begun on an image that was Cleared: the pass writes only inside `written` (draw rects, clears), so the rest is still the clear
+// value. `before` is the state captured before the begin barrier marked the image Dirty.
+inline void keep_cleared_after_pass_begin(State &st, const State &before, const IRect &written) {
+    if (before.content != Content::Cleared)
+        return;
+    st.content = Content::Cleared;
+    st.cleared_to = before.cleared_to;
+    st.dirty = before.dirty;
+    st.dirty.add(written);
+}
 
 struct Barrier {
     Stage src_stage{}, dst_stage{};
@@ -254,6 +299,7 @@ struct Stats {
     // scenes whose pass started more than once, and the intersection. unbacked && !restarted = scenes whose depth store was dead.
     // attachments the pass was going to LOAD that the content state turned into CLEAR / DONT_CARE (dynamic rendering path)
     std::atomic<uint64_t> loads_to_clear{ 0 }, loads_to_dontcare{ 0 }, loads_kept{ 0 };
+    std::atomic<uint64_t> passes_elided{ 0 }; // empty pass instances (no draw, clear or query, loads what it stores) that were not emitted
     std::atomic<uint64_t> loads_retired{ 0 }; // attachment loads removed because a full-area clear precedes the first draw of the instance
     std::atomic<uint64_t> depth_stores_dropped{ 0 }; // pass instances that did not store their (dead) depth
     std::atomic<uint64_t> scenes{ 0 }, scenes_depth_unbacked{ 0 }, scenes_restarted{ 0 }, scenes_unbacked_restarted{ 0 };

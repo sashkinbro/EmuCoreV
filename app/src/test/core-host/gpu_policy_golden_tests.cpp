@@ -26,6 +26,7 @@ GpuCaps modern(GpuIdentity id) {
     c.sync2 = true;
     c.timeline_semaphore = true;
     c.dynamic_rendering = true;
+    c.extended_dynamic_state = true;
     c.dynamic_rendering_local_read = true;
     c.depth_stencil_resolve = true;
     c.ds_resolve_depth_modes = 1 | 8;

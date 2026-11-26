@@ -741,6 +741,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
         bool support_sync2 = false;
         bool support_timeline = false;
         bool support_dyn_rendering = false;
+        bool support_ext_dyn_state = false;
         bool support_local_read = false;
         const std::map<std::string_view, bool *> optional_extensions = {
             { vk::KHRGetMemoryRequirements2ExtensionName, &temp_bool },
@@ -767,6 +768,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             { vk::KHRSynchronization2ExtensionName, &support_sync2 },
             // submit/frame completion tracking through one timeline semaphore (strategy table: SubmitTracking)
             { VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME, &support_timeline },
+            // cull mode as dynamic state (strategy: extended_dynamic_state)
+            { VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME, &support_ext_dyn_state },
             // dynamic rendering + local read (RenderPath::DynamicRendering) and the extensions they depend on on a Vulkan 1.1 instance
             { VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, &support_dyn_rendering },
             { VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME, &support_local_read },
@@ -974,6 +977,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             support_timeline = gpu_strategy.submit == SubmitTracking::TimelineSemaphore;
             support_dyn_rendering = support_local_read = gpu_strategy.render_path == RenderPath::DynamicRendering;
             use_dynamic_rendering = support_dyn_rendering;
+            support_ext_dyn_state = gpu_strategy.extended_dynamic_state;
+            use_extended_dynamic_state = support_ext_dyn_state;
             use_copy_snapshot = gpu_strategy.fbfetch == FbFetchPath::CopySnapshot;
             // the optional-extension map enables everything the driver lists; extensions of paths that were not selected stay off
             // multisampled GXM scenes (B140, msaa.cpp) need render pass 2 + depth/stencil resolve on the VkRenderPass path
@@ -985,6 +990,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                 if (!use_dynamic_rendering && !msaa_wanted
                     && (n == VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME || n == VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME
                         || n == VK_KHR_MULTIVIEW_EXTENSION_NAME || n == VK_KHR_MAINTENANCE_2_EXTENSION_NAME))
+                    return true;
+                if (!support_ext_dyn_state && n == VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME)
                     return true;
                 return !support_timeline && n == VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME;
             });
@@ -1028,6 +1035,7 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             vk::PhysicalDeviceFaultFeaturesEXT,
             vk::PhysicalDeviceSynchronization2Features,
             vk::PhysicalDeviceTimelineSemaphoreFeatures,
+            vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
             vk::PhysicalDeviceDynamicRenderingFeatures,
             vk::PhysicalDeviceDynamicRenderingLocalReadFeatures>
             device_info{
@@ -1050,6 +1058,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
                     .synchronization2 = VK_TRUE },
                 vk::PhysicalDeviceTimelineSemaphoreFeatures{
                     .timelineSemaphore = VK_TRUE },
+                vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT{
+                    .extendedDynamicState = VK_TRUE },
                 vk::PhysicalDeviceDynamicRenderingFeatures{
                     .dynamicRendering = VK_TRUE },
                 vk::PhysicalDeviceDynamicRenderingLocalReadFeatures{
@@ -1083,6 +1093,8 @@ bool VKState::create(std::unique_ptr<renderer::State> &state, const Config &conf
             device_info.unlink<vk::PhysicalDeviceSynchronization2Features>();
         if (!support_timeline)
             device_info.unlink<vk::PhysicalDeviceTimelineSemaphoreFeatures>();
+        if (!support_ext_dyn_state)
+            device_info.unlink<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
         if (!support_dyn_rendering) {
             device_info.unlink<vk::PhysicalDeviceDynamicRenderingFeatures>();
             device_info.unlink<vk::PhysicalDeviceDynamicRenderingLocalReadFeatures>();

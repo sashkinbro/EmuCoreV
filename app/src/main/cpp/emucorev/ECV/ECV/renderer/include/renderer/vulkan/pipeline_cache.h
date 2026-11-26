@@ -68,6 +68,8 @@ class PipelineCache {
     friend struct VKState;
 
 public:
+    // cull mode of a draw of this variant (a split draw culls the other facing on top of the guest mode)
+    static vk::CullModeFlags draw_cull_mode(SceGxmCullMode guest, dsmodel::PassVariant variant);
     void force_sync_compilation_for(std::chrono::milliseconds duration) {
         const auto until = std::chrono::steady_clock::now() + duration;
         sync_compile_until_ns.store(std::chrono::duration_cast<std::chrono::nanoseconds>(until.time_since_epoch()).count(), std::memory_order_release);

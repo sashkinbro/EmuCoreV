@@ -140,8 +140,19 @@ TEST(GpuStrategy, ForceFlagNamesAreExactlyTheTierForces) {
         EXPECT_FALSE(apply_force_name(f, gone)) << gone; // paths that no longer exist have no flag
 }
 
+TEST(GpuStrategy, ExtendedDynamicStateFollowsTheDeviceAndCanBeForcedOff) {
+    GpuCaps c = tiler_caps();
+    c.extended_dynamic_state = true;
+    EXPECT_TRUE(choose_strategy(c).extended_dynamic_state);
+    ForcedPaths f;
+    ASSERT_TRUE(apply_force_name(f, "base-dynamic-state"));
+    EXPECT_FALSE(choose_strategy(c, f).extended_dynamic_state);
+    c.extended_dynamic_state = false;
+    EXPECT_FALSE(choose_strategy(c).extended_dynamic_state);
+}
+
 TEST(GpuStrategy, DescribeLineHasStableKeys) {
     const std::string d = describe(tiler_caps(), choose_strategy(tiler_caps()));
-    for (const char *key : { "render_path=", "barriers=", "submit=", "transient=", "fbfetch=", "interlock=", "msaa_resolve=", "ds_resolve=", "forced_rejected=" })
+    for (const char *key : { "render_path=", "dyn_state=", "barriers=", "submit=", "transient=", "fbfetch=", "interlock=", "msaa_resolve=", "ds_resolve=", "forced_rejected=" })
         EXPECT_NE(d.find(key), std::string::npos) << key;
 }

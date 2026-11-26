@@ -114,6 +114,7 @@ struct GpuCaps {
     bool input_attachment_self_dependency = true; // core: input attachments + by-region self-dependency (every Vulkan 1.0 driver)
     uint32_t max_per_stage_input_attachments = 0;
     // --- MSAA / resolve ---
+    bool extended_dynamic_state = false; // VK_EXT_extended_dynamic_state (cull mode is set per draw instead of being baked into the pipeline)
     bool render_pass2 = false; // VK_KHR_create_renderpass2 listed (the MSAA diff needs vkCreateRenderPass2 for in-pass resolve + seed subpass)
     bool depth_stencil_resolve = false; // VK_KHR_depth_stencil_resolve enabled
     uint32_t ds_resolve_depth_modes = 0; // bit per vk::ResolveModeFlagBits (1 SAMPLE_ZERO, 2 AVERAGE, 4 MIN, 8 MAX)
@@ -171,6 +172,7 @@ struct ForcedPaths {
     bool fences = false; // act as a driver without timeline semaphores
     bool normal_memory = false; // act as a driver without lazily allocated memory
     bool render_pass = false; // act as a driver without dynamic rendering
+    bool base_dynamic_state = false; // act as a driver without extended dynamic state
     bool roaa = false, input_attachment = false, copy_snapshot = false; // pick this fbfetch rung (only rungs of the chosen render path)
 };
 
@@ -179,6 +181,7 @@ struct Strategy {
     SubmitTracking submit = SubmitTracking::Fences;
     TransientMemory transient = TransientMemory::Normal;
     RenderPath render_path = RenderPath::RenderPass;
+    bool extended_dynamic_state = false; // cull mode dynamic: one pipeline per state instead of one per (state x cull mode)
     FbFetchPath fbfetch = FbFetchPath::InputAttachmentBarrier;
     MsaaResolvePath msaa_resolve = MsaaResolvePath::None;
     bool use_shader_interlock = false; // desktop interlock path (only when no fbfetch rung above InputAttachment is available)
@@ -210,6 +213,7 @@ inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}) {
     s.transient = (c.lazily_allocated_memory && !f.normal_memory) ? TransientMemory::Lazy : TransientMemory::Normal;
     const bool dr = c.dynamic_rendering && c.dynamic_rendering_local_read && !f.render_pass;
     s.render_path = dr ? RenderPath::DynamicRendering : RenderPath::RenderPass;
+    s.extended_dynamic_state = c.extended_dynamic_state && !f.base_dynamic_state;
 
     // fbfetch: the dynamic path has exactly one rung; the VkRenderPass path walks ROAA, input attachment, copy snapshot
     FbFetchPath forced = FbFetchPath::CopySnapshot;
@@ -292,6 +296,8 @@ inline std::string describe(const GpuCaps &c, const Strategy &s) {
     r += to_string(s.submit);
     r += " render_path=";
     r += to_string(s.render_path);
+    r += " dyn_state=";
+    r += s.extended_dynamic_state ? "extended" : "base";
     r += " transient=";
     r += to_string(s.transient);
     r += " fbfetch=";
@@ -313,12 +319,13 @@ inline bool apply_force_name(ForcedPaths &f, std::string_view name) {
     else if (name == "fences") f.fences = true;
     else if (name == "normal-memory") f.normal_memory = true;
     else if (name == "render-pass") f.render_pass = true;
+    else if (name == "base-dynamic-state") f.base_dynamic_state = true;
     else if (name == "roaa") f.roaa = true;
     else if (name == "input-attachment") f.input_attachment = true;
     else if (name == "copy-snapshot") f.copy_snapshot = true;
     else return false;
     return true;
 }
-inline constexpr std::array<std::string_view, 7> force_path_names = { "legacy-barriers", "fences", "normal-memory", "render-pass", "roaa", "input-attachment", "copy-snapshot" };
+inline constexpr std::array<std::string_view, 8> force_path_names = { "legacy-barriers", "fences", "normal-memory", "render-pass", "base-dynamic-state", "roaa", "input-attachment", "copy-snapshot" };
 
 } // namespace renderer::vulkan

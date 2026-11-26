@@ -988,6 +988,15 @@ static vk::StencilOpState convert_op_state(const GxmStencilStateOp &state) {
     };
 }
 
+vk::CullModeFlags PipelineCache::draw_cull_mode(SceGxmCullMode guest, dsmodel::PassVariant variant) {
+    vk::CullModeFlags cull_mode = translate_cull_mode(guest);
+    if (variant == dsmodel::PassVariant::SplitFront)
+        cull_mode |= vk::CullModeFlagBits::eBack;
+    else if (variant == dsmodel::PassVariant::SplitBack)
+        cull_mode |= vk::CullModeFlagBits::eFront;
+    return cull_mode;
+}
+
 vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::RenderPass render_pass, const SceGxmVertexProgram &vertex_program_gxm, const SceGxmFragmentProgram &fragment_program_gxm, const ProgramSource &vertex_source, const ProgramSource &fragment_source, const GxmRecordState &record, const shader::Hints &hints, MemState &mem, const PipelineDsInfo &ds, dsmodel::PassVariant variant, vk::SampleCountFlagBits samples) {
     const VertexProgram &vertex_program = *vertex_program_gxm.renderer_data;
     const SceGxmProgram *gxm_fragment_shader = fragment_source.get();
@@ -1037,11 +1046,8 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
         LOG_WARN_ONCE("Polygon mode line/point requested but the device has no fillModeNonSolid: drawing filled");
         polygon_mode = vk::PolygonMode::eFill;
     }
-    vk::CullModeFlags cull_mode = translate_cull_mode(record.cull_mode);
-    if (variant == dsmodel::PassVariant::SplitFront)
-        cull_mode |= vk::CullModeFlagBits::eBack;
-    else if (variant == dsmodel::PassVariant::SplitBack)
-        cull_mode |= vk::CullModeFlagBits::eFront;
+    // with extended dynamic state the cull mode is set per draw (draw_cull_mode), the pipeline does not carry it
+    const vk::CullModeFlags cull_mode = state.use_extended_dynamic_state ? vk::CullModeFlags() : draw_cull_mode(record.cull_mode, variant);
 
     const vk::PipelineRasterizationStateCreateInfo rasterizer{
         .depthClampEnable = (enable_depth_clamp && state.depth_clamp_enabled && state.physical_device_features.depthClamp) ? VK_TRUE : VK_FALSE,
@@ -1101,19 +1107,20 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
 
     // all of these can be changed at any time using the vita graphics api (like opengl)
     // Because each one can take a lot of different values, it's better to set them as dynamic
-    const std::array dynamic_states = {
+    std::vector<vk::DynamicState> dynamic_states = {
         vk::DynamicState::eViewport,
         vk::DynamicState::eScissor,
         vk::DynamicState::eStencilCompareMask,
         vk::DynamicState::eStencilReference,
         vk::DynamicState::eStencilWriteMask,
         vk::DynamicState::eDepthBias,
-        vk::DynamicState::eLineWidth,
     };
+    if (state.use_extended_dynamic_state)
+        dynamic_states.push_back(vk::DynamicState::eCullModeEXT);
+    if (state.physical_device_features.wideLines)
+        dynamic_states.push_back(vk::DynamicState::eLineWidth);
     vk::PipelineDynamicStateCreateInfo dynamic_info{};
     dynamic_info.setDynamicStates(dynamic_states);
-    if (!state.physical_device_features.wideLines)
-        dynamic_info.dynamicStateCount--;
 
     // we still need to specify the viewport and scissor count even though they are dynamic
     vk::PipelineViewportStateCreateInfo viewport{
@@ -1177,7 +1184,18 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
 vk::Pipeline PipelineCache::retrieve_pipeline(VKContext &context, SceGxmPrimitiveType &type, bool consider_for_async, MemState &mem, dsmodel::PassVariant variant) {
     const GxmRecordState &record = context.record;
     // get the hash of the current context
-    const XXH128_hash_t record_hash = XXH3_128bits(&record, record_pipeline_len);
+    // the pipeline identity: the record up to the vertex streams; with extended dynamic state the cull mode is not part of it (set per draw)
+    static_assert(offsetof(GxmRecordState, cull_mode) + sizeof(GxmRecordState::cull_mode) <= record_pipeline_len, "cull_mode must be inside the hashed prefix");
+    XXH128_hash_t record_hash;
+    if (state.use_extended_dynamic_state) {
+        alignas(GxmRecordState) uint8_t prefix[record_pipeline_len];
+        std::memcpy(prefix, &record, record_pipeline_len);
+        const SceGxmCullMode none = SCE_GXM_CULL_NONE;
+        std::memcpy(prefix + offsetof(GxmRecordState, cull_mode), &none, sizeof(none));
+        record_hash = XXH3_128bits(prefix, record_pipeline_len);
+    } else {
+        record_hash = XXH3_128bits(&record, record_pipeline_len);
+    }
     uint64_t key = record_hash.low64;
     key = alpha_surface_pipeline_key(key, record.color_surface.colorFormat);
 

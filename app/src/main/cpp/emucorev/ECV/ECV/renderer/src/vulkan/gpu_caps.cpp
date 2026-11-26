@@ -54,6 +54,10 @@ GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::Extensio
         const auto p = device.getProperties2KHR<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceDriverProperties>();
         c.identity.driver_id = static_cast<uint32_t>(p.get<vk::PhysicalDeviceDriverProperties>().driverID);
     }
+    if (has_props2 && has_extension(exts, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME)) {
+        const auto f = device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+        c.extended_dynamic_state = static_cast<bool>(f.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState);
+    }
     c.render_pass2 = has_extension(exts, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     if (has_props2 && has_extension(exts, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME)) {
         const auto f = device.getFeatures2KHR<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceTimelineSemaphoreFeatures>();
