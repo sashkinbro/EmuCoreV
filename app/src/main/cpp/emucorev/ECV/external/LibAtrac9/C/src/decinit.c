@@ -24,13 +24,38 @@ static void GenerateImdctWindow(int frameSizePower);
 
 static int BlockTypeToChannelCount(BlockType blockType);
 
+// The tables are process-global and identical for every decoder: build them exactly once, for every frame size,
+// so decoders initialised concurrently on different threads never race on them (ECV: decoders are re-created after a
+// failed frame, so InitDecoder runs often and from several audio threads).
+static void InitGlobalTables(void)
+{
+	for (int power = 6; power <= 8; power++)
+		InitMdctTables(power);
+	InitHuffmanCodebooks();
+	GenerateGradientCurves();
+}
+
+#if defined(_WIN32)
+#include <windows.h>
+static INIT_ONCE GlobalTablesOnce = INIT_ONCE_STATIC_INIT;
+static BOOL CALLBACK InitGlobalTablesWin(PINIT_ONCE once, PVOID param, PVOID* ctx)
+{
+	(void)once; (void)param; (void)ctx;
+	InitGlobalTables();
+	return TRUE;
+}
+static void EnsureGlobalTables(void) { InitOnceExecuteOnce(&GlobalTablesOnce, InitGlobalTablesWin, NULL, NULL); }
+#else
+#include <pthread.h>
+static pthread_once_t GlobalTablesOnce = PTHREAD_ONCE_INIT;
+static void EnsureGlobalTables(void) { pthread_once(&GlobalTablesOnce, InitGlobalTables); }
+#endif
+
 At9Status InitDecoder(Atrac9Handle* handle, unsigned char* configData, int wlength)
 {
 	ERROR_CHECK(InitConfigData(&handle->Config, configData));
 	ERROR_CHECK(InitFrame(handle));
-	InitMdctTables(handle->Config.FrameSamplesPower);
-	InitHuffmanCodebooks();
-	GenerateGradientCurves();
+	EnsureGlobalTables();
 	handle->Wlength = wlength;
 	handle->Initialized = 1;
 	return ERR_SUCCESS;
