@@ -65,9 +65,16 @@ open class SDLSurface(context: Context) : SurfaceView(context),
 
     fun getNativeSurface(): Surface = holder.surface
 
+    /**
+     * SDL's lifecycle state and the native window are process-wide statics. When a game is closed and the next one
+     * started in the same process, the finished activity's surface can report surfaceDestroyed after the new
+     * activity's SDLActivity.onCreate: that callback must not pause the new session or release its window (B151).
+     */
+    private val isCurrentSurface: Boolean get() = SDLActivity.mSurface === this
+
     override fun surfaceCreated(holder: SurfaceHolder) {
         Log.v("SDL", "surfaceCreated()")
-        if (SDLActivity.mHasNativeShutdown) {
+        if (SDLActivity.mHasNativeShutdown || !isCurrentSurface) {
             return
         }
         SDLActivity.onNativeSurfaceCreated()
@@ -75,9 +82,13 @@ open class SDLSurface(context: Context) : SurfaceView(context),
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         Log.v("SDL", "surfaceDestroyed()")
+        mIsSurfaceReady = false
+        if (!isCurrentSurface) {
+            Log.v("SDL", "surfaceDestroyed() of a previous session's surface ignored")
+            return
+        }
         SDLActivity.mNextNativeState = SDLActivity.NativeState.PAUSED
         SDLActivity.handleNativeState()
-        mIsSurfaceReady = false
         if (SDLActivity.mHasNativeShutdown) {
             return
         }
@@ -87,7 +98,7 @@ open class SDLSurface(context: Context) : SurfaceView(context),
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         Log.v("SDL", "surfaceChanged()")
 
-        if (SDLActivity.mSingleton == null || SDLActivity.mHasNativeShutdown) {
+        if (SDLActivity.mSingleton == null || SDLActivity.mHasNativeShutdown || !isCurrentSurface) {
             return
         }
 

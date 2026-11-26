@@ -67,6 +67,22 @@ internal object LabSession {
 
     fun isLabIntent(intent: Intent?): Boolean = BuildConfig.DEBUG && LabConfig.fromIntent(intent) != null
 
+    /**
+     * `am start ... -a com.sbro.emucorev.action.LAB_EXIT` with this session's lab extras: leave the game the way a
+     * user does (pause menu, then exit to the library) without killing the process, so the next lab launch runs in
+     * the same process (run.py `then_title`, LAUNCH_CONTRACT.md). Only the running lab session's own run id counts.
+     */
+    fun isLabExitIntent(intent: Intent?): Boolean {
+        val cfg = config ?: return false
+        if (!BuildConfig.DEBUG || intent?.action != ACTION_LAB_EXIT) return false
+        val requested = LabConfig.fromIntent(intent) ?: return false
+        if (requested.runId != cfg.runId) return false
+        Log.i(TAG, "exit_requested run=${cfg.runId} pid=${android.os.Process.myPid()}")
+        return true
+    }
+
+    const val ACTION_LAB_EXIT = "com.sbro.emucorev.action.LAB_EXIT"
+
     /** Activity.onCreate: stamps the launch time. A task restored by the system is never a lab launch. */
     fun begin(intent: Intent?, restored: Boolean) {
         config = null
@@ -83,7 +99,7 @@ internal object LabSession {
         title = titleId
         val index = args.indexOf("-loadstate")
         val state = args.getOrNull(index + 1)?.takeIf { index >= 0 }.orEmpty()
-        Log.i(TAG, "launch run=${cfg.runId} title=$titleId state=$state")
+        Log.i(TAG, "launch run=${cfg.runId} title=$titleId state=$state pid=${android.os.Process.myPid()}")
         runCatching { LabBridge.nativeConfigure(cfg.runId, titleId, cfg.perfIntervalSeconds, state.isNotEmpty(), cfg.frameCapture ?: 0, cfg.gpuTrace, cfg.frameCaptureOpts) }
             .onFailure { Log.w(TAG, "native lab hooks unavailable", it) }
     }

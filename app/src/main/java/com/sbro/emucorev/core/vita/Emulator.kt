@@ -555,6 +555,14 @@ open class Emulator : SDLActivity(), InputManager.InputDeviceListener {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (isNativeShellSession && gameIdFromIntent(intent) == NativeLibraryMode.TITLE_ID) return
+        if (LabSession.isLabExitIntent(intent)) {
+            // Debug lab only: the user's way out (pause menu, then exit to the library), process kept.
+            exitScope.launch {
+                setMenuPausedAndAwait(true)
+                exitEmulation(autoSave = false)
+            }
+            return
+        }
         val outgoingTitle = currentGameIdOrIntent()
         setIntent(intent)
         if (isLaunchIntent(intent)) {
