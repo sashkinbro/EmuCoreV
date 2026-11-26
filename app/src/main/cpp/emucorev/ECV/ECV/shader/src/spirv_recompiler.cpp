@@ -639,7 +639,11 @@ static void create_fragment_inputs(spv::Builder &b, SpirvShaderParameters &param
 
                 pa_iter_var = b.createBinOp(spv::OpFDiv, v4, pa_iter_var, res_multiplier);
             } else {
-                spv::Decoration precision = (get_data_type_size(pa_dtype) < 4 && !features.force_full_precision) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
+                // Texture coordinate iterators: provisional rule (needs on-device A/B, see docs/image-quality-review.md).
+                // A mediump UV varying is quantised to 10 mantissa bits on GPUs that honour RelaxedPrecision, which
+                // makes large textures swim/shimmer in motion; keep them full precision regardless of the declared type.
+                const bool is_texcoord_iterator = input_id <= 0x9000;
+                spv::Decoration precision = (get_data_type_size(pa_dtype) < 4 && !features.force_full_precision && !is_texcoord_iterator) ? spv::DecorationRelaxedPrecision : spv::NoPrecision;
                 pa_iter_var = create_fragment_iterator(b, translation_state, precision, pa_iter_type, pa_name.c_str(), pa_loc);
             }
 
