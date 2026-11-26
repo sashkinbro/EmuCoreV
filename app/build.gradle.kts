@@ -42,8 +42,6 @@ val python3Executable = sequenceOf(
     .map(::File)
     .firstOrNull(File::isFile)
 
-// vita3k's cmake/vcpkg_android.cmake hard-requires ANDROID_NDK_HOME and VCPKG_ROOT env vars.
-// The EmuCoreV layer must not patch vita3k core, so inject them here for the CMake subprocess.
 run {
     val ndkVersion = "29.0.14206865"
     val sdkDir = localBuildProperties.getProperty("sdk.dir")
@@ -118,7 +116,7 @@ android {
     namespace = "com.sbro.emucorev"
     ndkVersion = "29.0.14206865"
     compileSdk {
-        version = release(37) { minorApiLevel = 1 }
+        version = release(37) { minorApiLevel = 2 }
     }
 
     defaultConfig {
