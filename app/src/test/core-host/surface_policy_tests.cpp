@@ -270,3 +270,33 @@ TEST(SurfacePolicyPreserved, CapacityIsBoundedOldestFirst) {
     EXPECT_FALSE(consume_preserved(ranges, 0x10000, 0x11000, 2));  // the oldest was dropped
     EXPECT_TRUE(consume_preserved(ranges, 0x10000 * (preserved_range_capacity + 4), 0x10000 * (preserved_range_capacity + 4) + 1, 2));
 }
+
+TEST(SurfacePolicySnapshotImages, EverythingThatFitsIsKept) {
+    const auto keep = select_snapshot_images({ 10, 20, 30 }, 100);
+    EXPECT_EQ(keep, (std::vector<bool>{ true, true, true }));
+}
+
+TEST(SurfacePolicySnapshotImages, ImportantSurfacesWinAndSmallOnesFillTheRest) {
+    // 70 + 50 do not both fit in 100: the more important one stays, the 30 still uses the room left
+    const auto keep = select_snapshot_images({ 70, 50, 30, 10 }, 100);
+    EXPECT_EQ(keep, (std::vector<bool>{ true, false, true, false }));
+}
+
+TEST(SurfacePolicySnapshotImages, KeptBytesNeverExceedTheBudget) {
+    std::vector<uint64_t> bytes;
+    for (uint64_t i = 1; i <= 64; ++i)
+        bytes.push_back(i * 3'000'000);
+    for (const uint64_t budget : { uint64_t{ 0 }, uint64_t{ 1 }, uint64_t{ 50'000'000 }, uint64_t{ 128ull << 20 } }) {
+        const auto keep = select_snapshot_images(bytes, budget);
+        uint64_t sum = 0;
+        for (size_t i = 0; i < bytes.size(); ++i)
+            if (keep[i])
+                sum += bytes[i];
+        EXPECT_LE(sum, budget);
+    }
+}
+
+TEST(SurfacePolicySnapshotImages, AnUnrepresentableOrOversizedSurfaceIsSkippedNotFatal) {
+    const auto keep = select_snapshot_images({ UINT64_MAX, 5 }, 100);
+    EXPECT_EQ(keep, (std::vector<bool>{ false, true }));
+}

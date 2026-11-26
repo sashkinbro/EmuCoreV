@@ -23,7 +23,8 @@
 namespace renderer::vulkan {
 namespace {
 constexpr uint8_t no_slot = 0xFF;
-constexpr uint64_t max_surface_cache_image_bytes = 128ull << 20;
+constexpr uint64_t max_surface_cache_image_bytes = surface_cache_snapshot_image_cap;
+constexpr uint64_t unknown_image_bytes = std::numeric_limits<uint64_t>::max();
 
 std::optional<uint64_t> image_snapshot_byte_size(const vkutil::Image &image) {
     if (!image.width || !image.height || image.width > 65535 || image.height > 65535
@@ -81,9 +82,10 @@ SurfaceCacheImageSnapshot capture_image(vkutil::Image &image, const vk::ImageUsa
     SurfaceCacheImageSnapshot result;
     if (!image.image)
         return result;
+    // the caller selected the surfaces that fit the budget (select_snapshot_images)
     const auto bytes = image_snapshot_byte_size(image);
-    if (!bytes || *bytes > max_surface_cache_image_bytes - aggregate_bytes) {
-        error = "surface-cache snapshot exceeds aggregate image cap";
+    if (!bytes) {
+        error = "surface-cache image cannot be snapshotted";
         return result;
     }
     result.present = true;
@@ -109,6 +111,19 @@ bool make_image(VKState &state, const SurfaceCacheImageSnapshot &snapshot,
     const void *p_next = snapshot.rgba8_format_list ? &format_list : nullptr;
     image.init_image(snapshot.usage | extra_usage, snapshot.mapping, snapshot.create_flags, p_next);
     return vkutil::restore_image_snapshot(device, image, snapshot.image, error);
+}
+
+uint64_t image_bytes_or_unknown(const vkutil::Image &image) {
+    if (!image.image)
+        return 0;
+    const auto bytes = image_snapshot_byte_size(image);
+    return bytes ? *bytes : unknown_image_bytes;
+}
+
+uint64_t color_snapshot_bytes(const ColorSurfaceCacheInfo &info) {
+    const uint64_t texture = image_bytes_or_unknown(info.texture);
+    const uint64_t raw = info.raw_image ? image_bytes_or_unknown(*info.raw_image) : 0;
+    return texture == unknown_image_bytes || raw == unknown_image_bytes ? unknown_image_bytes : texture + raw;
 }
 
 template <typename Queue>
@@ -254,8 +269,8 @@ bool capture_depth(DepthStencilSurfaceCacheInfo &info, DepthStencilSurfaceSnapsh
 } // namespace
 
 struct SurfaceCacheSnapshotAccess {
-    static bool capture(VKSurfaceCache &cache, const vkutil::ImageSnapshotDevice &device,
-        SurfaceCacheSnapshot &snapshot, std::string &error) {
+    static bool capture(VKSurfaceCache &cache, MemState &mem, const vkutil::ImageSnapshotDevice &device,
+        uint64_t image_budget_bytes, SurfaceCacheSnapshot &snapshot, std::string &error, SurfaceCacheSnapshotStats &stats) {
         if (!cache.pending_casts.empty()) {
             error = "cannot capture surface cache while deferred casts are pending";
             return false;
@@ -270,13 +285,67 @@ struct SurfaceCacheSnapshotAccess {
         if (!capture_lru_order(cache.color_surface_queue, staged.color_mru_order, error)
             || !capture_lru_order(cache.ds_surface_queue, staged.depth_stencil_mru_order, error))
             return false;
+
+        // B156: decide which surfaces keep their image. Priority: the surfaces of the last scene, then
+        // the colour surfaces and the depth surfaces in most-recently-used order.
+        struct Candidate {
+            bool depth;
+            size_t slot;
+            uint64_t bytes;
+        };
+        std::vector<Candidate> candidates;
+        const auto listed = [&](bool depth, size_t slot) {
+            return std::any_of(candidates.begin(), candidates.end(), [&](const Candidate &c) { return c.depth == depth && c.slot == slot; });
+        };
+        const auto add_color = [&](size_t slot) {
+            const auto &info = cache.color_surface_queue.items[slot].content;
+            if (info.texture.image && !listed(false, slot))
+                candidates.push_back({ false, slot, color_snapshot_bytes(info) });
+        };
+        const auto add_depth = [&](size_t slot) {
+            const auto &info = cache.ds_surface_queue.items[slot].content;
+            if (info.texture.image && !listed(true, slot))
+                candidates.push_back({ true, slot, image_bytes_or_unknown(info.texture) });
+        };
+        if (const uint8_t slot = get_slot(cache.ds_surface_queue, cache.pending_ds_scene); slot != no_slot)
+            add_depth(slot);
+        if (const uint8_t slot = get_slot(cache.color_surface_queue, cache.last_written_surface); slot != no_slot)
+            add_color(slot);
+        for (const uint8_t slot : staged.color_mru_order)
+            add_color(slot);
+        for (const uint8_t slot : staged.depth_stencil_mru_order)
+            add_depth(slot);
+        std::vector<uint64_t> sizes;
+        for (const auto &candidate : candidates)
+            sizes.push_back(candidate.bytes);
+        const std::vector<bool> keep = surface_policy::select_snapshot_images(
+            sizes, std::min(image_budget_bytes, surface_cache_snapshot_image_cap));
+
+        // what does not fit is written back (when the eviction rules say it must be) and left out
+        std::array<bool, surface_cache_snapshot_slots> color_kept{};
+        std::array<bool, surface_cache_snapshot_slots> depth_kept{};
+        for (size_t i = 0; i < candidates.size(); ++i) {
+            const Candidate &candidate = candidates[i];
+            if (keep[i]) {
+                (candidate.depth ? depth_kept : color_kept)[candidate.slot] = true;
+                ++stats.images;
+                stats.image_bytes += candidate.bytes;
+            } else {
+                ++stats.dropped;
+                if (!candidate.depth && cache.write_back_for_snapshot(cache.color_surface_queue.items[candidate.slot].content, mem))
+                    ++stats.written_back;
+            }
+        }
+
         uint64_t captured_image_bytes = 0;
         for (size_t i = 0; i < staged.colors.size(); ++i) {
-            if (!capture_color(cache.color_surface_queue.items[i].content, staged.colors[i], cache.state, device, captured_image_bytes, error))
+            if (color_kept[i]
+                && !capture_color(cache.color_surface_queue.items[i].content, staged.colors[i], cache.state, device, captured_image_bytes, error))
                 return false;
         }
         for (size_t i = 0; i < staged.depth_stencil.size(); ++i) {
-            if (!capture_depth(cache.ds_surface_queue.items[i].content, staged.depth_stencil[i], device, captured_image_bytes, error))
+            if (depth_kept[i]
+                && !capture_depth(cache.ds_surface_queue.items[i].content, staged.depth_stencil[i], device, captured_image_bytes, error))
                 return false;
         }
         staged.cpu_surfaces_changed = cache.cpu_surfaces_changed;
@@ -287,7 +356,12 @@ struct SurfaceCacheSnapshotAccess {
             error = "surface-cache association points outside its LRU queue";
             return false;
         }
-        staged.pending_depth_stencil_stores = cache.pending_ds_scene != nullptr && cache.pending_ds_scene_stores;
+        // an association to a surface left out of the snapshot is gone after load, as after an eviction
+        if (staged.last_written_color_slot != no_slot && !staged.colors[staged.last_written_color_slot].active)
+            staged.last_written_color_slot = no_slot;
+        if (staged.pending_depth_stencil_slot != no_slot && !staged.depth_stencil[staged.pending_depth_stencil_slot].active)
+            staged.pending_depth_stencil_slot = no_slot;
+        staged.pending_depth_stencil_stores = staged.pending_depth_stencil_slot != no_slot && cache.pending_ds_scene_stores;
         if (!validate_surface_cache_snapshot(staged, error))
             return false;
         snapshot = std::move(staged);
@@ -416,10 +490,14 @@ struct SurfaceCacheSnapshotAccess {
     }
 };
 
-bool capture_surface_cache_snapshot(VKSurfaceCache &cache, const vkutil::ImageSnapshotDevice &device,
-    SurfaceCacheSnapshot &snapshot, std::string &error) {
+bool capture_surface_cache_snapshot(VKSurfaceCache &cache, MemState &mem, const vkutil::ImageSnapshotDevice &device,
+    uint64_t image_budget_bytes, SurfaceCacheSnapshot &snapshot, std::string &error, SurfaceCacheSnapshotStats *stats) {
     error.clear();
-    return SurfaceCacheSnapshotAccess::capture(cache, device, snapshot, error);
+    SurfaceCacheSnapshotStats local;
+    const bool ok = SurfaceCacheSnapshotAccess::capture(cache, mem, device, image_budget_bytes, snapshot, error, local);
+    if (stats)
+        *stats = local;
+    return ok;
 }
 
 bool restore_surface_cache_snapshot(VKSurfaceCache &cache, MemState &mem,

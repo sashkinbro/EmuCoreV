@@ -9,6 +9,8 @@
 #include <gxm/savestate.h>
 #include <mem/ptr.h>
 #include <renderer/vulkan/state.h>
+#include <util/log.h>
+#include <vulkan/vulkan_format_traits.hpp>
 #include <renderer/vulkan/frame_runtime_reset.h>
 #include <renderer/vulkan/snapshot_request_barrier.h>
 
@@ -271,8 +273,23 @@ bool capture_gpu_state(EmuEnvState &env, GpuSnapshot &snapshot, std::string &err
     }
     uint64_t copied = 0;
     uint64_t surface_bytes = 0;
-    if (!renderer::vulkan::capture_surface_cache_snapshot(state.surface_cache, image_device(state), staged.surfaces, error))
+    // The render targets share the section budget with the surface images; surfaces that do not fit are
+    // written back to guest RAM and left out (B156), so the section size never fails the save.
+    uint64_t render_target_estimate = 0;
+    for (const auto &[address, target_ptr] : gxm::runtime_render_targets(env)) {
+        const auto &target = static_cast<renderer::vulkan::VKRenderTarget &>(*target_ptr);
+        for (const vkutil::Image *image : { &target.color, &target.depthstencil }) {
+            if (image->image) render_target_estimate += uint64_t{ image->width } * image->height * std::max<uint32_t>(vk::blockSize(image->format), 8);
+        }
+    }
+    const uint64_t surface_budget = render_target_estimate < kMaxBufferedSectionSize ? kMaxBufferedSectionSize - render_target_estimate : 0;
+    renderer::vulkan::SurfaceCacheSnapshotStats surface_stats;
+    if (!renderer::vulkan::capture_surface_cache_snapshot(state.surface_cache, env.mem, image_device(state), surface_budget,
+            staged.surfaces, error, &surface_stats))
         return false;
+    if (surface_stats.dropped)
+        LOG_INFO("[savestate] surface cache: {} images ({} MiB) saved, {} surfaces left to guest memory ({} written back)",
+            surface_stats.images, surface_stats.image_bytes >> 20, surface_stats.dropped, surface_stats.written_back);
     // Entries whose guest memory the game has since freed are dead; do not save dangling references.
     drop_unmapped_surface_cache_entries(staged.surfaces, [&env](uint64_t address, uint64_t size) {
         return size == 0 || (address + size <= UINT32_MAX && is_valid_addr_range(env.mem, static_cast<Address>(address), static_cast<Address>(address + size)));

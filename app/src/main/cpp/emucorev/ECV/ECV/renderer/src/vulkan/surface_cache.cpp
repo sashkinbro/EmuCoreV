@@ -563,9 +563,7 @@ uint64_t VKSurfaceCache::ensure_surface_budget() {
     return surface_budget;
 }
 
-bool VKSurfaceCache::write_back_before_destroy(ColorSurfaceCacheInfo &info, MemState &mem) {
-    if (!info.texture.image || !info.data || info.total_bytes == 0)
-        return false;
+surface_policy::Writeback VKSurfaceCache::writeback_decision(ColorSurfaceCacheInfo &info, MemState &mem) {
     refresh_guest_trap(mem, info);
 
     surface_policy::WritebackInput input;
@@ -585,48 +583,57 @@ bool VKSurfaceCache::write_back_before_destroy(ColorSurfaceCacheInfo &info, MemS
         }
     }
 
-    const surface_policy::Writeback decision = surface_policy::decide_writeback(input);
-#if ECV_ORACLE
-    if (ecv::oracle::gpu::enabled())
-        ecv::oracle::gpu::rt_surface("WRITEBACK", info.data.address(), info.total_bytes, info.original_width, info.original_height,
-            static_cast<uint32_t>(info.format), info.stride_bytes, static_cast<uint32_t>(info.tiling), input.cpu_newer,
-            decision == surface_policy::Writeback::Do, static_cast<uint64_t>(decision));
-#endif
-    if (decision == surface_policy::Writeback::Do) {
-        info.gpu_read_sync_only = false;
-        sync_for_eviction = true;
-        submit_immediate_surface_sync(info, &mem);
-        sync_for_eviction = false;
+    return surface_policy::decide_writeback(input);
+}
 
-        if (state.mapping_method == MappingMethod::DoubleBuffer && info.need_buffer_sync) {
-            // the scene-end path forwards the mirror buffer to guest memory through a BufferSyncRequest;
-            // a retired surface has no scene end, so do the same rows here, synchronously
-            info.need_buffer_sync = false;
-            const uint32_t bpp = gxm::bits_per_pixel(info.format) / 8;
-            const uint64_t x0 = static_cast<uint32_t>(std::max(info.post_sync_x0, 0));
-            const uint64_t y0 = static_cast<uint32_t>(std::max(info.post_sync_y0, 0));
-            const uint64_t row_bytes = static_cast<uint64_t>(info.post_sync_width) * bpp;
-            const uint64_t first = static_cast<uint64_t>(info.data.address()) + y0 * info.stride_bytes + x0 * bpp;
-            const auto span = surface_sync_rows_span(info.stride_bytes, row_bytes, info.post_sync_height);
-            auto mem_it = state.mapped_memories.lower_bound(static_cast<Address>(first));
-            if (bpp != 0 && span && *span != 0 && first + *span <= static_cast<uint64_t>(info.data.address()) + info.total_bytes
-                && mem_it != state.mapped_memories.end() && static_cast<Address>(first) >= mem_it->first
-                && std::holds_alternative<vkutil::Buffer>(mem_it->second.buffer_impl)) {
-                const uint64_t offset = first - mem_it->first;
-                if (offset <= mem_it->second.size && *span <= mem_it->second.size - offset) {
-                    const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
-                    const uint8_t *src = static_cast<const uint8_t *>(std::get<vkutil::Buffer>(mem_it->second.buffer_impl).mapped_data) + offset;
-                    uint8_t *dst = Ptr<void>(static_cast<Address>(first)).cast<uint8_t>().get(mem);
-                    surface_sync_internal_write = true;
+void VKSurfaceCache::write_back_now(ColorSurfaceCacheInfo &info, MemState &mem) {
+    info.gpu_read_sync_only = false;
+    sync_for_eviction = true;
+    submit_immediate_surface_sync(info, &mem);
+    sync_for_eviction = false;
+
+    if (state.mapping_method == MappingMethod::DoubleBuffer && info.need_buffer_sync) {
+        // the scene-end path forwards the mirror buffer to guest memory through a BufferSyncRequest;
+        // a retired surface has no scene end, so do the same rows here, synchronously
+        info.need_buffer_sync = false;
+        const uint32_t bpp = gxm::bits_per_pixel(info.format) / 8;
+        const uint64_t x0 = static_cast<uint32_t>(std::max(info.post_sync_x0, 0));
+        const uint64_t y0 = static_cast<uint32_t>(std::max(info.post_sync_y0, 0));
+        const uint64_t row_bytes = static_cast<uint64_t>(info.post_sync_width) * bpp;
+        const uint64_t first = static_cast<uint64_t>(info.data.address()) + y0 * info.stride_bytes + x0 * bpp;
+        const auto span = surface_sync_rows_span(info.stride_bytes, row_bytes, info.post_sync_height);
+        auto mem_it = state.mapped_memories.lower_bound(static_cast<Address>(first));
+        if (bpp != 0 && span && *span != 0 && first + *span <= static_cast<uint64_t>(info.data.address()) + info.total_bytes
+            && mem_it != state.mapped_memories.end() && static_cast<Address>(first) >= mem_it->first
+            && std::holds_alternative<vkutil::Buffer>(mem_it->second.buffer_impl)) {
+            const uint64_t offset = first - mem_it->first;
+            if (offset <= mem_it->second.size && *span <= mem_it->second.size - offset) {
+                const std::shared_lock<std::shared_mutex> transition_lock(mem.external_transition_mutex);
+                const uint8_t *src = static_cast<const uint8_t *>(std::get<vkutil::Buffer>(mem_it->second.buffer_impl).mapped_data) + offset;
+                uint8_t *dst = Ptr<void>(static_cast<Address>(first)).cast<uint8_t>().get(mem);
+                surface_sync_internal_write = true;
 #if ECV_ORACLE
-                    ecv::oracle::fcap::note_memory_write(static_cast<uint32_t>(first), *span, true);
+                ecv::oracle::fcap::note_memory_write(static_cast<uint32_t>(first), *span, true);
 #endif
-                    copy_surface_sync_rows(dst, *span, src, *span, info.stride_bytes, row_bytes, info.post_sync_height);
-                    surface_sync_internal_write = false;
-                }
+                copy_surface_sync_rows(dst, *span, src, *span, info.stride_bytes, row_bytes, info.post_sync_height);
+                surface_sync_internal_write = false;
             }
         }
     }
+}
+
+bool VKSurfaceCache::write_back_before_destroy(ColorSurfaceCacheInfo &info, MemState &mem) {
+    if (!info.texture.image || !info.data || info.total_bytes == 0)
+        return false;
+    const surface_policy::Writeback decision = writeback_decision(info, mem);
+#if ECV_ORACLE
+    if (ecv::oracle::gpu::enabled())
+        ecv::oracle::gpu::rt_surface("WRITEBACK", info.data.address(), info.total_bytes, info.original_width, info.original_height,
+            static_cast<uint32_t>(info.format), info.stride_bytes, static_cast<uint32_t>(info.tiling), info.dirty && *info.dirty,
+            decision == surface_policy::Writeback::Do, static_cast<uint64_t>(decision));
+#endif
+    if (decision == surface_policy::Writeback::Do)
+        write_back_now(info, mem);
 
     const bool guest_authoritative = decision == surface_policy::Writeback::Do
         || decision == surface_policy::Writeback::SkipAlreadySynced
@@ -637,6 +644,23 @@ bool VKSurfaceCache::write_back_before_destroy(ColorSurfaceCacheInfo &info, MemS
             { info.data.address(), info.data.address() + info.total_bytes, context.frame_timestamp });
     }
     return decision == surface_policy::Writeback::Do;
+}
+
+bool VKSurfaceCache::write_back_for_snapshot(ColorSurfaceCacheInfo &info, MemState &mem) {
+    if (!state.context || !info.texture.image || !info.data || info.total_bytes == 0
+        || writeback_decision(info, mem) != surface_policy::Writeback::Do)
+        return false;
+    // the surface stays live: the write-back must not change how it is synced from now on
+    // (submit_immediate_surface_sync keeps need_surface_sync set and drops the scene association)
+    const bool need_sync_before = info.need_surface_sync && *info.need_surface_sync;
+    const bool gpu_read_only_before = info.gpu_read_sync_only;
+    ColorSurfaceCacheInfo *const last_written_before = last_written_surface;
+    write_back_now(info, mem);
+    if (info.need_surface_sync)
+        *info.need_surface_sync = need_sync_before;
+    info.gpu_read_sync_only = gpu_read_only_before;
+    last_written_surface = last_written_before;
+    return true;
 }
 
 void VKSurfaceCache::evict_color_surface(ColorSurfaceCacheInfo &info, MemState &mem) {

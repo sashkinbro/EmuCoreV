@@ -40,14 +40,15 @@ TEST(GpuSurfaceCacheLifecycle, MissingDepthSceneAndSceneEndCaptureCanonicalEmpty
     depth.depth_data = Ptr<void>(0x8000);
     auto &cache = state.surface_cache;
     const vkutil::ImageSnapshotDevice unused_device{};
+    MemState mem;
     renderer::vulkan::SurfaceCacheSnapshot snapshot;
     std::string error;
     ASSERT_TRUE(cache.begin_ds_scene_depth_check(depth, true, 0x10000));
-    ASSERT_TRUE(renderer::vulkan::capture_surface_cache_snapshot(cache, unused_device, snapshot, error)) << error;
+    ASSERT_TRUE(renderer::vulkan::capture_surface_cache_snapshot(cache, mem, unused_device, renderer::vulkan::surface_cache_snapshot_image_cap, snapshot, error)) << error;
     EXPECT_EQ(snapshot.pending_depth_stencil_slot, 0xFF);
     EXPECT_FALSE(snapshot.pending_depth_stencil_stores);
     cache.resolve_ds_scene_end(true);
-    ASSERT_TRUE(renderer::vulkan::capture_surface_cache_snapshot(cache, unused_device, snapshot, error)) << error;
+    ASSERT_TRUE(renderer::vulkan::capture_surface_cache_snapshot(cache, mem, unused_device, renderer::vulkan::surface_cache_snapshot_image_cap, snapshot, error)) << error;
     EXPECT_EQ(snapshot.pending_depth_stencil_slot, 0xFF);
     EXPECT_FALSE(snapshot.pending_depth_stencil_stores);
     EXPECT_TRUE(renderer::vulkan::validate_surface_cache_snapshot(snapshot, error)) << error;

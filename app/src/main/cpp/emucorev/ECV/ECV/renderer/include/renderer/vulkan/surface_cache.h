@@ -328,6 +328,13 @@ private:
     // Write the surface content to guest memory when the GPU image is its only up-to-date copy.
     // Returns true when guest memory was written.
     bool write_back_before_destroy(ColorSurfaceCacheInfo &info, MemState &mem);
+    // Resolve the CPU-write trap and decide whether the GPU image is the only up-to-date copy (B131 rules).
+    surface_policy::Writeback writeback_decision(ColorSurfaceCacheInfo &info, MemState &mem);
+    // Copy the surface content to guest memory now (synchronous), including double-buffer mirror rows.
+    void write_back_now(ColorSurfaceCacheInfo &info, MemState &mem);
+    // B156 save states: write a live surface back when the rules say so, leaving its sync flags and the
+    // scene association as they were. Returns true when guest memory now holds the surface content.
+    bool write_back_for_snapshot(ColorSurfaceCacheInfo &info, MemState &mem);
     // Write back, destroy and unlink a colour surface; the slot is left empty.
     void evict_color_surface(ColorSurfaceCacheInfo &info, MemState &mem);
     // Resolve a fired CPU-write trap (hash check), then arm the trap again.

@@ -17,7 +17,7 @@
 
 namespace renderer::vulkan {
 namespace {
-constexpr uint64_t max_surface_cache_snapshot_bytes = 128ull << 20;
+constexpr uint64_t max_surface_cache_snapshot_bytes = surface_cache_snapshot_image_cap;
 constexpr uint8_t no_slot = 0xFF;
 constexpr uint32_t surface_snapshot_magic = 0x31534356; // "VCS1", little endian
 constexpr uint32_t surface_snapshot_version = 1;

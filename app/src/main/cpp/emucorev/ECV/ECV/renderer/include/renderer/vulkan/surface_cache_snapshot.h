@@ -21,6 +21,8 @@ namespace renderer::vulkan {
 inline constexpr uint32_t surface_cache_snapshot_slots = surface_policy::max_cache_slots;
 // Save states written before B130 carry this many slots; decode pads them to surface_cache_snapshot_slots.
 inline constexpr uint32_t surface_cache_snapshot_legacy_slots = surface_policy::legacy_cache_slots;
+// Aggregate GPU image bytes one snapshot can carry (decode refuses more); capture keeps under it.
+inline constexpr uint64_t surface_cache_snapshot_image_cap = 128ull << 20;
 
 // Image creation details needed to build a fresh, compatible Vulkan image on restore.
 // The Vulkan image/view/allocation handles themselves are deliberately absent.
@@ -113,11 +115,23 @@ bool decode_surface_cache_snapshot(const std::vector<uint8_t> &data, SurfaceCach
 // save states stays testable; decode_surface_cache_snapshot accepts both layouts.
 bool encode_surface_cache_snapshot_legacy_layout(const SurfaceCacheSnapshot &snapshot, std::vector<uint8_t> &data, std::string &error);
 
-// Caller must freeze rendering and submit all recorded work before capture. This
-// function copies native GPU images only; it does not flush surfaces to guest RAM
-// or alter cache/LRU/dirty state. Capture fails if unserializable pending casts exist.
-bool capture_surface_cache_snapshot(VKSurfaceCache &cache, const vkutil::ImageSnapshotDevice &device,
-    SurfaceCacheSnapshot &snapshot, std::string &error);
+// What capture kept of the cache (logged by the save path).
+struct SurfaceCacheSnapshotStats {
+    uint32_t images = 0;        // surfaces saved with their GPU image bytes
+    uint32_t written_back = 0;  // surfaces written back to guest memory because they did not fit
+    uint32_t dropped = 0;       // surfaces not saved (did not fit): a cache miss after load, like an eviction
+    uint64_t image_bytes = 0;
+};
+
+// Caller must freeze rendering and submit all recorded work before capture. Capture copies native GPU
+// images while they fit in `image_budget_bytes` (most recently used first, the surfaces of the last scene
+// before the rest). A colour surface that does not fit is written back to guest RAM first, when the
+// eviction rules say it must be, and then left out of the snapshot: restore finds it missing and the
+// cache rebuilds it from guest memory exactly as after an eviction (B156). The size never fails the
+// save. This writes guest RAM, so guest RAM must be captured after this call; cache/LRU state and the
+// surfaces' sync flags are left as they were. Capture fails if unserializable pending casts exist.
+bool capture_surface_cache_snapshot(VKSurfaceCache &cache, MemState &mem, const vkutil::ImageSnapshotDevice &device,
+    uint64_t image_budget_bytes, SurfaceCacheSnapshot &snapshot, std::string &error, SurfaceCacheSnapshotStats *stats = nullptr);
 
 // Caller must have restored guest RAM and stopped rendering. Restore creates fresh
 // GPU resources, rebuilds cache/address/LRU associations and reinstalls color-memory

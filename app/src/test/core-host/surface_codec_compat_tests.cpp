@@ -111,3 +111,59 @@ TEST(SurfaceCodecCompat, UnknownSlotCountIsRejected) {
     SurfaceCacheSnapshot decoded;
     EXPECT_FALSE(decode_surface_cache_snapshot(bytes, decoded, error));
 }
+
+namespace {
+// A colour surface whose image is `bytes` big (RGBA8, 8192 pixels wide).
+void make_big(ColorSurfaceSnapshot &color, uint32_t address, uint64_t bytes) {
+    make_active(color);
+    color.guest_address = address;
+    const uint32_t height = static_cast<uint32_t>(bytes / (8192u * 4u));
+    color.width = color.original_width = 8192;
+    color.height = color.original_height = static_cast<uint16_t>(height);
+    color.stride_bytes = 8192 * 4;
+    color.total_bytes = bytes;
+    color.texture.image.width = 8192;
+    color.texture.image.height = height;
+    color.texture.image.bytes.assign(bytes, 0x5A);
+}
+} // namespace
+
+// B156: capture keeps the image bytes within surface_cache_snapshot_image_cap and leaves what does not
+// fit out (an inactive slot); the decoder's cap stays a safety net for corrupt data only.
+TEST(SurfaceCodecCompat, SnapshotAtTheImageCapRoundTrips) {
+    auto snapshot = empty_snapshot();
+    make_big(snapshot.colors[1], 0x1000000, surface_cache_snapshot_image_cap);
+    std::string error;
+    std::vector<uint8_t> bytes;
+    ASSERT_TRUE(encode_surface_cache_snapshot(snapshot, bytes, error)) << error;
+    SurfaceCacheSnapshot decoded;
+    ASSERT_TRUE(decode_surface_cache_snapshot(bytes, decoded, error)) << error;
+    EXPECT_EQ(decoded.colors[1].texture.image.bytes.size(), surface_cache_snapshot_image_cap);
+}
+
+TEST(SurfaceCodecCompat, SurfaceLeftOutOfTheSnapshotLeavesAValidSnapshot) {
+    // capture dropped slot 2 (it did not fit) and cleared the association that pointed to it
+    auto snapshot = empty_snapshot();
+    make_big(snapshot.colors[1], 0x1000000, surface_cache_snapshot_image_cap);
+    make_active(snapshot.colors[2]);
+    snapshot.colors[2] = {};
+    snapshot.last_written_color_slot = 1;
+    std::string error;
+    std::vector<uint8_t> bytes;
+    ASSERT_TRUE(encode_surface_cache_snapshot(snapshot, bytes, error)) << error;
+    SurfaceCacheSnapshot decoded;
+    ASSERT_TRUE(decode_surface_cache_snapshot(bytes, decoded, error)) << error;
+    EXPECT_TRUE(decoded.colors[1].active);
+    EXPECT_FALSE(decoded.colors[2].active);
+    EXPECT_EQ(decoded.last_written_color_slot, 1);
+}
+
+TEST(SurfaceCodecCompat, SnapshotBeyondTheImageCapIsRefusedByTheCodec) {
+    auto snapshot = empty_snapshot();
+    make_big(snapshot.colors[1], 0x1000000, surface_cache_snapshot_image_cap);
+    make_active(snapshot.colors[2]);
+    snapshot.colors[2].guest_address = 0x2000000;
+    std::string error;
+    std::vector<uint8_t> bytes;
+    EXPECT_FALSE(encode_surface_cache_snapshot(snapshot, bytes, error));
+}

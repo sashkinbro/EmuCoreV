@@ -298,4 +298,20 @@ inline bool consume_preserved(std::vector<PreservedRange> &ranges, uint32_t begi
     return hit;
 }
 
+// B156: which surfaces of a save state keep their GPU image bytes. `bytes` lists the image bytes of
+// each candidate, most important first (the last scene's surfaces, then most recently used). A
+// candidate is kept while it fits the budget; one that does not fit is skipped and smaller, less
+// important ones may still use the room. The sum of the kept bytes never exceeds budget_bytes.
+inline std::vector<bool> select_snapshot_images(const std::vector<uint64_t> &bytes, uint64_t budget_bytes) {
+    std::vector<bool> keep(bytes.size(), false);
+    uint64_t remaining = budget_bytes;
+    for (size_t i = 0; i < bytes.size(); ++i) {
+        if (bytes[i] <= remaining) {
+            keep[i] = true;
+            remaining -= bytes[i];
+        }
+    }
+    return keep;
+}
+
 } // namespace renderer::vulkan::surface_policy
