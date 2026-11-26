@@ -223,6 +223,8 @@ struct Atrac9DecoderState : public DecoderState {
 
     void export_state(Atrac9DecoderSavedState *dest) const;
     void load_state(const Atrac9DecoderSavedState *src);
+    // Discards all decoder history and parameters, as after a decode failure
+    void reset_decoder();
 
     explicit Atrac9DecoderState(uint32_t config_data);
     ~Atrac9DecoderState() override;

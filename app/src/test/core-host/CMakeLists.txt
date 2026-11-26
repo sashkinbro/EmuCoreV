@@ -72,6 +72,23 @@ target_include_directories(core_host_tests PRIVATE
 target_link_libraries(core_host_tests PRIVATE gtest_host)
 target_compile_options(core_host_tests PRIVATE -Wall -Wextra)
 
+# ATRAC9: the vendored LibAtrac9 and the real decoder wrapper (codec/src/atrac9.cpp) with a stub log header,
+# plus the header-only NGS voice input validation. Run with run-core-host-tests.ps1 -Target atrac9_host_tests.
+set(LIBATRAC9_SRC "${ECV_ROOT}/external/LibAtrac9/C/src")
+file(GLOB LIBATRAC9_SOURCES "${LIBATRAC9_SRC}/*.c")
+add_executable(atrac9_host_tests
+    atrac9_decoder_tests.cpp
+    "${CORE_ROOT}/codec/src/atrac9.cpp"
+    ${LIBATRAC9_SOURCES})
+target_include_directories(atrac9_host_tests BEFORE PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/atrac9_shim"
+    "${CORE_ROOT}/codec/include"
+    "${CORE_ROOT}/ngs/include"
+    "${LIBATRAC9_SRC}")
+target_link_libraries(atrac9_host_tests PRIVATE gtest_host)
+target_compile_options(atrac9_host_tests PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
+add_test(NAME atrac9_host_tests COMMAND atrac9_host_tests)
+
 enable_testing()
 add_test(NAME core_host_tests COMMAND core_host_tests)
 

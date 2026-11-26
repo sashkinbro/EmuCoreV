@@ -248,6 +248,11 @@ static At9Status ReadExtensionParams(Block* block, BitReaderCxt* br)
 	int bexBand = 0;
 	if (block->BandExtensionEnabled)
 	{
+		// BexGroupInfo only covers 13..20 quantization units
+		if (block->QuantizationUnitCount < 13 || block->QuantizationUnitCount - 13 >= 8)
+		{
+			return ERR_UNPACK_EXTENSION_DATA_INVALID;
+		}
 		bexBand = BexGroupInfo[block->QuantizationUnitCount - 13].BandCount;
 		if (block->BlockType == Stereo)
 		{
@@ -366,6 +371,11 @@ static At9Status ReadSpectra(Channel* channel, BitReaderCxt* br)
 		if (precision <= maxHuffPrecision)
 		{
 			const HuffmanCodebook* huff = &HuffmanSpectrum[channel->CodebookSet[i]][precision][QuantUnitToCodebookIndex[i]];
+			// Some (set, precision, index) slots are empty; only inconsistent or corrupt data selects them
+			if (huff->Lookup == NULL || huff->Bits == NULL)
+			{
+				return ERR_UNPACK_SPECTRUM_CODEBOOK_INVALID;
+			}
 			const int groupCount = subbandCount >> huff->ValueCountPower;
 			for (int j = 0; j < groupCount; j++)
 			{

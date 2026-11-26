@@ -16,6 +16,7 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 #include <ngs/modules/atrac9.h>
+#include <ngs/modules/atrac9_input.h>
 #include <ngs/modules/logical_state_io.h>
 #include <util/log.h>
 
@@ -89,6 +90,13 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
         }
     }
 
+    // A voice whose config word the decoder rejects (bad header, unknown channel layout) produces no
+    // audio and ends, as on hardware; it must never reach the bit-stream decoder.
+    if (!runtime->decoder->valid || runtime->decoder->get(DecoderQuery::AT9_SUPERFRAME_SIZE) == 0) {
+        LOG_WARN_ONCE("NGS AT9: the voice has an invalid ATRAC9 config word ({:#010x}), no audio is produced", static_cast<uint32_t>(params->config_data));
+        return false;
+    }
+
     // re-apply the logical decoder state before we resume decoding
     runtime->decoder->load_state(&logical->saved_state);
 
@@ -104,6 +112,9 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
         if ((bufparam.loop_count != -1) && (logical->current_loop_count > bufparam.loop_count)) {
             state->current_buffer = bufparam.next_buffer_index;
             logical->current_loop_count = 0;
+
+            // the chain index comes from guest memory: anything outside the buffer table ends the stream
+            state->current_buffer = at9_valid_buffer_index(state->current_buffer, SCE_NGS_AT9_MAX_BUFFER_PARAMS);
 
             if (state->current_buffer == -1) {
                 callback_requested_update_abort = data.invoke_callback(kern, mem, thread_id, SCE_NGS_AT9_END_OF_DATA, 0, 0);
@@ -174,6 +185,9 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
         input = logical->superframe_staging.data();
     }
 
+    // number of valid bytes behind `input`
+    const uint32_t input_avail = logical->superframe_staging.empty() ? frame_bytes_gotten : static_cast<uint32_t>(logical->superframe_staging.size());
+
     const uint32_t samples_per_frame = runtime->decoder->get(DecoderQuery::AT9_SAMPLE_PER_FRAME);
     const uint32_t samples_per_superframe = runtime->decoder->get(DecoderQuery::AT9_SAMPLE_PER_SUPERFRAME);
     // we need to account for sampled skipped at the beginning or the end of the buffer
@@ -181,20 +195,13 @@ bool Atrac9Module::decode_more_data(KernelState &kern, const MemState &mem, cons
     uint32_t decoded_start_offset = 0;
 
     // some games (like Muramasa) send the atrac9 files with the header, we need to skip it
-    if (std::memcmp(input, "RIFF", 4) == 0
-        && std::memcmp(input + 8, "WAVE", 4) == 0) {
-        // file header is 12 bytes long
-        input += 3 * sizeof(uint32_t);
-        state->current_byte_position_in_buffer += 3 * sizeof(uint32_t);
-
-        while (std::memcmp(input, "data", 4) != 0) {
-            // each chunk has a 4-byte identifier followed by its size (minus 8) in an int32
-            const int32_t header_data = 2 * sizeof(uint32_t) + *reinterpret_cast<int32_t *>(input + 4);
-            state->current_byte_position_in_buffer += header_data;
-            input += header_data;
-        }
-
-        state->current_byte_position_in_buffer += 2 * sizeof(uint32_t);
+    if (const int64_t payload_offset = at9_riff_data_offset(input, input_avail); payload_offset >= 0) {
+        state->current_byte_position_in_buffer += static_cast<int32_t>(payload_offset);
+        return true;
+    }
+    if (input_avail >= 12 && std::memcmp(input, "RIFF", 4) == 0 && std::memcmp(input + 8, "WAVE", 4) == 0) {
+        LOG_WARN_ONCE("NGS AT9: malformed RIFF header, buffer skipped");
+        state->current_byte_position_in_buffer = bufparam.bytes_count;
         return true;
     }
 
@@ -351,7 +358,7 @@ bool Atrac9Module::process(KernelState &kern, const MemState &mem, const SceUID 
     Atrac9RuntimeState *runtime = data.get_runtime_state<Atrac9RuntimeState>();
     assert(state);
 
-    if (state->current_buffer == -1) {
+    if (at9_valid_buffer_index(state->current_buffer, SCE_NGS_AT9_MAX_BUFFER_PARAMS) == -1) {
         return true;
     }
     if (!params->buffer_params[state->current_buffer].buffer

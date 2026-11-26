@@ -142,8 +142,20 @@ void Atrac9DecoderState::load_state(const Atrac9DecoderSavedState *src) {
     superframe_data_left = src->superframe_data_left;
 }
 
+void Atrac9DecoderState::reset_decoder() {
+    // A frame that failed to unpack leaves the library's per-block parameters (band counts, stereo and
+    // extension units, gradients, precisions) half-updated. The next frame can reuse those parameters
+    // or index code books with them, so start again from a clean handle instead of resuming on them.
+    Atrac9ReleaseHandle(decoder_handle);
+    decoder_handle = Atrac9GetHandle();
+    valid = (Atrac9InitDecoder(decoder_handle, reinterpret_cast<uint8_t *>(&config_data)) == At9Status::ERR_SUCCESS);
+    const Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
+    superframe_frame_idx = 0;
+    superframe_data_left = info->superframeSize;
+}
+
 bool Atrac9DecoderState::send(const uint8_t *data, uint32_t size) {
-    if (!valid)
+    if (!valid || !data)
         return false;
     Atrac9CodecInfo *info = static_cast<Atrac9CodecInfo *>(atrac9_info);
 
@@ -163,6 +175,14 @@ bool Atrac9DecoderState::send(const uint8_t *data, uint32_t size) {
         } else {
             LOG_ERROR("Decode failure with code {}", log_hex(res));
         }
+        reset_decoder();
+        return false;
+    }
+
+    // A frame cannot use more bytes than are left in its superframe; the hardware rejects such data
+    if (decode_used < 0 || decode_used > superframe_data_left) {
+        LOG_ERROR("Decode failure: frame used {} bytes but only {} are left in the superframe", decode_used, superframe_data_left);
+        reset_decoder();
         return false;
     }
 
@@ -205,9 +225,10 @@ Atrac9DecoderState::Atrac9DecoderState(uint32_t config_data)
         LOG_ERROR("Error initializing decoder. Error code: {}", log_hex(err));
     }
 
-    Atrac9CodecInfo *info = new Atrac9CodecInfo;
+    Atrac9CodecInfo *info = new Atrac9CodecInfo{};
     atrac9_info = info;
-    Atrac9GetCodecInfo(decoder_handle, info);
+    if (valid)
+        Atrac9GetCodecInfo(decoder_handle, info);
 
     result.resize(info->frameSamples * info->channels * sizeof(uint16_t));
 
