@@ -1,7 +1,9 @@
 ﻿package com.sbro.emucorev.ui.common
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Rect
 import android.view.MotionEvent
 import androidx.annotation.DrawableRes
@@ -58,7 +60,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -184,15 +188,78 @@ private fun decodeSkinBitmap(file: java.io.File, targetPx: Int): Bitmap? = runCa
 
 private fun skinArtworkBounds(bitmap: Bitmap): Rect {
     val bounds = Rect()
+    val faintBounds = Rect()
     val row = IntArray(bitmap.width)
     for (y in 0 until bitmap.height) {
         bitmap.getPixels(row, 0, row.size, 0, y, row.size, 1)
         for (x in row.indices) {
-            if (row[x] ushr 24 == 0) continue
-            bounds.union(x, y, x + 1, y + 1)
+            val alpha = row[x] ushr 24
+            // A barely visible shadow or resampling fringe must not size the button.
+            if (alpha >= 16) {
+                bounds.union(x, y, x + 1, y + 1)
+            } else if (alpha != 0) {
+                faintBounds.union(x, y, x + 1, y + 1)
+            }
         }
     }
-    return bounds
+    return if (bounds.isEmpty) faintBounds else bounds
+}
+
+internal fun fitSkinToReference(
+    source: Size,
+    destination: Size,
+    reference: Size,
+    visibleFraction: ScaleFactor,
+    referenceScale: ContentScale
+): ScaleFactor {
+    val scale = referenceScale.computeScaleFactor(reference, destination)
+    val viewport = Size(
+        minOf(destination.width, reference.width * scale.scaleX),
+        minOf(destination.height, reference.height * scale.scaleY)
+    )
+    // A round skin button can replace a narrow arrow. Match the larger visible dimension
+    // without distorting the shape or exceeding the standard button's viewport.
+    val extent = maxOf(viewport.width * visibleFraction.scaleX, viewport.height * visibleFraction.scaleY)
+    val fit = ContentScale.Fit.computeScaleFactor(source, viewport).scaleX
+    val artworkScale = minOf(fit, extent / maxOf(source.width, source.height))
+    return ScaleFactor(artworkScale, artworkScale)
+}
+
+private fun referenceArtworkScale(
+    context: Context,
+    @DrawableRes drawableRes: Int,
+    referenceScale: ContentScale
+): ContentScale {
+    val drawable = context.getDrawable(drawableRes) ?: return ContentScale.Fit
+    val width = drawable.intrinsicWidth
+    val height = drawable.intrinsicHeight
+    if (width <= 0 || height <= 0) return ContentScale.Fit
+    val reference = Size(width.toFloat(), height.toFloat())
+    val rasterScale = 128f / maxOf(width, height)
+    val rasterWidth = (width * rasterScale).roundToInt().coerceAtLeast(1)
+    val rasterHeight = (height * rasterScale).roundToInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(rasterWidth, rasterHeight, Bitmap.Config.ARGB_8888)
+    drawable.setBounds(0, 0, rasterWidth, rasterHeight)
+    drawable.draw(AndroidCanvas(bitmap))
+    val bounds = skinArtworkBounds(bitmap)
+    bitmap.recycle()
+    if (bounds.isEmpty) return ContentScale.Fit
+    val visibleFraction = ScaleFactor(bounds.width() / rasterWidth.toFloat(), bounds.height() / rasterHeight.toFloat())
+    return object : ContentScale {
+        override fun computeScaleFactor(srcSize: Size, dstSize: Size): ScaleFactor =
+            fitSkinToReference(srcSize, dstSize, reference, visibleFraction, referenceScale)
+    }
+}
+
+@Composable
+private fun rememberSkinArtworkScale(
+    @DrawableRes drawableRes: Int,
+    referenceScale: ContentScale = ContentScale.Fit
+): ContentScale {
+    val context = LocalContext.current
+    return remember(context, drawableRes, referenceScale) {
+        referenceArtworkScale(context, drawableRes, referenceScale)
+    }
 }
 
 /** Trim transparent margins and keep the same framing for the two press states. */
@@ -456,11 +523,12 @@ fun VectorOverlayButton(
             else -> Unit
         }
         if (skinShown != null) {
+            val referenceDrawable = drawableRes
             Image(
                 bitmap = skinShown,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
+                contentScale = rememberSkinArtworkScale(referenceDrawable, contentScale),
                 colorFilter = skin?.tintFilter,
                 filterQuality = FilterQuality.Medium
             )
@@ -1056,7 +1124,7 @@ fun VectorAnalogStick(
                     bitmap = analogSkinBase,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
+                    contentScale = rememberSkinArtworkScale(R.drawable.ic_controller_analog_base),
                     alpha = skinAlpha,
                     colorFilter = skin?.tintFilter,
                     filterQuality = FilterQuality.Medium
@@ -1077,7 +1145,7 @@ fun VectorAnalogStick(
                     modifier = Modifier
                         .size(analogSize * 0.52f)
                         .offset { IntOffset(displayedThumbOffset.x.roundToInt(), displayedThumbOffset.y.roundToInt()) },
-                    contentScale = ContentScale.Fit,
+                    contentScale = rememberSkinArtworkScale(R.drawable.ic_controller_analog_stick),
                     alpha = skinAlpha,
                     colorFilter = skin?.tintFilter,
                     filterQuality = FilterQuality.Medium
