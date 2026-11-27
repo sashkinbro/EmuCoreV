@@ -153,6 +153,26 @@ TEST(GpuStrategy, ExtendedDynamicStateFollowsTheDeviceAndCanBeForcedOff) {
 
 TEST(GpuStrategy, DescribeLineHasStableKeys) {
     const std::string d = describe(tiler_caps(), choose_strategy(tiler_caps()));
-    for (const char *key : { "render_path=", "dyn_state=", "barriers=", "submit=", "transient=", "fbfetch=", "interlock=", "msaa_resolve=", "ds_resolve=", "forced_rejected=" })
+    for (const char *key : { "render_path=", "dyn_state=", "barriers=", "submit=", "transient=", "fbfetch=", "interlock=", "msaa_resolve=", "ds_resolve=", "depth_range=", "forced_rejected=" })
         EXPECT_NE(d.find(key), std::string::npos) << key;
+}
+
+// The Vita depth range rule (near: clamp, far: clip) gets the best tier the device can express
+TEST(GpuStrategy, DepthRangeTierFollowsDepthClampAndClipDistances) {
+    GpuCaps c = tiler_caps();
+    c.depth_clamp = c.shader_clip_distance = true;
+    EXPECT_EQ(choose_strategy(c).depth_range, DepthRangePath::ClampClipDistance);
+    c.shader_clip_distance = false;
+    EXPECT_EQ(choose_strategy(c).depth_range, DepthRangePath::FragmentDiscard);
+    c.depth_clamp = false;
+    c.shader_clip_distance = true;
+    EXPECT_EQ(choose_strategy(c).depth_range, DepthRangePath::VertexClamp);
+
+    c.depth_clamp = c.shader_clip_distance = true;
+    ForcedPaths f;
+    f.fragment_discard_depth = true;
+    EXPECT_EQ(choose_strategy(c, f).depth_range, DepthRangePath::FragmentDiscard);
+    f.vertex_clamp_depth = true;
+    EXPECT_EQ(choose_strategy(c, f).depth_range, DepthRangePath::VertexClamp);
+    EXPECT_NE(describe(c, choose_strategy(c)).find("depth_range=clamp+clip-distance"), std::string::npos);
 }

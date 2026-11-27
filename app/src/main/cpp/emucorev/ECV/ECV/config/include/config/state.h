@@ -86,8 +86,6 @@ struct Config {
         bool show_shader_cache_warn = true;
         bool accurate_thread_scheduling = false;
         bool eager_surface_sync = false;
-        // Compatibility-only rasterization policy; defaults preserve other titles.
-        bool depth_clamp = true;
         int guest_cores = 1;
         bool import_textures = false;
         bool export_textures = false;

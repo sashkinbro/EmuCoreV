@@ -1074,7 +1074,8 @@ vk::Pipeline PipelineCache::compile_pipeline(SceGxmPrimitiveType type, vk::Rende
     const vk::CullModeFlags cull_mode = state.use_extended_dynamic_state ? vk::CullModeFlags() : draw_cull_mode(record.cull_mode, variant);
 
     const vk::PipelineRasterizationStateCreateInfo rasterizer{
-        .depthClampEnable = (enable_depth_clamp && state.depth_clamp_enabled && state.physical_device_features.depthClamp) ? VK_TRUE : VK_FALSE,
+        // the Vita clips only at the far plane in depth: the clamp tiers keep near geometry, their shaders cut the far plane
+        .depthClampEnable = state.gpu_strategy.depth_range != DepthRangePath::VertexClamp ? VK_TRUE : VK_FALSE,
         .polygonMode = polygon_mode,
         .cullMode = cull_mode,
         // front face is always counter clockwise

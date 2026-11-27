@@ -40,8 +40,6 @@ struct Config;
 
 namespace renderer::vulkan {
 
-inline constexpr bool enable_depth_clamp = true; // Warning: also disables near clipping (Vulkan couples them)
-
 enum class LinuxSurfaceType {
     Unknown,
     Wayland,
@@ -193,7 +191,6 @@ struct VKState : public renderer::State {
     // bound guest write-backs to the render-target extent the surface was rendered with
     bool surface_sync_clamp_rt = true;
     bool eager_surface_sync = false;
-    bool depth_clamp_enabled = true;
     LinuxSurfaceType linux_surface_type = LinuxSurfaceType::Unknown;
 
 #ifdef __ANDROID__

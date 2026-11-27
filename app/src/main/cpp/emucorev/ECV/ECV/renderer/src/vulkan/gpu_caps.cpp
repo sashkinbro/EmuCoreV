@@ -38,6 +38,8 @@ GpuCaps probe_gpu_caps(vk::PhysicalDevice device, const std::vector<vk::Extensio
         c.large_points = features.largePoints;
         c.fill_mode_non_solid = features.fillModeNonSolid;
         c.occlusion_query_precise = features.occlusionQueryPrecise;
+        c.depth_clamp = features.depthClamp;
+        c.shader_clip_distance = features.shaderClipDistance;
         c.vertex_stores_and_atomics = features.vertexPipelineStoresAndAtomics;
         c.fragment_stores_and_atomics = features.fragmentStoresAndAtomics;
         c.max_point_size = lim.pointSizeRange[1];

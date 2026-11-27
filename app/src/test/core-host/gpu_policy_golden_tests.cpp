@@ -34,6 +34,7 @@ GpuCaps modern(GpuIdentity id) {
     c.framebuffer_color_sample_counts = c.framebuffer_depth_sample_counts = c.framebuffer_stencil_sample_counts = 1 | 2 | 4 | 8;
     c.max_per_stage_input_attachments = 8;
     c.host_visible_coherent = c.host_visible_coherent_cached = true;
+    c.depth_clamp = c.shader_clip_distance = true;
     return c;
 }
 

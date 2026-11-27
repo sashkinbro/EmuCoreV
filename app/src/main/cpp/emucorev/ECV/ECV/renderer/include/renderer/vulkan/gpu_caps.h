@@ -136,6 +136,8 @@ struct GpuCaps {
     bool vertex_stores_and_atomics = false; // vertexPipelineStoresAndAtomics: vertex programs may store to guest buffers (USSE buffer stores)
     bool fragment_stores_and_atomics = false; // fragmentStoresAndAtomics: fragment programs may store to guest buffers
     bool occlusion_query_precise = false; // visibility entries count samples instead of a flag
+    bool depth_clamp = false; // feature depthClamp
+    bool shader_clip_distance = false; // feature shaderClipDistance
     float max_point_size = 1.0f;
     // --- colour surface formats (P7): host format chosen per GXM colour base format from the probed attachment/blend support ---
     // (colour_format_model.h owns the table of candidates; `repack` is its Repack enum value)
@@ -163,6 +165,7 @@ struct GpuCaps {
 //   transient  lazily allocated memory     | normal memory (no LAZILY_ALLOCATED type)
 //   render     dynamic rendering + local read | VkRenderPass / VkFramebuffer objects
 //   fbfetch    local read (dynamic path) | ROAA | input attachment + barrier | copy snapshot, then (runtime verdict, renderer.cpp) split between draws
+//   depth      depth clamp + clip distances | depth clamp + fragment discard | per-vertex depth clamp (see DepthRangePath)
 
 enum class BarrierStyle : uint8_t { Legacy, Sync2 };
 enum class SubmitTracking : uint8_t { Fences, TimelineSemaphore };
@@ -185,6 +188,21 @@ enum class MsaaResolvePath : uint8_t {
     ResolveAttachmentColorOnly, // colour resolve attachment; depth resolved by a shader/copy pass
 };
 
+// How the Vita's depth range rule is reproduced. The Vita does not clip at the near plane in depth: geometry in front of the eye whose
+// depth falls below 0 is drawn with its depth clamped (only geometry behind the eye, w <= 0, is cut). The far plane does clip: geometry
+// beyond depth 1 is not drawn. Evidence: Stealth Inc (PCSE00280) hides its room covers by moving them beyond the far plane (host replay
+// of its capture: far clip alone reproduces the device image, near clip alone does not); Vita3K drew near geometry with clamped depth
+// (per-vertex clamp, later depthClampEnable) for Killzone and others. VK_EXT_depth_clip_enable cannot express this rule (its
+// depthClipEnable switches both planes together, and depthClampEnable + depthClipEnable=false is what core depthClampEnable
+// already does), so it is not a tier.
+enum class DepthRangePath : uint8_t {
+    VertexClamp, // no depth clamp: the rasteriser clips both planes; the vertex shader clamps depth to >= 0 so the near plane never cuts
+                 // (approximate: a triangle crossing depth 0 gets a bent depth plane; the only option without depthClamp short of
+                 // writing gl_FragDepth in every fragment shader)
+    FragmentDiscard, // depthClampEnable, no clip distances: the fragment shader discards gl_FragCoord.z > 1 (far plane) and < -1 (near wedge)
+    ClampClipDistance, // depthClampEnable + gl_ClipDistance: w > 0 (behind-eye guard), depth >= -1 (near wedge), depth <= 1 (far plane)
+};
+
 // Debug/lab: force a LOWER tier (or a specific fbfetch rung) to exercise the fallbacks on a device that has the better one.
 struct ForcedPaths {
     bool legacy_barriers = false; // act as a driver without sync2
@@ -193,6 +211,8 @@ struct ForcedPaths {
     bool render_pass = false; // act as a driver without dynamic rendering
     bool base_dynamic_state = false; // act as a driver without extended dynamic state
     bool roaa = false, input_attachment = false, copy_snapshot = false; // pick this fbfetch rung (only rungs of the chosen render path)
+    bool vertex_clamp_depth = false; // act as a driver without depth clamp / clip distances
+    bool fragment_discard_depth = false; // act as a driver with depth clamp but without clip distances
 };
 
 struct Strategy {
@@ -204,6 +224,7 @@ struct Strategy {
     FbFetchPath fbfetch = FbFetchPath::InputAttachmentBarrier;
     MsaaResolvePath msaa_resolve = MsaaResolvePath::None;
     bool use_shader_interlock = false; // desktop interlock path (only when no fbfetch rung above InputAttachment is available)
+    DepthRangePath depth_range = DepthRangePath::VertexClamp;
     // which request could not be honoured (forced rung not available): shown in the log
     bool force_rejected = false;
     DriverFamily family = DriverFamily::Unknown;
@@ -261,6 +282,13 @@ inline Strategy choose_strategy(const GpuCaps &c, const ForcedPaths &f = {}) {
     // interlock stands in only when nothing better than the barrier rung exists (ROAA wins over interlock)
     s.use_shader_interlock = c.shader_interlock && !dr && s.fbfetch != FbFetchPath::RasterOrderAttachmentAccess && !f.roaa && !f.input_attachment && !f.copy_snapshot;
 
+    if (!c.depth_clamp || f.vertex_clamp_depth)
+        s.depth_range = DepthRangePath::VertexClamp;
+    else if (!c.shader_clip_distance || f.fragment_discard_depth)
+        s.depth_range = DepthRangePath::FragmentDiscard;
+    else
+        s.depth_range = DepthRangePath::ClampClipDistance;
+
     // MSAA resolve
     const bool ms = c.supports_samples(4) || c.supports_samples(2);
     if (!ms)
@@ -282,6 +310,14 @@ inline const char *to_string(FbFetchPath v) {
     case FbFetchPath::DynamicRenderingLocalRead: return "local-read";
     case FbFetchPath::InputAttachmentBarrier: return "input-attachment";
     case FbFetchPath::CopySnapshot: return "copy";
+    }
+    return "?";
+}
+inline const char *to_string(DepthRangePath v) {
+    switch (v) {
+    case DepthRangePath::VertexClamp: return "vertex-clamp";
+    case DepthRangePath::FragmentDiscard: return "clamp+fragment-discard";
+    case DepthRangePath::ClampClipDistance: return "clamp+clip-distance";
     }
     return "?";
 }
@@ -327,6 +363,8 @@ inline std::string describe(const GpuCaps &c, const Strategy &s) {
     r += to_string(s.msaa_resolve);
     r += " ds_resolve=";
     r += c.depth_stencil_resolve ? "1" : "0";
+    r += " depth_range=";
+    r += to_string(s.depth_range);
     r += " forced_rejected=";
     r += s.force_rejected ? "1" : "0";
     return r;
@@ -342,9 +380,11 @@ inline bool apply_force_name(ForcedPaths &f, std::string_view name) {
     else if (name == "roaa") f.roaa = true;
     else if (name == "input-attachment") f.input_attachment = true;
     else if (name == "copy-snapshot") f.copy_snapshot = true;
+    else if (name == "vertex-clamp-depth") f.vertex_clamp_depth = true;
+    else if (name == "fragment-discard-depth") f.fragment_discard_depth = true;
     else return false;
     return true;
 }
-inline constexpr std::array<std::string_view, 8> force_path_names = { "legacy-barriers", "fences", "normal-memory", "render-pass", "base-dynamic-state", "roaa", "input-attachment", "copy-snapshot" };
+inline constexpr std::array<std::string_view, 10> force_path_names = { "legacy-barriers", "fences", "normal-memory", "render-pass", "base-dynamic-state", "roaa", "input-attachment", "copy-snapshot", "vertex-clamp-depth", "fragment-discard-depth" };
 
 } // namespace renderer::vulkan
