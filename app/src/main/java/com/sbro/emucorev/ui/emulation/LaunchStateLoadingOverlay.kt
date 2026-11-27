@@ -34,6 +34,7 @@ internal fun LaunchStateLoadingOverlay(
     state: LaunchStateLoadingState,
     modifier: Modifier = Modifier,
     indeterminate: Boolean = false,
+    showProgress: Boolean = true,
     scrimAlpha: Float = 1f,
     @StringRes messageRes: Int = R.string.emulation_savestate_startup_loading
 ) {
@@ -50,6 +51,7 @@ internal fun LaunchStateLoadingOverlay(
             .testTag("launch_state_loading_overlay"),
         contentAlignment = Alignment.Center
     ) {
+        if (!showProgress) return@Box
         Surface(
             modifier = Modifier
                 .widthIn(max = 420.dp)

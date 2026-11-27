@@ -164,6 +164,7 @@ fun EmulationOverlayHost(
     val nativeGameId = activity.currentGameId
     val gameId = nativeGameId.ifBlank { activity.currentGameIdOrIntent() }
     val launchStateLoading = activity.launchStateLoading
+    val showRoutineStateFeedback = remember(activity) { !activity.returnsToNativeLibrary }
     val waitingForStateFrame = activity.stateFrameWaiting
     val autoSaving = activity.autoSaveInProgress
     val repository = remember(activity) { VitaGameSettingsRepository(activity) }
@@ -436,7 +437,9 @@ fun EmulationOverlayHost(
                 saveStateBusy = false
                 saveStateBusySaving = false
                 saveStateBusyLoading = false
-                Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
+                if (showRoutineStateFeedback || !result.isOk || action is SaveStateAction.Delete) {
+                    Toast.makeText(activity, messageRes, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -1115,6 +1118,7 @@ fun EmulationOverlayHost(
             } else {
                 launchStateLoading
             },
+            showProgress = showRoutineStateFeedback,
             indeterminate = saveStateBusyLoading || saveStateBusySaving || autoSaving || waitingForStateFrame,
             scrimAlpha = if (saveStateBusySaving || autoSaving) 0.35f else 1f,
             messageRes = if (saveStateBusySaving || autoSaving) R.string.emulation_savestate_saving
