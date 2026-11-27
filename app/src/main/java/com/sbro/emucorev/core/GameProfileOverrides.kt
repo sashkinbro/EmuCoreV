@@ -7,12 +7,28 @@ import java.lang.reflect.Field
 import java.lang.reflect.Modifier
 
 /**
- * A per-game profile stores the effective config (the native core reads the whole XML) plus the names of the
- * fields the user really changed. Every other field keeps following the global settings and the game database.
+ * A per-game profile stores the effective config plus the names of the fields the user really changed
+ * (`user-overrides`). Only those fields are applied over the global settings, here and in the native core
+ * (config/profile_overrides.h holds the shared name table); every other field keeps following the global settings.
  */
 internal object ConfigOverrides {
     /** Driver choice has its own override mode in the profile. */
     private val excluded = setOf("customDriverName")
+
+    /**
+     * What a legacy profile (written before `user-overrides` existed) still pins: the renderer, as in the native
+     * core's legacy_pinned, plus the app's own input-mapping fields. Everything else follows the global settings.
+     */
+    val LEGACY_PINNED: Set<String> = setOf(
+        "backendRenderer",
+        "enableGamepadOverlay", "overlayShowTouchSwitch", "overlayScale", "overlayOpacity", "disableMotion",
+        "touchHaptics", "touchHapticsPreset", "touchHapticsStrength",
+        "gyroMode", "gyroSensitivity", "gyroSmoothing", "gyroInvertX", "gyroInvertY",
+        "analogMultiplier", "gamepadDeadzone", "gamepadTriggerThreshold", "gamepadButtonProfile",
+        "gamepadVibration", "gamepadVibrationStrength", "deviceVibrationFallback", "gamepadSwapSticks",
+        "gamepadInvertLeftX", "gamepadInvertLeftY", "gamepadInvertRightX", "gamepadInvertRightY",
+        "showTouchpadCursor"
+    )
 
     private val fields: List<Field> by lazy {
         VitaCoreConfig::class.java.declaredFields

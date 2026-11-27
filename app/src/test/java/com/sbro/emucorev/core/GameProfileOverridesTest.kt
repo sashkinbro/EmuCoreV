@@ -81,38 +81,59 @@ class GameProfileOverridesTest {
     }
 
     @Test
-    fun overridesAccumulateAndTheLaunchRefreshesTheFileTheCoreReads() {
+    fun overridesAccumulateAndTheFileListsThemForTheCore() {
         val repository = VitaGameSettingsRepository(context)
         val base = repository.loadProfile(titleId).config
         repository.saveOverrides(titleId, base.copy(turboMode = true), setOf("turboMode"))
         repository.saveOverrides(titleId, base.copy(turboMode = true, vSync = !base.vSync), setOf("vSync"))
         assertEquals(setOf("turboMode", "vSync"), repository.loadProfile(titleId).overrides)
 
-        global { it.copy(audioVolume = 21) }
-        // the core parses the XML itself: the launch step must bring the non-overridden values up to date
         repository.syncEffectiveDriverForLaunch(titleId)
         val xml = repository.customConfigFile(titleId).readText()
-        assertTrue(xml, xml.contains("audio-volume=\"21\""))
         assertTrue(xml, xml.contains("turbo-mode=\"true\""))
         assertTrue(xml, xml.contains("user-overrides=\"turboMode,vSync\""))
     }
 
     @Test
-    fun legacyFullProfilesKeepPinningEverythingAndResetToGlobalClearsThem() {
+    fun fullConfigSavesPinOnlyWhatChanged() {
         val repository = VitaGameSettingsRepository(context)
-        repository.savePreservingDriverOverride(titleId, VitaCoreConfig(audioVolume = 50))
-        assertEquals(null, repository.loadProfile(titleId).overrides)
+        val base = repository.loadProfile(titleId).config
+        repository.saveProfile(titleId, base.copy(textureCache = !base.textureCache), null)
+        assertEquals(setOf("textureCache"), repository.loadProfile(titleId).overrides)
+        global { it.copy(audioVolume = 44) }
+        val after = repository.loadProfile(titleId).config
+        assertEquals(44, after.audioVolume)
+        assertEquals(!base.textureCache, after.textureCache)
+    }
+
+    @Test
+    fun legacyProfilesFollowGlobalExceptRendererAndInputAndMigrateOnTheNextChange() {
+        val repository = VitaGameSettingsRepository(context)
+        configDirectory.mkdirs()
+        // written before user-overrides existed: every value stored, nothing marked
+        repository.customConfigFile(titleId).writeText("""<?xml version="1.0" encoding="utf-8"?>
+            <config>
+              <gpu backend-renderer="OpenGL" texture-cache="false" disable-surface-sync="true"/>
+              <audio audio-volume="50"/>
+              <emucorev gpu-driver-mode="global" gamepad-swap-sticks="true"/>
+            </config>""".trimIndent())
         global { it.copy(audioVolume = 70) }
-        assertEquals(50, repository.loadProfile(titleId).config.audioVolume)
-        // a menu change on a legacy profile stays legacy (nothing is silently unpinned)
-        val config = repository.loadProfile(titleId).config
-        repository.saveOverrides(titleId, config.copy(turboMode = true), setOf("turboMode"))
-        assertEquals(null, repository.loadProfile(titleId).overrides)
-        assertEquals(50, repository.loadProfile(titleId).config.audioVolume)
+
+        val profile = repository.loadProfile(titleId)
+        assertEquals(ConfigOverrides.LEGACY_PINNED, profile.overrides)
+        assertEquals("OpenGL", profile.config.backendRenderer)
+        assertTrue(profile.config.gamepadSwapSticks)
+        assertEquals(70, profile.config.audioVolume)
+        assertTrue(profile.config.textureCache)
+        assertFalse(profile.config.disableSurfaceSync)
+
+        repository.saveOverrides(titleId, profile.config.copy(turboMode = true), setOf("turboMode"))
+        assertEquals(ConfigOverrides.LEGACY_PINNED + "turboMode", repository.loadProfile(titleId).overrides)
+        assertTrue(repository.customConfigFile(titleId).readText().contains("user-overrides="))
 
         repository.reset(titleId)
         assertFalse(repository.hasCustomConfig(titleId))
-        assertEquals(70, repository.loadProfile(titleId).config.audioVolume)
+        assertEquals("Vulkan", repository.loadProfile(titleId).config.backendRenderer)
     }
 
     @Test

@@ -10,7 +10,6 @@ import com.sbro.emucorev.core.GpuDriverCompatibility
 import com.sbro.emucorev.core.GpuDriverManager
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
-import com.sbro.emucorev.core.GameGpuRecommendation
 import com.sbro.emucorev.core.VitaCoreConfigRepository
 import com.sbro.emucorev.core.VitaGameSettingsRepository
 import com.sbro.emucorev.data.AppPreferences
@@ -32,7 +31,6 @@ data class GameManagerUiState(
     val selectedTitleId: String? = null,
     val config: VitaCoreConfig = VitaCoreConfig(),
     val defaults: VitaCoreConfig = VitaCoreConfig(),
-    val gameDbRecommendation: GameGpuRecommendation? = null,
     val installedGpuDrivers: List<InstalledGpuDriver> = emptyList(),
     val customDriverOverride: String? = null,
     val hasCustomProfile: Boolean = false,
@@ -104,9 +102,6 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
                 selectedTitleId = selected,
                 config = profile?.config ?: defaults,
                 defaults = defaults,
-                gameDbRecommendation = selected?.let { id ->
-                    perGameRepository.recommendationFor(id, games.firstOrNull { it.titleId == id }?.title.orEmpty())
-                },
                 installedGpuDrivers = installedGpuDrivers,
                 customDriverOverride = profile?.customDriverOverride,
                 hasCustomProfile = selected?.let(perGameRepository::hasCustomConfig) == true,
@@ -185,8 +180,7 @@ class GameManagerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun resetSelectedToGlobal() {
         val titleId = _uiState.value.selectedTitleId ?: return
-        val defaults = _uiState.value.gameDbRecommendation?.applyTo(_uiState.value.defaults)
-            ?: _uiState.value.defaults
+        val defaults = _uiState.value.defaults
         _uiState.value = _uiState.value.copy(
             config = defaults,
             customDriverOverride = null,

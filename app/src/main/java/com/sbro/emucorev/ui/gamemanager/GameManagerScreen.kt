@@ -82,7 +82,6 @@ import com.sbro.emucorev.core.GpuDriverCompatibility
 import com.sbro.emucorev.ui.settings.gpuDriverSelectionSummary
 import com.sbro.emucorev.core.InstalledGpuDriver
 import com.sbro.emucorev.core.VitaCoreConfig
-import com.sbro.emucorev.core.GameGpuRecommendation
 import com.sbro.emucorev.data.InstalledVitaGame
 import com.sbro.emucorev.ui.common.LocalImage
 import com.sbro.emucorev.ui.common.GameCoverArt
@@ -203,7 +202,6 @@ fun GameManagerScreen(
                         titleId = uiState.selectedTitleId,
                         config = uiState.config,
                         device = device,
-                        gameDbRecommendation = uiState.gameDbRecommendation,
                         defaults = uiState.defaults,
                         installedGpuDrivers = uiState.installedGpuDrivers,
                         customDriverOverride = uiState.customDriverOverride,
@@ -480,7 +478,6 @@ private fun GraphicsProfileSection(
     titleId: String?,
     config: VitaCoreConfig,
     device: DeviceGpuSnapshot,
-    gameDbRecommendation: GameGpuRecommendation?,
     defaults: VitaCoreConfig,
     installedGpuDrivers: List<InstalledGpuDriver>,
     customDriverOverride: String?,
@@ -489,14 +486,6 @@ private fun GraphicsProfileSection(
     onDriverOverrideSelected: (String?) -> Unit
 ) {
     SectionCard(title = stringResource(R.string.settings_tab_graphics)) {
-        if (gameDbRecommendation?.backendRenderer != null && gameDbRecommendation.memoryMapping != null) {
-            Text(
-                text = stringResource(R.string.game_manager_db_recommendation,
-                    gameDbRecommendation.backendRenderer, gameDbRecommendation.memoryMapping),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
         ChoiceRow(stringResource(R.string.settings_core_renderer_label), stringResource(R.string.settings_help_renderer), config.backendRenderer, listOf("Vulkan", "OpenGL"), { onUpdate { it.copy(backendRenderer = defaults.backendRenderer) } }) {
             onUpdate { cfg -> cfg.copy(backendRenderer = it) }
         }

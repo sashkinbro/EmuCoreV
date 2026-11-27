@@ -105,7 +105,8 @@ class SettingsPersistenceContractTest {
     fun nativeShaderPreferencesFlowFromGlobalAndPerGameStorageToRendering() {
         val configHeader = cppSource("emucorev/ECV/ECV/config/include/config/config.h")
         val stateHeader = cppSource("emucorev/ECV/ECV/config/include/config/state.h")
-        val settings = cppSource("emucorev/ECV/ECV/config/src/settings.cpp")
+        // per-game profiles read and write every field through the shared table (profile_overrides.h)
+        val profileTable = cppSource("emucorev/ECV/ECV/config/include/config/profile_overrides.h")
         val runtime = cppSource("emucorev/src/runtime_bridge.cpp")
         val appInit = cppSource("emucorev/ECV/ECV/app/src/app_init.cpp")
         val gui = cppSource("emucorev/ECV/ECV/gui/src/gui.cpp")
@@ -114,7 +115,7 @@ class SettingsPersistenceContractTest {
         assertTrue("Per-game compile notice must default off", "bool show_compile_shaders = false;" in stateHeader)
         assertTrue("Per-game config must carry the cache warning", "bool show_shader_cache_warn = true;" in stateHeader)
         listOf("show-compile-shaders", "show-shader-cache-warn").forEach { key ->
-            assertTrue("Native custom config must read and write $key", settings.split(key).size >= 3)
+            assertTrue("Native custom config must read and write $key", "\"gpu\", \"$key\"" in profileTable)
         }
         assertTrue("Runtime toggle must update the effective profile", "current.show_compile_shaders =" in runtime)
         assertTrue("Renderer must consume the effective compile-notice value", "r.show_compile_shaders = cc.show_compile_shaders;" in appInit)
@@ -126,13 +127,13 @@ class SettingsPersistenceContractTest {
     fun accurateThreadSchedulingRoundTripsAndControlsTheGuestScheduler() {
         val configHeader = cppSource("emucorev/ECV/ECV/config/include/config/config.h")
         val stateHeader = cppSource("emucorev/ECV/ECV/config/include/config/state.h")
-        val settings = cppSource("emucorev/ECV/ECV/config/src/settings.cpp")
+        val profileTable = cppSource("emucorev/ECV/ECV/config/include/config/profile_overrides.h")
         val runtime = cppSource("emucorev/ECV/ECV/interface.cpp")
         val thread = cppSource("emucorev/ECV/ECV/kernel/src/thread.cpp")
 
         listOf("accurate-thread-scheduling", "guest-cores").forEach { key ->
             assertTrue("Global config must serialize $key", key in configHeader)
-            assertTrue("Per-game config must read and write $key", settings.split(key).size >= 3)
+            assertTrue("Per-game config must read and write $key", "\"gpu\", \"$key\"" in profileTable)
         }
         assertTrue("Effective config must carry accurate scheduling", "accurate_thread_scheduling" in stateHeader)
         assertTrue("Effective config must carry the guest core count", "guest_cores" in stateHeader)

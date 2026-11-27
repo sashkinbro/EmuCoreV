@@ -268,8 +268,7 @@ static Config::CurrentConfig get_runtime_current_config_after_save(
 }
 
 void set_current_config(EmuEnvState &emuenv, const std::string &app_path) {
-    const auto title = app_path == emuenv.io.app_path ? emuenv.current_app_title : std::string();
-    config::set_current_config(emuenv.cfg, emuenv.config_path, app_path, title);
+    config::set_current_config(emuenv.cfg, emuenv.config_path, app_path);
     set_backend_renderer(emuenv, emuenv.cfg.current_config.backend_renderer);
     emuenv.audio.set_global_volume(emuenv.cfg.current_config.audio_volume / 100.f);
     lang::set_locale(emuenv.cfg.current_config.sys_lang);

@@ -1,7 +1,6 @@
 package com.sbro.emucorev.core
 
 import android.content.Context
-import android.util.Log
 import com.sbro.emucorev.data.KeyboardMouseSettings
 import com.sbro.emucorev.data.KeyboardMouseSettingsCodec
 import org.json.JSONObject
@@ -19,21 +18,12 @@ data class VitaGameSettingsProfile(
     val config: VitaCoreConfig,
     val customDriverOverride: String?,
     val keyboardMouse: KeyboardMouseSettings? = null,
-    /** Field names the user changed for this game; null = legacy profile where every stored value is pinned. */
+    /** Field names the user changed for this game (ConfigOverrides.LEGACY_PINNED for a legacy profile); null = no profile. */
     val overrides: Set<String>? = null
 )
 
 class VitaGameSettingsRepository(private val context: Context) {
     private val globalRepository = VitaCoreConfigRepository(context)
-    private val gameDatabase by lazy {
-        runCatching { context.assets.open(GameCompatibilityDatabase.ASSET_PATH).use(GameCompatibilityDatabase::parse) }
-            .onFailure { Log.e("GameCompatibilityDB", "Could not load bundled recommendations", it) }
-            .getOrDefault(GameCompatibilityDatabase.EMPTY)
-    }
-
-    fun recommendationFor(titleId: String, title: String = ""): GameGpuRecommendation? =
-        gameDatabase.recommendationFor(titleId, title)
-
     private val configDirectory: File
         get() {
             val base = EmulatorStorage.runtimeRoot(context)
@@ -59,20 +49,17 @@ class VitaGameSettingsRepository(private val context: Context) {
     }
 
     fun loadProfile(titleId: String): VitaGameSettingsProfile {
-        val global = globalRepository.ensureDefaultsPersisted()
-        if (!isUsableTitleId(titleId)) return VitaGameSettingsProfile(global, null)
-        val title = runCatching { VitaSfoParser.parse(EmulatorStorage.paramSfoPath(context, titleId)).title.orEmpty() }
-            .getOrDefault("")
-        val base = gameDatabase.applyDefaults(global, titleId, title)
+        val base = globalRepository.ensureDefaultsPersisted()
+        if (!isUsableTitleId(titleId)) return VitaGameSettingsProfile(base, null)
         val file = customConfigFile(titleId)
         val profile = if (file.exists()) {
             runCatching { readCustomConfig(file, base) }.getOrDefault(VitaGameSettingsProfile(base, null))
         } else {
             VitaGameSettingsProfile(base, null)
         }
-        val overrides = profile.overrides
-        val effective = if (overrides == null) profile.config else
-            ConfigOverrides.merge(base, profile.config, overrides).copy(customDriverName = profile.config.customDriverName)
+        // Same rule as the native core (profile_overrides::apply): only the pinned fields leave the global settings.
+        val effective = ConfigOverrides.merge(base, profile.config, profile.overrides.orEmpty())
+            .copy(customDriverName = profile.config.customDriverName)
         return profile.copy(config = effective.clampedToUiRanges())
     }
 
@@ -95,14 +82,22 @@ class VitaGameSettingsRepository(private val context: Context) {
         config: VitaCoreConfig,
         customDriverOverride: String?,
         keyboardMouse: KeyboardMouseSettings?
-    ) = saveProfileInternal(titleId, config, customDriverOverride, keyboardMouse, null)
+    ) {
+        if (!isUsableTitleId(titleId)) return
+        synchronized(CONFIG_IO_LOCK) {
+            // Full-config editors: pin what differs from the stored effective config, keep what was pinned before.
+            val current = loadProfile(titleId)
+            val overrides = current.overrides.orEmpty() + ConfigOverrides.changed(current.config, config)
+            saveProfileInternal(titleId, config, customDriverOverride, keyboardMouse, overrides)
+        }
+    }
 
     private fun saveProfileInternal(
         titleId: String,
         config: VitaCoreConfig,
         customDriverOverride: String?,
         keyboardMouse: KeyboardMouseSettings?,
-        overrides: Set<String>?
+        overrides: Set<String>
     ) {
         if (!isUsableTitleId(titleId)) return
         synchronized(CONFIG_IO_LOCK) {
@@ -121,7 +116,7 @@ class VitaGameSettingsRepository(private val context: Context) {
 
     /**
      * Menu path: stores [config] as the game's effective settings but marks only [changed] as user overrides, so
-     * every other value keeps following the global settings. Reads just the profile file (no SFO or database).
+     * every other value keeps following the global settings. Reads just the profile file.
      */
     fun saveOverrides(titleId: String, config: VitaCoreConfig, changed: Set<String>) {
         if (!isUsableTitleId(titleId)) return
@@ -131,8 +126,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             val stored = if (file.isFile) runCatching { readCustomConfig(file, base) }.getOrNull() else null
             val launchOnly = file.isFile && isLaunchOnlyConfig(file)
             val existing = if (stored == null || launchOnly) null else stored.overrides
-            val legacyProfile = stored != null && !launchOnly && stored.overrides == null
-            val overrides = if (legacyProfile) null else (existing.orEmpty() + changed)
+            val overrides = existing.orEmpty() + changed
             val driverOverride = if (launchOnly) null else stored?.customDriverOverride
             val effectiveConfig = config.copy(customDriverName = driverOverride ?: base.customDriverName).clampedToUiRanges()
             configDirectory.mkdirs()
@@ -150,7 +144,7 @@ class VitaGameSettingsRepository(private val context: Context) {
         }
         // Keep the override set: a keyboard/mouse change must not pin the other settings of the game.
         saveProfileInternal(titleId, profile.config, profile.customDriverOverride, keyboardMouse,
-            profile.overrides ?: if (customConfigFile(titleId).exists()) null else emptySet())
+            profile.overrides.orEmpty())
     }
 
     /**
@@ -185,11 +179,6 @@ class VitaGameSettingsRepository(private val context: Context) {
             configDirectory.mkdirs()
             writeCustomConfig(file, effective, DRIVER_MODE_GLOBAL, null, launchOnly = true)
         } else {
-            if (profile.overrides != null) {
-                // The native core reads this file whole: refresh the values that follow the global settings.
-                writeCustomConfig(file, profile.config, profile.customDriverOverride.driverMode(), profile.keyboardMouse,
-                    overrides = profile.overrides)
-            }
             writeLaunchProjection(file, effective, profile.customDriverOverride)
         }
         effective
@@ -343,7 +332,7 @@ class VitaGameSettingsRepository(private val context: Context) {
             config = config.copy(customDriverName = customDriverOverride ?: base.customDriverName),
             customDriverOverride = customDriverOverride,
             keyboardMouse = keyboardMouse,
-            overrides = overrides
+            overrides = overrides ?: ConfigOverrides.LEGACY_PINNED
         )
     }
 
@@ -353,7 +342,7 @@ class VitaGameSettingsRepository(private val context: Context) {
         driverMode: String,
         keyboardMouse: KeyboardMouseSettings?,
         launchOnly: Boolean = false,
-        overrides: Set<String>? = null
+        overrides: Set<String> = emptySet()
     ) {
         val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument()
         val root = doc.createElement("config")
@@ -424,7 +413,8 @@ class VitaGameSettingsRepository(private val context: Context) {
             setAttribute("gpu-driver-mode", driverMode)
             if (driverMode == DRIVER_MODE_CUSTOM) setAttribute(REQUESTED_DRIVER_ATTRIBUTE, config.customDriverName)
             if (launchOnly) setAttribute(LAUNCH_ONLY_ATTRIBUTE, "true")
-            if (overrides != null) setAttribute(OVERRIDES_ATTRIBUTE, ConfigOverrides.encode(overrides))
+            // always written: a profile without it is read as a legacy profile (ConfigOverrides.LEGACY_PINNED)
+            setAttribute(OVERRIDES_ATTRIBUTE, ConfigOverrides.encode(overrides))
             setAttribute("enable-gamepad-overlay", config.enableGamepadOverlay.toString())
             setAttribute("overlay-show-touch-switch", config.overlayShowTouchSwitch.toString())
             setAttribute("overlay-scale", config.overlayScale.toString())
