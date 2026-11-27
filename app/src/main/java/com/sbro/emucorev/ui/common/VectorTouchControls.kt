@@ -1,6 +1,8 @@
 ﻿package com.sbro.emucorev.ui.common
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Rect
 import android.view.MotionEvent
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateFloatAsState
@@ -167,16 +169,50 @@ private val drawableControlIds: Map<Int, String> by lazy {
     SkinControlIds.mapNotNull { id -> overlayDrawableForControl(id)?.let { it to id } }.toMap()
 }
 
-private fun decodeSkinBitmap(file: java.io.File, targetPx: Int): ImageBitmap? = runCatching {
+private fun decodeSkinBitmap(file: java.io.File, targetPx: Int): Bitmap? = runCatching {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.path, bounds)
     val minSide = minOf(bounds.outWidth, bounds.outHeight)
     if (minSide <= 0) return@runCatching null
     var sample = 1
     while (minSide / (sample * 2) >= targetPx) sample *= 2
-    BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
-        ?.asImageBitmap()
+    BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply {
+        inSampleSize = sample
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    })
 }.getOrNull()
+
+private fun skinArtworkBounds(bitmap: Bitmap): Rect {
+    val bounds = Rect()
+    val row = IntArray(bitmap.width)
+    for (y in 0 until bitmap.height) {
+        bitmap.getPixels(row, 0, row.size, 0, y, row.size, 1)
+        for (x in row.indices) {
+            if (row[x] ushr 24 == 0) continue
+            bounds.union(x, y, x + 1, y + 1)
+        }
+    }
+    return bounds
+}
+
+/** Trim transparent margins and keep the same framing for the two press states. */
+internal fun fitSkinArtwork(normal: Bitmap, pressed: Bitmap?): Pair<Bitmap, Bitmap?> {
+    fun crop(bitmap: Bitmap, bounds: Rect): Bitmap =
+        if (bounds.isEmpty) bitmap
+        else Bitmap.createBitmap(bitmap, bounds.left, bounds.top, bounds.width(), bounds.height())
+
+    val normalBounds = skinArtworkBounds(normal)
+    val pressedArtwork = pressed?.let { bitmap ->
+        val bounds = skinArtworkBounds(bitmap)
+        if (normal.width == bitmap.width && normal.height == bitmap.height) {
+            normalBounds.union(bounds)
+            crop(bitmap, normalBounds)
+        } else {
+            crop(bitmap, bounds)
+        }
+    }
+    return crop(normal, normalBounds) to pressedArtwork
+}
 
 /** Loads the applied Store controls skin once per pack id (and density) on Dispatchers.IO. */
 @Composable
@@ -194,23 +230,28 @@ fun rememberAppliedControlSkin(): ControlSkinBitmaps? {
                 val pack = StoreControlSkins.load(context, id) ?: return@withContext null
                 val controlPx = (200f * density).roundToInt().coerceIn(64, 512)
                 val analogPx = (320f * density).roundToInt().coerceIn(64, 512)
-                fun decodeAll(files: Map<String, java.io.File>): Map<String, ImageBitmap> {
-                    val out = HashMap<String, ImageBitmap>()
-                    files.forEach { (controlId, file) ->
-                        val isAnalog = controlId == "analog_base" || controlId == "analog_stick"
-                        if (!isAnalog && controlId !in SkinControlIds) return@forEach
-                        decodeSkinBitmap(file, if (isAnalog) analogPx else controlPx)
-                            ?.let { out[controlId] = it }
+                val images = HashMap<String, ImageBitmap>()
+                val pressedImages = HashMap<String, ImageBitmap>()
+                for (controlId in pack.images.keys + pack.pressed.keys) {
+                    val isAnalog = controlId == "analog_base" || controlId == "analog_stick"
+                    if (!isAnalog && controlId !in SkinControlIds) continue
+                    val targetPx = if (isAnalog) analogPx else controlPx
+                    val normal = pack.images[controlId]?.let { decodeSkinBitmap(it, targetPx) }
+                    val pressed = pack.pressed[controlId]?.let { decodeSkinBitmap(it, targetPx) }
+                    if (normal != null) {
+                        val (normalArt, pressedArt) = fitSkinArtwork(normal, pressed)
+                        images[controlId] = normalArt.asImageBitmap()
+                        if (pressedArt != null) pressedImages[controlId] = pressedArt.asImageBitmap()
+                    } else if (pressed != null) {
+                        pressedImages[controlId] = fitSkinArtwork(pressed, null).first.asImageBitmap()
                     }
-                    return out
                 }
-                val images = decodeAll(pack.images)
                 if (images.isEmpty()) {
                     null
                 } else {
                     ControlSkinBitmaps(
                         images = images,
-                        pressed = decodeAll(pack.pressed),
+                        pressed = pressedImages,
                         opacity = pack.opacity,
                         tintFilter = pack.tint?.let { ColorFilter.tint(Color(it), BlendMode.Modulate) },
                         pressEffect = pack.pressEffect
